@@ -1,3 +1,10 @@
+## Usage
+- `./main audios/[FILENAME]`
+- output JSON `charts/[FILENAME]`
+
+- `bun install`
+- `bun run dev`
+
 ## Dependencies
 
 ### Backend
@@ -6,7 +13,7 @@
 - `nlohmann-json`
 ### Frontend
 - ~[](https://docs.nativescript.org/setup/macos)~ FUCK THIS WE DOING WEBAPP
-
+- [Bun](https://bun.sh/)
 
 ## JSON
 - scanline (can have multiples)
