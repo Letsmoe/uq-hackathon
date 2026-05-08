@@ -4,10 +4,13 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 
+#include <fstream>
 #include <iostream>
 #include <sndfile.h>
 #include <nlohmann/json.hpp>
+
 
 struct AudioInfo {
     float bpm;
@@ -178,7 +181,21 @@ int main(int argc, char *argv[]) {
         chart["page_list"] = buildPageList(audio.bpm, audio.duration_sec);
         chart["note_list"] = buildNoteList(audio.bpm, audio.duration_sec);
 
-        std::cout << chart.dump(2) << std::endl;
+        // std::cout << chart.dump(2) << std::endl;
+
+        std::string input(argv[1]);
+
+        std::string filename = input.substr(input.find_last_of("/\\") + 1);
+        std::string stem = filename.substr(0, filename.find_last_of('.'));
+
+        std::filesystem::create_directories("charts");
+        std::string outpath = "charts/" + stem + ".json";
+
+        std::ofstream out(outpath);
+        out << chart.dump(2);
+        out.close();
+
+        std::cout << "Saved " << outpath << std::endl;
     } catch (const std::exception &e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
