@@ -97,7 +97,6 @@ Page redundent?
 	],
 	"note_list": [
 		{
-	      "page_index": 0,
 	      "type": 0,
 	      "id": 0,
 	      "tick": 69,
@@ -105,7 +104,6 @@ Page redundent?
 	      "duration": 0
 	    },
 	    {
-	      "page_index": 0,
 	      "type": 2,
 	      "id": 1,
 	      "tick": 420,
@@ -113,7 +111,6 @@ Page redundent?
 	      "duration": 240
 	    },
 	    {
-		  "page_index": 1,
 		  "type": 3,
 		  "id": 2,
 		  "nodes": [

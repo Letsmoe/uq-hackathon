@@ -14,8 +14,6 @@ struct AudioInfo {
     float duration_sec;
 };
 
-
-
 float detectBPM(const std::vector<float>& mono, int sampleRate) {
     // Compute energy envelope (RMS over windows)
     const int windowSize = 1024;
@@ -32,7 +30,7 @@ float detectBPM(const std::vector<float>& mono, int sampleRate) {
     float energyRate = (float)sampleRate / windowSize;
 
     int minLag = (int)(energyRate * 60.0f / 200.0f); // 200 BPM max
-    int maxLag = (int)(energyRate * 40.0f / 40.0f);  // 40 BPM min
+    int maxLag = (int)(energyRate * 60.0f / 50.0f);  // 50 BPM min
 
     std::vector<float> autocorr(maxLag + 1, 0);
     for (int lag = minLag; lag <= maxLag; lag++) {
@@ -55,7 +53,7 @@ float detectBPM(const std::vector<float>& mono, int sampleRate) {
     float bpm = 60.0f * energyRate / bestLag;
 
     while (bpm > 0 && bpm > 200) bpm /= 2;
-    while (bpm > 0 && bpm < 40)  bpm *= 2;
+    while (bpm > 0 && bpm < 50)  bpm *= 2;
 
     return bpm;
 }
@@ -120,7 +118,7 @@ AudioInfo detectAudio(const char *path) {
 //     };
 // }
 
-nlohmann::json buildPageList(float bpm, float duration_sec, int time_base = 480, int beats_per_page = 2) {
+nlohmann::json buildPageList(float bpm, float duration_sec, int time_base = 480, int beats_per_page = 4) {
     const int ticks_per_page = time_base * beats_per_page;
     const float seconds_per_tick = 60.0f / (bpm * time_base);
     const int total_ticks = (int)(duration_sec / seconds_per_tick);
@@ -141,6 +139,26 @@ nlohmann::json buildPageList(float bpm, float duration_sec, int time_base = 480,
     return page_list;
 }
 
+nlohmann::json buildNoteList(float bpm, float duration_sec, int time_base = 480) {
+    const float seconds_per_tick = 60.0f / (bpm * time_base);
+    const int total_ticks = (int)(duration_sec / seconds_per_tick);
+
+    nlohmann::json note_list = nlohmann::json::array();
+    int id = 0;
+
+    for (int tick = 0; tick < total_ticks; tick += time_base) {
+        note_list.push_back({
+            {"type", 0},
+            {"id", id++},
+            {"tick", tick},
+            {"x", 0.5},
+            {"duration", 0}
+        });
+    }
+
+    return note_list;
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         std::cerr << "Usage: bpmdetect <file.wav>" << std::endl;
@@ -158,9 +176,9 @@ int main(int argc, char *argv[]) {
         chart["time_base"] = 480;
         chart["start_offset_time"] = 0;
         chart["page_list"] = buildPageList(audio.bpm, audio.duration_sec);
-        chart["note_list"] = nlohmann::json::array();
+        chart["note_list"] = buildNoteList(audio.bpm, audio.duration_sec);
 
-        // std::cout << chart.dump(2) << std::endl;
+        std::cout << chart.dump(2) << std::endl;
     } catch (const std::exception &e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
