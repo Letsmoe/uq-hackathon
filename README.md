@@ -76,8 +76,8 @@ TBD units
 	- 2: hold
 	- 3: drag (nested)
 
-TBD what do if a hold goes more than one page
-
+TBD what do if a hold goes more than one page - fron
+Page redundent?
 ```json
 {
 	"time_base": 480,
