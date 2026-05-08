@@ -3,6 +3,7 @@
 ### Backend
 - [sound-touch](https://www.surina.net/soundtouch/readme.html)
 - `/opt/homebrew/bin/brew install sound-touch libsndfile`
+- `nlohmann-json`
 ### Frontend
 - ~[](https://docs.nativescript.org/setup/macos)~ FUCK THIS WE DOING WEBAPP
 
@@ -15,11 +16,11 @@
 	- type
 	- timestamp
 	- coordinate
-		- TBD pixel/ grid/ ratio
+		- ratio
 TBD units
-TBD who manage the drag thingy connect lines (its more of a visual thing so i believe frontend)
+~TBD who manage the drag thingy connect lines (its more of a visual thing so i believe frontend)~ Connect lines of an array, nested notes
 
-```json
+<!-- ```json
 	{
 	  "scanlines": [
 	    {
@@ -67,6 +68,62 @@ TBD who manage the drag thingy connect lines (its more of a visual thing so i be
 	    }
 	  ]
 	}
+``` -->
+
+- Note types
+	- 0: tap
+	- 1: swipe
+	- 2: hold
+	- 3: drag (nested)
+
+TBD what do if a hold goes more than one page
+
+```json
+{
+	"time_base": 480,
+	"start_offset_time": 0,
+	"page_list": [
+		{
+	      "start_tick": 0,
+	      "end_tick": 1920, // 2~4 beats per page
+	      "scan_line_direction": -1
+	    },
+	    {
+	      "start_tick": 1920,
+	      "end_tick": 3840,
+	      "scan_line_direction": 1
+	    },
+	    //...
+	],
+	"note_list": [
+		{
+	      "page_index": 0,
+	      "type": 0,
+	      "id": 0,
+	      "tick": 69,
+	      "x": 0.42069,
+	      "duration": 0
+	    },
+	    {
+	      "page_index": 0,
+	      "type": 2,
+	      "id": 1,
+	      "tick": 420,
+	      "x": 0.42069,
+	      "duration": 240
+	    },
+	    {
+		  "page_index": 1,
+		  "type": 3,
+		  "id": 2,
+		  "nodes": [
+		    { "tick": 2400, "x": 0.420, "duration": 0 },
+		    { "tick": 2520, "x": 0.690, "duration": 0 }
+		  ]
+		}
+	]
+}
+
 ```
 
 
@@ -74,13 +131,19 @@ TBD who manage the drag thingy connect lines (its more of a visual thing so i be
 ### Main
 - EZ Mode (Half speed scanlines)
 - HD Mode (Full speed scanlines)
+- Scanline
+	- Formulas
+	`time_in_sec = 60*tick/bpm/time_base`
+
 - Tap note at beats
 - Reasonable layout of notes for gameplay
+	- [Patterns](https://sites.google.com/site/cytoidcommunity/charting/extra-information-on-charting/patterns)
 - Audio upload & send to backend
 - A scoring system
 	- Hit accuracy metric
 	- counter
 	- overall scores
+	- https://cytus.fandom.com/wiki/Combo
 
 
 ### Advanced

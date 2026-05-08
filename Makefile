@@ -1,16 +1,24 @@
 CXX = g++
-CXXFLAGS = -std=c++11
-INCLUDES = -I/opt/homebrew/include
-LDFLAGS = -L/opt/homebrew/lib
+
+SOUNDTOUCH_PREFIX := $(shell brew --prefix sound-touch)
+SNDFILE_PREFIX    := $(shell brew --prefix libsndfile)
+NLOHMANN_PREFIX   := $(shell brew --prefix nlohmann-json)
+
+CXXFLAGS = -std=c++17 -Wall \
+  -I$(NLOHMANN_PREFIX)/include \
+  -I$(SOUNDTOUCH_PREFIX)/include \
+  -I$(SNDFILE_PREFIX)/include
+
+LDFLAGS = -L$(SOUNDTOUCH_PREFIX)/lib \
+          -L$(SNDFILE_PREFIX)/lib
+
 LIBS = -lSoundTouch -lsndfile
 
-TARGET = bpmdetect
-SRC = bpmdetect.cpp
+TARGET = main
+SRC = main.cpp
 
 $(TARGET): $(SRC)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $(SRC) -o $(TARGET) $(LDFLAGS) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS) $(LIBS)
 
 clean:
 	rm -f $(TARGET)
-
-.PHONY: clean
