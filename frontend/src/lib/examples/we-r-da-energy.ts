@@ -93,6 +93,7 @@ function songFromJson(json: SongJson): Song {
     bpm,
     length,
     notes,
+    audioUrl: "/Metrik - We Are The Energy.mp3",
     player: rawJson
   };
 }

@@ -56,6 +56,11 @@
     scanner: [0, 1, 1, 1] as RGBA,
   };
 
+
+  // AUDIOOOOOO
+  // svelte-ignore state_referenced_locally
+  const audio = new Audio(song.audioUrl);
+
   // ── Types local to this component ─────────────────────────────
   type Quality = "perfect" | "good" | "bad" | "miss";
 
@@ -431,6 +436,7 @@
         else if (countdownTimer < 3.5)
           countdown = 0; // shows 'GO'
         else {
+        	audio.play()
           phase = "playing";
           songTime = 0;
         }
@@ -439,7 +445,7 @@
       // ── Playing phase ──────────────────────────────────────
       if (phase === "playing") {
         // Use AudioContext clock for precise timing if available
-        songTime = ac ? ac.currentTime - songStartAC : songTime + dt;
+        songTime = audio ? audio.currentTime - songStartAC : songTime + dt;
 
         const finished = gameState!.update(songTime, songLength);
         if (finished) {
@@ -580,11 +586,11 @@
     if (phase === "playing") {
       phase = "paused";
       showPause = true;
-      ac?.suspend();
+      audio.pause();
     } else if (phase === "paused") {
       phase = "playing";
       showPause = false;
-      if (ac?.state === "suspended") ac.resume();
+      if (audio.paused) audio.play();
     }
   }
 
