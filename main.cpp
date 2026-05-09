@@ -325,6 +325,7 @@ nlohmann::json buildNoteList(
             simultaneousPairs(pattern)
         });
     }
+}
 
     auto directionAt = [&](int tick) -> int {
         int page = tick / ticksPerPage;
@@ -344,7 +345,7 @@ nlohmann::json buildNoteList(
     const float X_MAX = 0.9f;
 
     std::mt19937 rng(42069);
-    std::uniform_int_distribution<int> pickPat(0, (int)pool.size() - 1);
+    std::uniform_int_distribution<int> pick_pat(0, (int)pool.size() - 1);
 
     std::map<int, int> tickCounts;
 
@@ -408,8 +409,8 @@ nlohmann::json buildNoteList(
         const int MAX_TRIES = 8;
         bool placed = false;
 
-        for (int attempt = 0; attempt < MAX_TRIES && !placed; ++attempt) {
-            int pi = pickPat(rng);
+        for (int attempt = 0; attempt < max_tries && !placed; ++attempt) {
+            int          pi = pick_pat(rng);
             PatternMeta& pm = meta[pi];
 
             if (pm.isStream && streamStreak >= 4) {
@@ -513,7 +514,7 @@ nlohmann::json buildNoteList(
             int unscaledSpan = pm.span;
             int scaledSpan = unscaledSpan * scale;
 
-            auto transformTick = [&](int t) -> int {
+            auto transform_tick = [&](int t) -> int {
                 int scaled = t * scale;
                 return beatTick + (direction == -1 ? scaledSpan - scaled : scaled);
             };
@@ -671,7 +672,7 @@ char* analyze_audio_json(
         chart["bpm"] = audio.bpm;
         chart["time_base"] = timeBase;
         chart["start_offset_time"] = 0;
-        chart["length"] = audio.duration_sec;
+        chart["length"]            = audio.duration_sec;
 
         chart["page_list"] = buildPageList(
             audio.bpm,
