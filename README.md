@@ -101,6 +101,7 @@ TBD what do if a hold goes more than one page - fron
 Page redundent?
 ```json
 {
+	"audio_file": "Chungusii is the stoinkily.mp3",
 	"time_base": 480,
 	"start_offset_time": 0,
 	"page_list": [
@@ -162,6 +163,7 @@ Page redundent?
 - Scale notes according to screensize
 - Tap note at beats
 - progress bar (RGB)
+- restart button when paused
 - Reasonable layout of notes for gameplay
 	- [Patterns](https://sites.google.com/site/cytoidcommunity/charting/extra-information-on-charting/patterns)
 - **Audio upload & send to backend**

@@ -1,6 +1,3 @@
-#include <soundtouch/SoundTouch.h>
-#include <soundtouch/BPMDetect.h>
-
 #include <vector>
 #include <algorithm>
 #include <cmath>
@@ -462,12 +459,11 @@ static void emitStreamCounterHold(
 nlohmann::json buildNoteList(float bpm, float duration_sec,
                              const nlohmann::json& patterns_json,
                              int time_base      = 480,
-                             int beats_per_page = 4)
+                             int scale = 4)
 {
-    const int   scale            = beats_per_page;
     const float seconds_per_tick = 60.0f / (bpm * time_base);
     const int   total_ticks      = (int)(duration_sec / seconds_per_tick);
-    const int   ticks_per_page   = time_base * beats_per_page;
+    const int   ticks_per_page   = time_base * scale;
 
     // Build pattern pool and precomputed metadata.
     std::vector<nlohmann::json> pool;
@@ -612,6 +608,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Duration: " << audio.duration_sec << "s" << std::endl;
 
         nlohmann::json chart;
+        chart["audio_file"]        = argv[1];
         chart["bpm"]               = audio.bpm;
         chart["time_base"]         = 480;
         chart["start_offset_time"] = 0;
