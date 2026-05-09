@@ -5,7 +5,7 @@
   import SongOverlay from "./lib/SongOverlay.svelte";
   import type { Song } from "./lib/types";
   import RhythmCanvas from "./lib/RhythmCanvas.svelte";
-  import { exampleSong } from "./lib/examples/neon-pulse";
+  import { exampleSong } from "./lib/examples/we-r-da-energy";
   let screen: HTMLElement = $state(undefined!);
   let width = $state(0);
   let height = $state(0);
