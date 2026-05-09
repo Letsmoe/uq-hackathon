@@ -9,7 +9,7 @@
 ### Frontend
 - Music not playing
 - nowhere to set scanline speed(?) currently one page is approx two pages (at least on mac)
-- Drags (type 3) and swipes (type 1) not rendering successfully
+- Drags (type 3) and swipes (type 1) not rendering correctly
 ### Backend
 - the pattern generator is trash
 
