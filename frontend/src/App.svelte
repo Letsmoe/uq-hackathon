@@ -125,15 +125,15 @@
           <!-- ── Row 1: Logo + Header ──────────────────────────────────────── -->
           <Logo></Logo>
           <div class="col-span-2">
-            <UserHeader
-              username="ink"
-              rating={12.41}
-              ratingCurrent={2430}
-              ratingMax={8000}
-              fragments={8756}
-              memories={315}
-              avatarSrc="/ellasy.png"
-            />
+            <!-- <UserHeader -->
+            <!--   username="ink" -->
+            <!--   rating={12.41} -->
+            <!--   ratingCurrent={2430} -->
+            <!--   ratingMax={8000} -->
+            <!--   fragments={8756} -->
+            <!--   memories={315} -->
+            <!--   avatarSrc="/ellasy.png" -->
+            <!-- /> -->
           </div>
 
           <!-- ── Row 2: Main area ──────────────────────────────────────────── -->
@@ -152,7 +152,7 @@
             <div class="grid grid-cols-[1fr_2fr_1fr] items-end pb-4">
               <!-- Recently played -->
               <div class="flex items-end">
-                <RecentlyPlayed />
+                <!-- <RecentlyPlayed /> -->
               </div>
 
               <!-- Song info + start button -->

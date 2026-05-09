@@ -46,23 +46,23 @@
   <!-- Bottom info bar -->
   <div class="flex flex-row items-center justify-end gap-4">
     <!-- Notifications -->
-    <div class="flex flex-row items-center gap-2">
-      <span class="text-[0.6rem] tracking-[0.2em] text-on-surface/35 uppercase"
-        >Notifications</span
-      >
-      <span
-        class="text-[0.6rem] font-semibold bg-accent-purple text-white px-1.5 py-0.5 leading-none"
-      >
-        {notifications}
-      </span>
-    </div>
+    <!-- <div class="flex flex-row items-center gap-2"> -->
+    <!--   <span class="text-[0.6rem] tracking-[0.2em] text-on-surface/35 uppercase" -->
+    <!--     >Notifications</span -->
+    <!--   > -->
+    <!--   <span -->
+    <!--     class="text-[0.6rem] font-semibold bg-accent-purple text-white px-1.5 py-0.5 leading-none" -->
+    <!--   > -->
+    <!--     {notifications} -->
+    <!--   </span> -->
+    <!-- </div> -->
 
     <!-- Divider -->
     <div class="w-px h-3 bg-on-surface-light/15"></div>
 
     <!-- Version -->
     <span class="text-[0.6rem] tracking-[0.2em] text-on-surface/35 uppercase"
-      >Update {version}</span
+      >Version {version}</span
     >
   </div>
 </div>
