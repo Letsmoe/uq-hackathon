@@ -5,6 +5,15 @@
 - `bun install`
 - `bun run dev`
 
+## ISSUES
+### Frontend
+- Music not playing
+- nowhere to set scanline speed(?) currently one page is approx two pages (at least on mac)
+- Drags (type 3) and swipes (type 1) not rendering successfully
+### Backend
+- the pattern generator is trash
+
+
 ## Dependencies
 
 ### Backend
@@ -135,14 +144,14 @@ Page redundent?
 ### Main
 - EZ Mode (Half speed scanlines)
 - HD Mode (Full speed scanlines)
-- Scanline
+- **Scanline**
 	- Formulas
 	`time_in_sec = 60*tick/bpm/time_base`
 
 - Tap note at beats
 - Reasonable layout of notes for gameplay
 	- [Patterns](https://sites.google.com/site/cytoidcommunity/charting/extra-information-on-charting/patterns)
-- Audio upload & send to backend
+- **Audio upload & send to backend**
 - A scoring system
 	- Hit accuracy metric
 	- counter

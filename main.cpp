@@ -146,7 +146,7 @@ nlohmann::json buildPageList(float bpm,
     return page_list;
 }
 
-nlohmann::json buildNoteList(float bpm, float duration_sec, int time_base = 480) {
+nlohmann::json buildNoteListOLD(float bpm, float duration_sec, int time_base = 480) {
     const float seconds_per_tick = 60.0f / (bpm * time_base);
     const int total_ticks = (int)(duration_sec / seconds_per_tick);
 
@@ -221,171 +221,171 @@ static int patternSpan(const nlohmann::json& notes)
     return last;
 }
 
-// nlohmann::json buildNoteList(float bpm, float duration_sec,
-//                              const nlohmann::json& patterns_json,
-//                              int time_base = 480,
-//                              int beats_per_page = 4)
-// {
-//     const int   scale            = beats_per_page;
-//     const float seconds_per_tick = 60.0f / (bpm * time_base);
-//     const int   total_ticks      = (int)(duration_sec / seconds_per_tick);
-//     const int   ticks_per_page   = time_base * beats_per_page;
+nlohmann::json buildNoteList(float bpm, float duration_sec,
+                             const nlohmann::json& patterns_json,
+                             int time_base = 480,
+                             int beats_per_page = 4)
+{
+    const int   scale            = beats_per_page;
+    const float seconds_per_tick = 60.0f / (bpm * time_base);
+    const int   total_ticks      = (int)(duration_sec / seconds_per_tick);
+    const int   ticks_per_page   = time_base * beats_per_page;
 
-//     // pattern pool
-//     std::vector<nlohmann::json> pool;
-//     for (auto& [level_name, level] : patterns_json["patterns"].items()) {
-//         for (auto& [key, val] : level.items()) {
-//             if (!key.empty() && key[0] == '_') continue;
-//             collectPatterns(val, pool);
-//         }
-//     }
+    // pattern pool
+    std::vector<nlohmann::json> pool;
+    for (auto& [level_name, level] : patterns_json["patterns"].items()) {
+        for (auto& [key, val] : level.items()) {
+            if (!key.empty() && key[0] == '_') continue;
+            collectPatterns(val, pool);
+        }
+    }
 
-//     // precompute x-extents and spans (unscaled ticks)
-//     struct PatternMeta {
-//         float lo, hi;   // relative x extent (first-note x = 0)
-//         int   span;     // last tick (unscaled)
-//     };
-//     std::vector<PatternMeta> meta;
-//     meta.reserve(pool.size());
-//     for (auto& p : pool) {
-//         auto [lo, hi] = patternXExtent(p);
-//         meta.push_back({lo, hi, patternSpan(p)});
-//     }
+    // precompute x-extents and spans (unscaled ticks)
+    struct PatternMeta {
+        float lo, hi;   // relative x extent (first-note x = 0)
+        int   span;     // last tick (unscaled)
+    };
+    std::vector<PatternMeta> meta;
+    meta.reserve(pool.size());
+    for (auto& p : pool) {
+        auto [lo, hi] = patternXExtent(p);
+        meta.push_back({lo, hi, patternSpan(p)});
+    }
 
-//     // precompute page directions
-//     auto directionAt = [&](int tick) -> int {
-//         int page = tick / ticks_per_page;
-//         // buildPageList starts direction at -1 and flips each page
-//         return (page % 2 == 0) ? -1 : 1;
-//     };
+    // precompute page directions
+    auto directionAt = [&](int tick) -> int {
+        int page = tick / ticks_per_page;
+        // buildPageList starts direction at -1 and flips each page
+        return (page % 2 == 0) ? -1 : 1;
+    };
 
-//     // Walk beats, placing patterns spatially ────────────────────────────
-//     // Active placements: track which x-intervals are occupied and until when.
-//     struct Active {
-//         float lo, hi;      // absolute x interval
-//         int   ends_at;     // tick at which this pattern finishes
-//     };
-//     std::vector<Active> active;
+    // Walk beats, placing patterns spatially ────────────────────────────
+    // Active placements: track which x-intervals are occupied and until when.
+    struct Active {
+        float lo, hi;      // absolute x interval
+        int   ends_at;     // tick at which this pattern finishes
+    };
+    std::vector<Active> active;
 
-//     const float X_GAP   = 0.05f;  // minimum gap between patterns in x
-//     const float X_MAX   = 1.0f;   // screen width
+    const float X_GAP   = 0.05f;  // minimum gap between patterns in x
+    const float X_MAX   = 0.9f;   // 0.9*screen width
 
-//     std::mt19937 rng(42);
-//     std::uniform_int_distribution<int> pickPat(0, (int)pool.size() - 1);
+    std::mt19937 rng(42069);
+    std::uniform_int_distribution<int> pickPat(0, (int)pool.size() - 1);
 
-//     nlohmann::json note_list = nlohmann::json::array();
-//     int id = 0;
+    nlohmann::json note_list = nlohmann::json::array();
+    int id = 0;
 
-//     for (int beat_tick = 0; beat_tick < total_ticks; beat_tick += time_base) {
-//         // Remove patterns that have ended
-//         active.erase(std::remove_if(active.begin(), active.end(),
-//             [&](const Active& a){ return a.ends_at <= beat_tick; }),
-//             active.end());
+    for (int beat_tick = 0; beat_tick < total_ticks; beat_tick += time_base) {
+        // Remove patterns that have ended
+        active.erase(std::remove_if(active.begin(), active.end(),
+            [&](const Active& a){ return a.ends_at <= beat_tick; }),
+            active.end());
 
-//         // Collect free x-intervals (gaps between / around active patterns)
-//         // Sort active by lo
-//         std::vector<std::pair<float,float>> occupied;
-//         for (auto& a : active) occupied.push_back({a.lo, a.hi});
-//         std::sort(occupied.begin(), occupied.end());
+        // Collect free x-intervals (gaps between / around active patterns)
+        // Sort active by lo
+        std::vector<std::pair<float,float>> occupied;
+        for (auto& a : active) occupied.push_back({a.lo, a.hi});
+        std::sort(occupied.begin(), occupied.end());
 
-//         // Build free segments: gaps in [0, X_MAX] not covered by occupied
-//         std::vector<std::pair<float,float>> free_segs;
-//         float cursor = 0.f;
-//         for (auto& [olo, ohi] : occupied) {
-//             float gap_start = cursor;
-//             float gap_end   = olo - X_GAP;
-//             if (gap_end > gap_start + 0.01f)
-//                 free_segs.push_back({gap_start, gap_end});
-//             cursor = ohi + X_GAP;
-//         }
-//         if (cursor < X_MAX - 0.01f)
-//             free_segs.push_back({cursor, X_MAX});
+        // Build free segments: gaps in [0.1, 0.9] not covered by occupied
+        std::vector<std::pair<float,float>> free_segs;
+        float cursor = 0.1f;
+        for (auto& [olo, ohi] : occupied) {
+            float gap_start = cursor;
+            float gap_end   = olo - X_GAP;
+            if (gap_end > gap_start + 0.2f)
+                free_segs.push_back({gap_start, gap_end});
+            cursor = ohi + X_GAP;
+        }
+        if (cursor < X_MAX - 0.2f)
+            free_segs.push_back({cursor, X_MAX});
 
-//         if (free_segs.empty()) continue; // no room at all this beat
+        if (free_segs.empty()) continue; // no room at all this beat
 
-//         // Try a random pattern; retry a few times if it doesn't fit
-//         const int MAX_TRIES = 20;
-//         bool placed = false;
-//         for (int attempt = 0; attempt < MAX_TRIES && !placed; ++attempt) {
-//             int pi = pickPat(rng);
-//             PatternMeta& pm = meta[pi];
-//             float width  = pm.hi - pm.lo;  // total x span of pattern
+        // Try a random pattern; retry a few times if it doesn't fit
+        const int MAX_TRIES = 5;
+        bool placed = false;
+        for (int attempt = 0; attempt < MAX_TRIES && !placed; ++attempt) {
+            int pi = pickPat(rng);
+            PatternMeta& pm = meta[pi];
+            float width  = pm.hi - pm.lo;  // total x span of pattern
 
-//             // Find free segments wide enough
-//             std::vector<int> candidates;
-//             for (int si = 0; si < (int)free_segs.size(); ++si) {
-//                 auto [fs, fe] = free_segs[si];
-//                 if (fe - fs >= width + 0.001f)
-//                     candidates.push_back(si);
-//             }
-//             if (candidates.empty()) continue;
+            // Find free segments wide enough
+            std::vector<int> candidates;
+            for (int si = 0; si < (int)free_segs.size(); ++si) {
+                auto [fs, fe] = free_segs[si];
+                if (fe - fs >= width + 0.2f)
+                    candidates.push_back(si);
+            }
+            if (candidates.empty()) continue;
 
-//             // Pick a random candidate segment
-//             int si = candidates[rng() % candidates.size()];
-//             auto [fs, fe] = free_segs[si];
+            // Pick a random candidate segment
+            int si = candidates[rng() % candidates.size()];
+            auto [fs, fe] = free_segs[si];
 
-//             // Random anchor within the segment so pattern fits
-//             // anchor = absolute x of pattern's first note (offset 0)
-//             // pattern spans [anchor + pm.lo, anchor + pm.hi]
-//             // must have: anchor + pm.lo >= fs  →  anchor >= fs - pm.lo
-//             //            anchor + pm.hi <= fe  →  anchor <= fe - pm.hi
-//             float anchor_min = fs - pm.lo;
-//             float anchor_max = fe - pm.hi;
-//             std::uniform_real_distribution<float> pickX(anchor_min, anchor_max);
-//             float anchor = pickX(rng);
+            // Random anchor within the segment so pattern fits
+            // anchor = absolute x of pattern's first note (offset 0)
+            // pattern spans [anchor + pm.lo, anchor + pm.hi]
+            // must have: anchor + pm.lo >= fs  →  anchor >= fs - pm.lo
+            //            anchor + pm.hi <= fe  →  anchor <= fe - pm.hi
+            float anchor_min = fs - pm.lo;
+            float anchor_max = fe - pm.hi;
+            std::uniform_real_distribution<float> pickX(anchor_min, anchor_max);
+            float anchor = pickX(rng);
 
-//             // ── Emit notes ───────────────────────────────────────────────────
-//             int direction    = directionAt(beat_tick);
-//             int unscaled_span = pm.span;
-//             int scaled_span  = unscaled_span * scale;
+            // ── Emit notes ───────────────────────────────────────────────────
+            int direction    = directionAt(beat_tick);
+            int unscaled_span = pm.span;
+            int scaled_span  = unscaled_span * scale;
 
-//             const nlohmann::json& notes = pool[pi];
-//             int n_notes = (int)notes.size();
+            const nlohmann::json& notes = pool[pi];
+            int n_notes = (int)notes.size();
 
-//             for (int ni = 0; ni < n_notes; ++ni) {
-//                 // When direction == -1, reverse tick order within the pattern:
-//                 // a note at tick T becomes tick (span - T) so the pattern
-//                 // plays "upside-down" along the scanline.
-//                 int src = (direction == -1) ? (n_notes - 1 - ni) : ni;
-//                 nlohmann::json note = notes[src];
+            for (int ni = 0; ni < n_notes; ++ni) {
+                // When direction == -1, reverse tick order within the pattern:
+                // a note at tick T becomes tick (span - T) so the pattern
+                // plays "upside-down" along the scanline.
+                int src = (direction == -1) ? (n_notes - 1 - ni) : ni;
+                nlohmann::json note = notes[src];
 
-//                 auto transformTick = [&](int t) -> int {
-//                     int scaled = t * scale;
-//                     return beat_tick + (direction == -1 ? scaled_span - scaled : scaled);
-//                 };
+                auto transformTick = [&](int t) -> int {
+                    int scaled = t * scale;
+                    return beat_tick + (direction == -1 ? scaled_span - scaled : scaled);
+                };
 
-//                 if (note.contains("nodes")) {
-//                     // Drag note: transform each node
-//                     auto& nodes = note["nodes"];
-//                     // If reversed, also reverse node order within the drag
-//                     if (direction == -1) {
-//                         std::reverse(nodes.begin(), nodes.end());
-//                     }
-//                     for (auto& node : nodes) {
-//                         node["tick"] = transformTick((int)node["tick"]);
-//                         node["x"]    = anchor + (float)node["x"];
-//                     }
-//                 } else {
-//                     int orig_tick     = note["tick"];
-//                     int orig_duration = note.value("duration", 0);
-//                     note["tick"]      = transformTick(orig_tick);
-//                     note["duration"]  = orig_duration * scale;
-//                     note["x"]         = anchor + (float)note["x"];
-//                 }
+                if (note.contains("nodes")) {
+                    // Drag note: transform each node
+                    auto& nodes = note["nodes"];
+                    // If reversed, also reverse node order within the drag
+                    if (direction == -1) {
+                        std::reverse(nodes.begin(), nodes.end());
+                    }
+                    for (auto& node : nodes) {
+                        node["tick"] = transformTick((int)node["tick"]);
+                        node["x"]    = anchor + (float)node["x"];
+                    }
+                } else {
+                    int orig_tick     = note["tick"];
+                    int orig_duration = note.value("duration", 0);
+                    note["tick"]      = transformTick(orig_tick);
+                    note["duration"]  = orig_duration * scale;
+                    note["x"]         = anchor + (float)note["x"];
+                }
 
-//                 note["id"] = id++;
-//                 note_list.push_back(note);
-//             }
+                note["id"] = id++;
+                note_list.push_back(note);
+            }
 
-//             // Register as active
-//             active.push_back({anchor + pm.lo, anchor + pm.hi,
-//                               beat_tick + scaled_span});
-//             placed = true;
-//         }
-//     }
+            // Register as active
+            active.push_back({anchor + pm.lo, anchor + pm.hi,
+                              beat_tick + scaled_span});
+            placed = true;
+        }
+    }
 
-//     return note_list;
-// }
+    return note_list;
+}
 
 
 int main(int argc, char *argv[]) {
@@ -405,17 +405,18 @@ int main(int argc, char *argv[]) {
         chart["bpm"] = audio.bpm;
         chart["time_base"] = 480;
         chart["start_offset_time"] = 0;
+        chart["length"] = audio.duration_sec;
 
         int beats_per_page = 4;
         chart["page_list"] = buildPageList(audio.bpm, audio.duration_sec, chart["time_base"], beats_per_page);
 
         // Load patterns.json
-        // std::ifstream patterns_file("patterns.json");
-        // nlohmann::json patterns_json;
-        // patterns_file >> patterns_json;
+        std::ifstream patterns_file("patterns.json");
+        nlohmann::json patterns_json;
+        patterns_file >> patterns_json;
 
-        // chart["note_list"] = buildNoteList(audio.bpm, audio.duration_sec, patterns_json, chart["time_base"], beats_per_page);
-        chart["note_list"] = buildNoteList(audio.bpm, audio.duration_sec);
+        chart["note_list"] = buildNoteList(audio.bpm, audio.duration_sec, patterns_json, chart["time_base"], beats_per_page);
+        // chart["note_list"] = buildNoteListOLD(audio.bpm, audio.duration_sec);
 
         // std::cout << chart.dump(2) << std::endl;
 

@@ -11,7 +11,7 @@ interface JsonNode {
 
 interface JsonNote {
   id?: number;
-  type: 0 | 2 | 3;
+  type: 0 | 1 | 2 | 3;
   // type 0 (tap) and type 2 (hold)
   tick?: number;
   duration?: number;
@@ -39,6 +39,13 @@ function songFromJson(json: SongJson): Song {
       const beat = n.tick! / time_base;
       maxTick = Math.max(maxTick, n.tick!);
       return [{ beat, x: n.x!, type: "tap" }];
+    }
+
+    if (n.type === 1) {
+      // Swipe
+      const beat = n.tick! / time_base;
+      maxTick = Math.max(maxTick, n.tick!);
+      return [{ beat, x: n.x!, type: "swipe" }];
     }
 
     if (n.type === 2) {
