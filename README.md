@@ -147,8 +147,11 @@ Page redundent?
 
 ## Features
 ### Main
-- EZ Mode (Half speed scanlines)
-- HD Mode (Full speed scanlines)
+- EZ Mode
+	- Half speed scanlines
+	- restrict to level 3 notes
+- HD Mode
+	- Full speed scanlines
 - **Scanline**
 	- Formulas
 	`time_in_sec = 60*tick/bpm/time_base`
