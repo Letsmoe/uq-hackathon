@@ -415,8 +415,8 @@ int main(int argc, char *argv[]) {
         nlohmann::json patterns_json;
         patterns_file >> patterns_json;
 
-        // chart["note_list"] = buildNoteList(audio.bpm, audio.duration_sec, patterns_json, chart["time_base"], beats_per_page);
-        chart["note_list"] = buildNoteListOLD(audio.bpm, audio.duration_sec);
+        chart["note_list"] = buildNoteList(audio.bpm, audio.duration_sec, patterns_json, chart["time_base"], beats_per_page);
+        // chart["note_list"] = buildNoteListOLD(audio.bpm, audio.duration_sec);
 
         // std::cout << chart.dump(2) << std::endl;
 

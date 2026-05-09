@@ -3,13 +3,15 @@
 - output JSON `charts/[FILENAME]`
 
 - `bun install`
-- `bun run dev`
+- `bun run dev --host`
 
 ## ISSUES
 ### Frontend
 - Music not playing
-- nowhere to set scanline speed(?) currently one page is approx two pages (at least on mac)
+- ~nowhere to set scanline speed(?) currently one page is approx two pages (at least on mac)~
 - Drags (type 3) and swipes (type 1) not rendering correctly
+- Doesnt work on iphone browser
+- cannot resume once full screened... maybe fullscreen by default?
 ### Backend
 - the pattern generator is trash
 
@@ -21,7 +23,7 @@
 - `/opt/homebrew/bin/brew install sound-touch libsndfile`
 - `nlohmann-json`
 ### Frontend
-- ~[](https://docs.nativescript.org/setup/macos)~ FUCK THIS WE DOING WEBAPP
+- ~https://docs.nativescript.org/setup/macos~ FUCK THIS WE DOING WEBAPP
 - [Bun](https://bun.sh/)
 
 ## JSON
@@ -33,7 +35,7 @@
 	- timestamp
 	- coordinate
 		- ratio
-TBD units
+TBD units \
 ~TBD who manage the drag thingy connect lines (its more of a visual thing so i believe frontend)~ Connect lines of an array, nested notes
 
 <!-- ```json
@@ -147,6 +149,7 @@ Page redundent?
 - **Scanline**
 	- Formulas
 	`time_in_sec = 60*tick/bpm/time_base`
+
 
 - Tap note at beats
 - Reasonable layout of notes for gameplay
