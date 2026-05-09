@@ -273,6 +273,17 @@ nlohmann::json buildNoteList(float bpm, float duration_sec,
     std::mt19937 rng(42069);
     std::uniform_int_distribution<int> pickPat(0, (int)pool.size() - 1);
 
+    //  Tick density tracking (hard cap: max 3 notes share any one tick)
+    std::map<int, int> tick_counts;
+
+    // Spatial continuity state
+    // prev_center : absolute x of the center of the last successfully placed pattern.
+    // next_mirror : when true the next pattern mirrors around 0.5; when false it
+    //               drifts (gradient) from the previous center. Alternates each beat.
+    float prev_center = 0.5f;
+    bool  has_prev    = false;
+    bool  next_mirror = true;
+
     nlohmann::json note_list = nlohmann::json::array();
     int id = 0;
 
@@ -283,7 +294,6 @@ nlohmann::json buildNoteList(float bpm, float duration_sec,
             active.end());
 
         // Collect free x-intervals (gaps between / around active patterns)
-        // Sort active by lo
         std::vector<std::pair<float,float>> occupied;
         for (auto& a : active) occupied.push_back({a.lo, a.hi});
         std::sort(occupied.begin(), occupied.end());
@@ -301,85 +311,132 @@ nlohmann::json buildNoteList(float bpm, float duration_sec,
         if (cursor < X_MAX - 0.2f)
             free_segs.push_back({cursor, X_MAX});
 
-        if (free_segs.empty()) continue; // no room at all this beat
+        if (free_segs.empty()) continue;
 
-        // Try a random pattern; retry a few times if it doesn't fit
-        const int MAX_TRIES = 5;
+        // Bumped slightly to absorb the extra tick-cap constraint
+        const int MAX_TRIES = 8;
         bool placed = false;
+
         for (int attempt = 0; attempt < MAX_TRIES && !placed; ++attempt) {
             int pi = pickPat(rng);
             PatternMeta& pm = meta[pi];
-            float width  = pm.hi - pm.lo;  // total x span of pattern
 
-            // Find free segments wide enough
+            // prefer mirror or gradient of previous
+            // pat_center_offset: distance from anchor to the pattern's x-center.
+            float pat_center_offset = (pm.lo + pm.hi) / 2.0f;
+            float preferred_center;
+            if (!has_prev) {
+                preferred_center = 0.5f;
+            } else if (next_mirror) {
+                // Mirror: reflect the previous center around the screen midpoint.
+                preferred_center = 1.0f - prev_center;
+            } else {
+                // Gradient: small continuous drift from the previous center.
+                std::uniform_real_distribution<float> drift(-0.15f, 0.15f);
+                preferred_center = prev_center + drift(rng);
+            }
+            float preferred_anchor = preferred_center - pat_center_offset;
+
+            // Find free segments wide enough to hold this pattern
             std::vector<int> candidates;
             for (int si = 0; si < (int)free_segs.size(); ++si) {
                 auto [fs, fe] = free_segs[si];
-                if (fe - fs >= width + 0.2f)
+                if (fe - fs >= (pm.hi - pm.lo) + 0.2f)
                     candidates.push_back(si);
             }
             if (candidates.empty()) continue;
 
-            // Pick a random candidate segment
-            int si = candidates[rng() % candidates.size()];
-            auto [fs, fe] = free_segs[si];
-
-            // Random anchor within the segment so pattern fits
-            // anchor = absolute x of pattern's first note (offset 0)
-            // pattern spans [anchor + pm.lo, anchor + pm.hi]
-            // must have: anchor + pm.lo >= fs  →  anchor >= fs - pm.lo
-            //            anchor + pm.hi <= fe  →  anchor <= fe - pm.hi
+            // Pick the candidate segment whose valid anchor range is closest to
+            // preferred_anchor (spatial coherence beats pure randomness).
+            int best_si = candidates[0];
+            float best_dist = std::numeric_limits<float>::max();
+            for (int si : candidates) {
+                auto [fs, fe] = free_segs[si];
+                float a_min = fs - pm.lo;
+                float a_max = fe - pm.hi;
+                float clamped = std::clamp(preferred_anchor, a_min, a_max);
+                float dist = std::abs(clamped - preferred_anchor);
+                if (dist < best_dist) { best_dist = dist; best_si = si; }
+            }
+            auto [fs, fe] = free_segs[best_si];
             float anchor_min = fs - pm.lo;
             float anchor_max = fe - pm.hi;
-            std::uniform_real_distribution<float> pickX(anchor_min, anchor_max);
-            float anchor = pickX(rng);
 
-            // ── Emit notes ───────────────────────────────────────────────────
-            int direction    = directionAt(beat_tick);
+            // Clamp to valid range then add a small jitter so it isn't mechanical.
+            float anchor_base  = std::clamp(preferred_anchor, anchor_min, anchor_max);
+            float jitter_range = std::min(0.1f, (anchor_max - anchor_min) * 0.5f);
+            std::uniform_real_distribution<float> jitter(-jitter_range, jitter_range);
+            float anchor = std::clamp(anchor_base + jitter(rng), anchor_min, anchor_max);
+
+            // tick density cap
+            // Count ticks this candidate would add; reject if any tick would
+            // exceed 3 total notes (across all simultaneously active patterns).
+            int direction     = directionAt(beat_tick);
             int unscaled_span = pm.span;
-            int scaled_span  = unscaled_span * scale;
+            int scaled_span   = unscaled_span * scale;
 
+            auto transformTick = [&](int t) -> int {
+                int scaled = t * scale;
+                return beat_tick + (direction == -1 ? scaled_span - scaled : scaled);
+            };
+
+            bool tick_ok = true;
+            {
+                std::map<int, int> candidate_counts;
+                for (auto& note : pool[pi]) {
+                    if (note.contains("nodes")) {
+                        for (auto& n : note["nodes"])
+                            candidate_counts[transformTick((int)n["tick"])]++;
+                    } else {
+                        candidate_counts[transformTick((int)note["tick"])]++;
+                    }
+                }
+                for (auto& [t, cnt] : candidate_counts) {
+                    if (tick_counts[t] + cnt > 3) { tick_ok = false; break; }
+                }
+            }
+            if (!tick_ok) continue;
+
+            // Emit notes
             const nlohmann::json& notes = pool[pi];
             int n_notes = (int)notes.size();
 
             for (int ni = 0; ni < n_notes; ++ni) {
-                // When direction == -1, reverse tick order within the pattern:
-                // a note at tick T becomes tick (span - T) so the pattern
-                // plays "upside-down" along the scanline.
+                // When direction == -1, reverse tick order so the pattern plays
+                // "upside-down" along the scanline.
                 int src = (direction == -1) ? (n_notes - 1 - ni) : ni;
                 nlohmann::json note = notes[src];
 
-                auto transformTick = [&](int t) -> int {
-                    int scaled = t * scale;
-                    return beat_tick + (direction == -1 ? scaled_span - scaled : scaled);
-                };
-
                 if (note.contains("nodes")) {
-                    // Drag note: transform each node
                     auto& nodes = note["nodes"];
-                    // If reversed, also reverse node order within the drag
-                    if (direction == -1) {
+                    if (direction == -1)
                         std::reverse(nodes.begin(), nodes.end());
-                    }
                     for (auto& node : nodes) {
-                        node["tick"] = transformTick((int)node["tick"]);
+                        int t = transformTick((int)node["tick"]);
+                        node["tick"] = t;
                         node["x"]    = anchor + (float)node["x"];
+                        tick_counts[t]++;
                     }
                 } else {
                     int orig_tick     = note["tick"];
                     int orig_duration = note.value("duration", 0);
-                    note["tick"]      = transformTick(orig_tick);
-                    note["duration"]  = orig_duration * scale;
-                    note["x"]         = anchor + (float)note["x"];
+                    int t = transformTick(orig_tick);
+                    note["tick"]     = t;
+                    note["duration"] = orig_duration * scale;
+                    note["x"]        = anchor + (float)note["x"];
+                    tick_counts[t]++;
                 }
 
                 note["id"] = id++;
                 note_list.push_back(note);
             }
 
-            // Register as active
+            // Register as active and update spatial continuity state
             active.push_back({anchor + pm.lo, anchor + pm.hi,
                               beat_tick + scaled_span});
+            prev_center = anchor + pat_center_offset;
+            has_prev    = true;
+            next_mirror = !next_mirror;  // alternate mirror ↔ gradient
             placed = true;
         }
     }

@@ -11,9 +11,12 @@
 - ~nowhere to set scanline speed(?) currently one page is approx two pages (at least on mac)~
 - Drags (type 3) and swipes (type 1) not rendering correctly
 - Doesnt work on iphone browser
-- cannot resume once full screened... maybe fullscreen by default?
+- cannot resume once full screened... maybe just fullscreen by default?
 ### Backend
-- the pattern generator is trash
+- the pattern generator
+	- density cap
+	- stream not too often
+	- audio feature analysor, so the patterns actually fit well
 
 
 ## Dependencies
@@ -149,8 +152,10 @@ Page redundent?
 - **Scanline**
 	- Formulas
 	`time_in_sec = 60*tick/bpm/time_base`
-
-- 2 empty scanlines (go down and then up) & silence at the very start would be nice
+	- leave space (5%?) of the top & bottom, so notes dont get cut off
+	- 2 empty scanlines (go down and then up) & silence at the very start would be nice
+	- scanline expand out at the start and squished at the end
+- **drag/ hold/ swipe notes**
 - Scale notes according to screensize
 - Tap note at beats
 - Reasonable layout of notes for gameplay
@@ -165,6 +170,5 @@ Page redundent?
 
 ### Advanced
 - An edit mode for customised mode
-- drag/ hold/ swipe
 - scanline speed change and still makes sense (maybe jump btwn half and full speed)
 - Fancy main page (Chungussi is working on it :3)
