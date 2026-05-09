@@ -10,7 +10,7 @@
     difficulty = "hard" as Difficulty,
     level = $bindable(8),
     maxLevel = 15,
-    bestScore = 923456,
+    bestScore = 0,
     badge = "S",
     onstart = () => {},
   } = $props();

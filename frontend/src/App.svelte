@@ -26,61 +26,19 @@
   // ── Data ───────────────────────────────────────────────────────────────────
   const songs: Song[] = $state([
     {
-      title: "RESONANT",
-      artist: "NIHIL",
+      title: "Unnamed",
+      artist: "Upload",
       badge: "A",
-      cover: "/cover/cover-1.png",
-      description:
-        "A resonance born deep within the void,\nechoes of a forgotten signal.",
+      cover: "/cover/placeholder.png",
+      description: "Upload an mp3 file to get started!",
       difficulty: "normal",
-      level: 6,
-      bestScore: 876543,
-    },
-    {
-      title: "STARDUST",
-      artist: "NHATO",
-      badge: "S",
-      cover: "/cover/cover-2.png",
-      description: "Drift beyond the silence,\nwhere light becomes fragment.",
-      difficulty: "hard",
-      level: 8,
-      bestScore: 923456,
-    },
-    {
-      title: "LUCID DREAMS",
-      artist: "XAFU",
-      badge: "A",
-      cover: "/cover/cover-3.png",
-      description: "Between waking and sleep,\na melody dissolves into colour.",
-      difficulty: "hard",
-      level: 9,
-      bestScore: 901234,
-    },
-    {
-      title: "ECLIPSE",
-      artist: "CAMELLIA",
-      badge: "B",
-      cover: "/cover-image.png",
-      description: "Shadow crosses light,\nmomentarily — then nothing.",
-      difficulty: "expert",
-      level: 12,
-      bestScore: 812300,
-    },
-    {
-      title: "VOID RUNNER",
-      artist: "XI",
-      badge: "S",
-      cover: "/cover-image.png",
-      description:
-        "Racing through the dark between stars,\nno destination, only velocity.",
-      difficulty: "expert",
-      level: 14,
-      bestScore: 988100,
+      level: 0,
+      bestScore: 0,
     },
   ]);
 
   // ── State ──────────────────────────────────────────────────────────────────
-  let selected = $state(1);
+  let selected = $state(0);
   let level = $state(songs[selected].level ?? 8);
   let page = $state<"Menu" | "Game">("Menu");
 
