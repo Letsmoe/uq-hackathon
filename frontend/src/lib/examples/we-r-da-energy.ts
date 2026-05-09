@@ -91,6 +91,7 @@ function songFromJson(json: SongJson): Song {
     bpm,
     length,
     notes,
+    player: rawJson
   };
 }
 

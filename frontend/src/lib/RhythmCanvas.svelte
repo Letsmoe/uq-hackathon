@@ -38,7 +38,7 @@
   const PAD_X = 0.07; // fraction of width
   const LANE_TOP = 0.08; // fraction of height
   const LANE_BOT = 0.92;
-  const NOTE_R = 26; // logical pixels
+  const NOTE_R = 64; // logical pixels
   const HOLD_W = 18;
 
   // ── Timing constants ──────────────────────────────────────────
@@ -93,13 +93,31 @@
   let audioSrc: AudioBufferSourceNode | null = null;
   let songStartAC = 0; // AC.currentTime when beat 0 starts
 
+
   // ── Scanner math ───────────────────────────────────────────────
-  // Returns normalised Y in [0,1] (0=top, 1=bottom) at song time t.
-  function scannerNY(songTime: number, beatLen: number): number {
-    const halfPeriod = SCAN_BEATS * beatLen;
-    const period = halfPeriod * 2;
-    const phase = (((songTime % period) + period) % period) / period;
-    return phase < 0.5 ? phase * 2 : 2 - phase * 2;
+  // Returns normalised Y in [0,1] (0=bottom, 1=top) at song time t.
+  let lastScannerYPosition = 1
+  function getScannerYPosition(song: Song, time: number): number {
+  	// We need to search through all the pages and check which page we're on and then calculate the scanner position from there.
+   const tick = time / (60 / song.bpm) * song.player.time_base;
+   	// We need to search through all the pages and check which page we're on and then calculate the scanner position from there.
+    const segment = song.player.page_list.find(
+      s => tick >= s.start_tick && tick < s.end_tick
+    );
+  
+    if (!segment) {
+      return 0;
+    }
+  
+    const duration = segment.end_tick - segment.start_tick;
+    const progress = (tick - segment.start_tick) / duration;
+ 
+  
+    if (segment.scan_line_direction === 1) {
+      return progress;
+    } else {
+      return 1 - progress;
+    }
   }
 
   // ── Game state class ───────────────────────────────────────────
@@ -109,6 +127,7 @@
   class GameState {
     readonly notes: LiveNote[];
     readonly beatLen: number;
+    readonly song: Song;
 
     private _score = 0;
     private _combo = 0;
@@ -133,6 +152,7 @@
       this.beatLen = 60 / song.bpm;
       const halfPeriod = SCAN_BEATS * this.beatLen;
 
+      this.song = song;
       this.notes = song.notes
         .slice()
         .sort((a, b) => a.beat - b.beat)
@@ -144,8 +164,8 @@
             data: n,
             hitTime,
             holdEnd,
-            scanY: scannerNY(hitTime, this.beatLen),
-            holdEndSY: scannerNY(holdEnd, this.beatLen),
+            scanY: getScannerYPosition(this.song, hitTime),
+            holdEndSY: getScannerYPosition(this.song, holdEnd),
             state: "idle" as const,
             holdProg: 0,
           };
@@ -211,7 +231,7 @@
       const laneTop = LANE_TOP * H;
       const laneBot = LANE_BOT * H;
       const playH = laneBot - laneTop;
-      const scanPxY = laneTop + scannerNY(songTime, this.beatLen) * playH;
+      const scanPxY = laneTop + getScannerYPosition(this.song, songTime) * playH;
 
       let best: LiveNote | null = null;
       let bestScore = -Infinity;
@@ -463,7 +483,7 @@
     const playW = laneRight - laneLeft;
     const playH = laneBot - laneTop;
 
-    const sy = scannerNY(Math.max(0, st), gs.beatLen);
+    const sy = getScannerYPosition(song, Math.max(0, st));
     const scanPxY = laneTop + sy * playH;
     const scroll = (Math.max(0, st) / (SCAN_BEATS * gs.beatLen)) % 1;
 

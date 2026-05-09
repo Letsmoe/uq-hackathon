@@ -68,33 +68,60 @@ precision highp float;
 in vec2 v_uv;
 in vec4 v_color;
 in vec2 v_extra;
-
 out vec4 fragColor;
 
 void main() {
   vec2  uv   = v_uv * 2.0 - 1.0;          // [-1,1]
   float d    = length(uv);
   float glow = v_extra.x;
-  float apT  = v_extra.y;                  // approach ring thickness scale
+  float apT  = v_extra.y;
 
-  // ── Outer ring ───────────────────────────────────────────
-  float ring = smoothstep(1.05, 0.90, d) * smoothstep(0.68, 0.82, d);
+  // ── Colours (tinted by v_color but biased toward the purple look) ──────
+  vec3 baseCol   = mix(vec3(0.55, 0.15, 0.85), v_color.rgb, 0.45); // purple bias
+  vec3 coreCol   = vec3(1.0,  0.85, 1.0);                           // white-pink core
+  vec3 metalCol  = vec3(0.18, 0.18, 0.22);                          // dark bezel
 
-  // ── Inner glow fill ───────────────────────────────────────
-  float inner = smoothstep(0.70, 0.0, d) * 0.30;
+  // ── Outer metallic bezel ring ─────────────────────────────────────────
+  float bezel = smoothstep(1.02, 0.94, d) * smoothstep(0.80, 0.88, d);
 
-  // ── Specular highlight ────────────────────────────────────
-  float spec = smoothstep(0.22, 0.0, length(uv - vec2(-0.30, -0.30)));
+  // ── Subtle inner bevel / shadow just inside bezel ────────────────────
+  float bevelShadow = smoothstep(0.88, 0.80, d) * smoothstep(0.65, 0.78, d) * 0.35;
 
-  // ── Proximity bloom (additive; leaks into surrounding px) ─
-  float bloom = exp(-d * d * 2.5) * glow * 0.55;
+  // ── Purple glow ring ──────────────────────────────────────────────────
+  float ringD   = abs(d - 0.73);
+  float glowRing = smoothstep(0.18, 0.0, ringD);          // soft ring band
+  glowRing *= smoothstep(1.0, 0.60, d);                   // clip outside bezel
 
-  // ── Approach ring (shrinks from apT→0 as scanner nears) ───
-  float approachD = abs(d - (0.95 + apT * 1.8)) / (0.06 + apT * 0.1);
-  float approachR = smoothstep(1.0, 0.0, approachD) * step(0.001, apT) * 0.55;
+  // ── Bright core orb ──────────────────────────────────────────────────
+  float core     = smoothstep(0.30, 0.0,  d);             // solid inner fill
+  float coreHot  = smoothstep(0.10, 0.0,  d);             // extra-bright centre
+  float specDot  = smoothstep(0.08, 0.0,  length(uv - vec2(-0.18, -0.18))); // specular
 
-  float alpha = (ring + inner + spec * 0.5 + approachR) * v_color.a;
-  vec3  col   = v_color.rgb * (1.0 + bloom * 1.4);
+  // ── Radial bloom (bleeds outside disc) ───────────────────────────────
+  float bloom    = exp(-d * d * 3.2) * (glow * 0.7 + 0.25);
+
+  // ── Approach ring ────────────────────────────────────────────────────
+  float approachD = abs(d - (0.95 + apT * 1.8)) / (0.05 + apT * 0.08);
+  float approachR = smoothstep(1.0, 0.0, approachD) * step(0.001, apT) * 0.6;
+
+  // ── Composite ────────────────────────────────────────────────────────
+  // Start with dark metallic bezel, layer glow ring, then hot core
+  vec3 col = vec3(0.0);
+  col += metalCol   * bezel;
+  col -= vec3(0.12) * bevelShadow;                        // darken inner bevel
+  col += baseCol    * glowRing  * 1.8;                    // purple ring
+  col += baseCol    * core      * 1.2;                    // purple fill
+  col += coreCol    * coreHot   * 2.5;                    // white-hot centre
+  col += coreCol    * specDot   * 0.9;                    // specular glint
+  col += baseCol    * bloom     * 1.2;                    // outer bloom tint
+  col += approachR  * baseCol;
+
+  // Overall brightness boost driven by glow uniform
+  col *= 1.0 + glow * 0.6;
+
+  // Alpha: ring + core + approach cover, bloom fades at edges
+  float alpha = clamp(bezel + glowRing + core + approachR + bloom * 0.4, 0.0, 1.0);
+  alpha *= v_color.a;
 
   fragColor = vec4(col, alpha);
 }`;

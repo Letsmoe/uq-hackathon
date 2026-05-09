@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { ArrowLeft, EnterFullScreen } from "svelte-radix";
+  import { ArrowLeft, EnterFullScreen, ExitFullScreen } from "svelte-radix";
   import SongEntryScroller from "./lib/SongEntryScroller.svelte";
   import SongOverlay from "./lib/SongOverlay.svelte";
   import type { Song } from "./lib/types";
@@ -23,7 +23,7 @@
     );
     document.documentElement.style.setProperty(
       "--heading-font-size",
-      `${width * 0.02}px`,
+      `${width * 0.015}px`,
     );
     document.documentElement.style.setProperty(
       "--subheading-font-size",
@@ -32,7 +32,7 @@
 
     document.documentElement.style.setProperty(
       "--text-font-size",
-      `${width * 0.008}px`,
+      `${width * 0.011}px`,
     );
   });
 
@@ -44,6 +44,8 @@
 
   let selectedSong: Song = $state(null);
   let phase: "menu" | "game" = $state("menu");
+
+  let fullscreen = $state()
 </script>
 
 <svelte:window
@@ -51,6 +53,10 @@
     width = screen.clientWidth;
     height = screen.clientHeight;
   }}
+
+  onfullscreenchange={() => {
+		fullscreen = !!document.fullscreenElement;
+	}}
 />
 
 {#if phase === "menu"}
@@ -59,13 +65,21 @@
     class="w-full max-w-screen max-h-screen aspect-video flex flex-row relative container"
   >
     <div class="background"></div>
-    <button class="back-btn" onclick={() => screen.requestFullscreen()}>
-      <EnterFullScreen size="48"></EnterFullScreen>
+    <button class="back-btn" onclick={() => {
+    				if (document.fullscreenElement) {
+				document.exitFullscreen();
+			} else {
+				document.documentElement.requestFullscreen();
+			}
+    }}>
+      {#if fullscreen}
+      	<ExitFullScreen size={width / 50}></ExitFullScreen>
+      {:else}
+      	<EnterFullScreen size={width / 50}></EnterFullScreen>
+      {/if}
     </button>
     <SongEntryScroller
-      songs={Array(25)
-        .fill(0)
-        .map((_, i) => exampleSong)}
+      songs={[exampleSong]}
       {slant}
       bind:selectedSong
     ></SongEntryScroller>
@@ -82,15 +96,15 @@
     padding-top: calc(5 * var(--h-percent));
     padding-bottom: calc(5 * var(--h-percent));
   }
-  .heading {
+  :global(.heading) {
     font-size: var(--heading-font-size);
   }
 
-  .subheading {
+ :global( .subheading) {
     font-size: var(--subheading-font-size);
   }
 
-  .text {
+ :global( .text) {
     font-size: var(--text-font-size);
   }
 
@@ -107,8 +121,8 @@
   }
 
   .back-btn {
-    height: calc(8 * var(--h-percent));
-    width: calc(12 * var(--w-percent));
+    height: calc(10 * var(--h-percent));
+    width: calc(10 * var(--w-percent));
     display: flex;
     align-items: center;
     justify-content: center;

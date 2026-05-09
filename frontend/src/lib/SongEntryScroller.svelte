@@ -11,7 +11,7 @@
   let selected: number | null = $state(null);
   let velocity = 0;
   let rafId: number;
-  const ITEMS_VISIBLE = 10;
+  const ITEMS_VISIBLE = 8;
 
   function clamp(val: number, min: number, max: number) {
     return Math.max(min, Math.min(max, val));
@@ -81,7 +81,7 @@
 <div class="flex flex-col w-[25%] song-list" bind:this={listEl}>
   {#each songs.slice(Math.floor(currentOffset), Math.floor(currentOffset) + ITEMS_VISIBLE) as song, i}
     {@const absoluteIndex = Math.floor(currentOffset) + i}
-    {@const margin = 12 - i * slant}
+    {@const margin = ITEMS_VISIBLE - i * slant}
     <div
       class="song-list-entry"
       class:selected={selected === absoluteIndex}
@@ -151,9 +151,9 @@
     }
 
     &.selected {
-      width: 110%;
+      width: 105%;
       position: relative;
-      left: -5%;
+      left: -2.5%;
       background: rgba(0, 0, 0, 0.8);
     }
 

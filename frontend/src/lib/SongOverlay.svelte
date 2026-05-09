@@ -57,11 +57,11 @@
     margin-top: calc(15 * var(--h-percent));
     position: relative;
     flex: 1;
-    height: calc(63 * var(--h-percent));
+
+    height: calc(60 * var(--h-percent));
     overflow: hidden;
-    display: flex;
-    align-items: flex-end;
     padding-left: calc(7 * var(--slant));
+    padding-right: calc(7 * var(--slant));
     background: rgba(0, 0, 0, 0.5);
     clip-path: polygon(
       calc(7 * var(--slant)) 0,
@@ -69,6 +69,12 @@
       calc(100% - 7 * var(--slant)) 100%,
       0 100%
     );
+
+    &.empty {
+    	display: flex;
+     justify-content: center;
+     align-items: center;
+    }
   }
 
   .bg {
@@ -84,10 +90,13 @@
   .content {
     position: relative;
     z-index: 2;
-    width: 100%;
+    width: calc(100% - 7 * var(--w-percent));
+    height: 100%;
     padding: 4%;
     display: flex;
+    align-items: center;
     flex-direction: column;
+    justify-content: center;
     gap: calc(2 * var(--h-percent));
   }
 
