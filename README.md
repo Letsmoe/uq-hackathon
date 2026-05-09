@@ -161,6 +161,7 @@ Page redundent?
 - **drag/ hold/ swipe notes**
 - Scale notes according to screensize
 - Tap note at beats
+- progress bar (RGB)
 - Reasonable layout of notes for gameplay
 	- [Patterns](https://sites.google.com/site/cytoidcommunity/charting/extra-information-on-charting/patterns)
 - **Audio upload & send to backend**
