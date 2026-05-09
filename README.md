@@ -150,7 +150,8 @@ Page redundent?
 	- Formulas
 	`time_in_sec = 60*tick/bpm/time_base`
 
-
+- 2 empty scanlines (go down and then up) & silence at the very start would be nice
+- Scale notes according to screensize
 - Tap note at beats
 - Reasonable layout of notes for gameplay
 	- [Patterns](https://sites.google.com/site/cytoidcommunity/charting/extra-information-on-charting/patterns)
