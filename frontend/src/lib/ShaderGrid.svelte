@@ -94,7 +94,7 @@ void main() {
   vec3 dotColor   = vec3(0.38, 0.37, 0.35);
   vec3 lineColor  = vec3(0.50, 0.49, 0.47);
   vec3 crossColor = vec3(0.13, 0.13, 0.20);
-  vec3 accent     = vec3(0.24, 0.46, 1.0);
+  vec3 accent     = vec3(125.0, 103.0, 210.0) / 255.0;
 
   // -----------------------------
   // Minor dot grid (small dots inside)
@@ -281,23 +281,22 @@ void main() {
     gl.enableVertexAttribArray(positionLocation);
     gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
-    canvas.addEventListener("pointermove", handlePointerMove);
-    canvas.addEventListener("pointerleave", handlePointerLeave);
-    window.addEventListener("resize", resizeCanvas);
-
     render();
   });
 
   onDestroy(() => {
     cancelAnimationFrame(animationFrame);
-
-    canvas?.removeEventListener("pointermove", handlePointerMove);
-    canvas?.removeEventListener("pointerleave", handlePointerLeave);
-    window.removeEventListener("resize", resizeCanvas);
   });
 </script>
 
-<canvas bind:this={canvas} class="shader-grid" />
+<svelte:window
+  onpointerleave={handlePointerLeave}
+  onpointerdown={handlePointerMove}
+  onresize={resizeCanvas}
+  onpointermove={handlePointerMove}
+/>
+
+<canvas bind:this={canvas} class="shader-grid"></canvas>
 
 <style>
   .shader-grid {

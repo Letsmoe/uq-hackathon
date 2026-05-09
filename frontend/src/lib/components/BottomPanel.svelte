@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Plus, Upload } from "svelte-radix";
+  import UploadButton from "./UploadButton.svelte";
 
   let {
     notifications = 2,
@@ -12,13 +13,7 @@
 <div class="flex flex-col justify-end gap-3 w-full h-full pb-4 pr-4">
   <div class="flex flex-row items-center justify-end gap-3">
     <!-- Upload / add button -->
-    <button
-      onclick={onupload}
-      class="ml-1 h-full aspect-square flex items-center justify-center border border-on-surface-light/20 hover:bg-on-surface-light/[0.07] bg-on-surface-light/[0.03] text-on-surface-light/40 hover:text-on-surface-light/80 hover:border-on-surface-light/40 transition-all duration-200 cursor-pointer bg-transparent text-lg leading-none"
-      title="Upload"
-    >
-      <Upload size="24"></Upload>
-    </button>
+    <UploadButton {onupload}></UploadButton>
     <!-- Quick play card -->
     <button
       onclick={onquickplay}

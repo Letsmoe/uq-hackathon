@@ -1,13 +1,6 @@
 <script lang="ts">
   import { ChevronLeft, ChevronRight } from "svelte-radix";
 
-  type Song = {
-    title: string;
-    artist: string;
-    badge: string;
-    cover: string;
-  };
-
   let { songs, selected = $bindable(1) } = $props();
 
   function prev() {
@@ -47,6 +40,7 @@
   }}
 />
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="relative flex flex-col items-center justify-center w-full h-full select-none overflow-hidden"
   ontouchstart={(e) => {
@@ -114,7 +108,7 @@
 
         <!-- Title + artist on non-center cards -->
         {#if p.abs > 0}
-          <div class="absolute bottom-4 left-4">
+          <div class="absolute bottom-4 left-4 flex flex-col items-start">
             <p
               class="text-white/90 font-semibold tracking-widest leading-none {p.abs ===
               1
@@ -165,7 +159,9 @@
 
   <!-- Song title -->
   <div class="mt-8 flex flex-col items-center gap-1.5">
-    <h2 class="text-2xl tracking-[0.6em] text-on-surface font-light">
+    <h2
+      class="text-2xl tracking-[0.6em] text-on-surface font-light text-center"
+    >
       {songs[selected].title}
     </h2>
     <span class="text-sm tracking-[0.3em] text-on-surface/40 uppercase"

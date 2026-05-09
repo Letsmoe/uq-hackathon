@@ -148,8 +148,3 @@
     </button>
   </div>
 </header>
-
-<style>
-  @reference "tailwindcss";
-  @reference "src/style/global.css";
-</style>

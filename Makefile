@@ -1,24 +1,21 @@
-CXX = g++
+CXX = em++
 
-SOUNDTOUCH_PREFIX := $(shell brew --prefix sound-touch)
-SNDFILE_PREFIX    := $(shell brew --prefix libsndfile)
-NLOHMANN_PREFIX   := $(shell brew --prefix nlohmann-json)
+CXXFLAGS = -std=c++17 -Wall -O3
 
-CXXFLAGS = -std=c++17 -Wall \
-  -I$(NLOHMANN_PREFIX)/include \
-  -I$(SOUNDTOUCH_PREFIX)/include \
-  -I$(SNDFILE_PREFIX)/include
-
-LDFLAGS = -L$(SOUNDTOUCH_PREFIX)/lib \
-          -L$(SNDFILE_PREFIX)/lib
-
-LIBS = -lSoundTouch -lsndfile
-
-TARGET = main
+TARGET = main.js
 SRC = main.cpp
 
+EMFLAGS = \
+  -s WASM=1 \
+  -s MODULARIZE=1 \
+  -s EXPORT_ES6=1 \
+  -s ENVIRONMENT=web \
+  -s ALLOW_MEMORY_GROWTH=1 \
+  -s EXPORTED_FUNCTIONS='["_analyze_audio_json","_free_result","_malloc","_free"]' \
+  -s EXPORTED_RUNTIME_METHODS='["HEAPU8","HEAPF32","UTF8ToString","stringToUTF8","lengthBytesUTF8"]'
+
 $(TARGET): $(SRC)
-	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(EMFLAGS)
 
 clean:
-	rm -f $(TARGET)
+	rm -f main.js main.wasm

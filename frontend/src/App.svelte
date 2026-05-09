@@ -5,10 +5,10 @@
   import NavButtons from "./lib/components/NavButtons.svelte";
   import SongCarousel from "./lib/components/SongCarousel.svelte";
   import SongInfo from "./lib/components/SongInfo.svelte";
-  import StartButton from "./lib/components/StartButton.svelte";
   import RecentlyPlayed from "./lib/components/RecentlyPlayed.svelte";
   import Logo from "./lib/components/Logo.svelte";
   import BottomPanel from "./lib/components/BottomPanel.svelte";
+  import Canvas from "./lib/components/Game/Canvas.svelte";
 
   // ── Types ──────────────────────────────────────────────────────────────────
   type Song = {
@@ -23,7 +23,7 @@
   };
 
   // ── Data ───────────────────────────────────────────────────────────────────
-  const songs: Song[] = [
+  const songs: Song[] = $state([
     {
       title: "RESONANT",
       artist: "NIHIL",
@@ -76,7 +76,7 @@
       level: 14,
       bestScore: 988100,
     },
-  ];
+  ]);
 
   // ── State ──────────────────────────────────────────────────────────────────
   let selected = $state(1);
@@ -98,6 +98,10 @@
   }
 
   onMount(resizeGame);
+
+  let score: number = $state(0);
+  let combo: number = $state(0);
+  let tp: number = $state(0);
 </script>
 
 <svelte:window onresize={resizeGame} onorientationchange={resizeGame} />
@@ -172,8 +176,20 @@
                 onquickplay={() => {
                   selected = Math.floor(Math.random() * songs.length);
                 }}
-                onupload={() => {
+                onupload={(chart, buffer, file: File) => {
                   /* open upload modal */
+                  songs.push({
+                    title: file.name,
+                    artist: "UNKNOWN",
+                    badge: "C",
+                    cover: "/cover/placeholder.png",
+                    description: "A newly uploaded song.",
+                    difficulty: "normal",
+                    level: 7,
+                    bestScore: 0,
+                    chart,
+                    buffer,
+                  });
                 }}
               />
             </div>
@@ -181,15 +197,19 @@
         </div>
       {:else if page === "Game"}
         <!-- Placeholder — replace with your game component -->
-        <div
-          class="w-full h-full flex items-center justify-center bg-surface-dark"
-        >
-          <button
-            onclick={() => (page = "Menu")}
-            class="text-on-surface-dark/40 tracking-widest text-sm uppercase border border-on-surface-dark/20 px-8 py-3 hover:text-on-surface-dark/70 transition-colors cursor-pointer bg-transparent"
-          >
-            ← Back to menu
-          </button>
+        <div class="relative w-full h-full bg-[#e8e8ec]">
+          <!-- HUD overlay -->
+          <Canvas
+            chart={songs[selected].chart}
+            buffer={songs[selected].buffer}
+            songTitle={songs[selected].title}
+            artist={songs[selected].artist}
+            difficulty={songs[selected].badge}
+            level={songs[selected].level ?? 8}
+            coverSrc={songs[selected].cover}
+            onpause={() => (page = "Menu")}
+            onfinish={(stats) => console.log("Final stats:", stats)}
+          />
         </div>
       {/if}
     </div>
@@ -198,7 +218,7 @@
 
 <style>
   @reference "tailwindcss";
-  @reference "style/global.css";
+  @reference "./style/global.css";
 
   #viewport {
     width: 100vw;

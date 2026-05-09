@@ -8,24 +8,24 @@
       sub: "PLAY",
       shape: "slanted-right",
     },
-    {
-      id: "course",
-      label: "COURSE",
-      sub: "CHALLENGE",
-      shape: "slanted-left-right",
-    },
-    {
-      id: "event",
-      label: "EVENT",
-      sub: "LIMITED",
-      shape: "slanted-left-right",
-    },
-    {
-      id: "random",
-      label: "RANDOM",
-      sub: "SURPRISE",
-      shape: "slanted-left",
-    },
+    // {
+    //   id: "course",
+    //   label: "COURSE",
+    //   sub: "CHALLENGE",
+    //   shape: "slanted-left-right",
+    // },
+    // {
+    //   id: "event",
+    //   label: "EVENT",
+    //   sub: "LIMITED",
+    //   shape: "slanted-left-right",
+    // },
+    // {
+    //   id: "random",
+    //   label: "RANDOM",
+    //   sub: "SURPRISE",
+    //   shape: "slanted-left",
+    // },
   ] as const;
 </script>
 
