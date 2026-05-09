@@ -2,16 +2,10 @@ import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import basicSsl from "@vitejs/plugin-basic-ssl";
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  server: {
-    host: true,
-    allowedHosts: ["localhost", "caucus-composed-champion.ngrok-free.dev"],
-  },
   plugins: [
-    basicSsl(),
     tailwindcss(),
     svelte(),
     VitePWA({
@@ -25,7 +19,8 @@ export default defineConfig({
       manifest: {
         name: "Synapse: Rhythm Protocol",
         short_name: "Synapse",
-        description: "A highly engaging rhythm game built with Svelte and PixiJS.",
+        description:
+          "A highly engaging rhythm game built with Svelte and PixiJS.",
         display: "fullscreen",
         start_url: "/",
         scope: "/",
