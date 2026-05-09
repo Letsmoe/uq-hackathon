@@ -1,29 +1,53 @@
-// ─── Note types ───────────────────────────────────────────────────────────────
+export type JudgmentResult = 'perfect' | 'good' | 'bad' | 'miss';
 
-export type NoteType = "tap" | "hold" | "swipe";
-export type SwipeDir = "left" | "right";
-export type JudgmentResult = "perfect" | "good" | "bad" | "miss";
-
-export interface ChartNote {
-  id: number;
-  type: NoteType;
-  time: number; // ms: moment scan line crosses this note
-  lane: number; // 0–7 horizontal lane
-  swipeDir?: SwipeDir;
-  holdDuration?: number; // ms, hold notes only
+export interface RuntimeChainNode {
+  tick: number;
+  x: number;
+  pixelX: number;
+  pixelY: number;
+  timeSeconds: number;
+  judged: boolean;
 }
 
-export interface RuntimeNote extends ChartNote {
-  pixelX: number; // pre-computed pixel X
-  pixelY: number; // pre-computed pixel Y
-  sweepIndex: number; // which pass of the scan line
+export interface RuntimeNote {
+  id: number;
+  type: 0 | 1 | 2 | 3; // 0=tap, 1=flick, 2=hold, 3=chain
+  tick: number;
+  x: number;            // 0..1 normalized
+  duration: number;     // ticks; 0 for taps/flicks
+  nodes?: RuntimeChainNode[];
+  pixelX: number;
+  pixelY: number;
+  endPixelY: number;    // for holds: where tail ends; equals pixelY otherwise
+  timeSeconds: number;
+  endTimeSeconds: number;
   hit: boolean;
   missed: boolean;
-  holdActive: boolean; // finger currently held
-  holdProgress: number; // 0–1 fill progress
+  holdActive: boolean;
+  holdProgress: number;
+  chainNodeIdx: number; // next unjudged chain node index
 }
 
-// ─── Judgment ─────────────────────────────────────────────────────────────────
+// Judgment windows in seconds (matching Cytus II feel)
+export const JUDGMENT_WINDOWS = {
+  perfect: 0.08,
+  good:    0.15,
+  bad:     0.25,
+} as const;
+
+export const SCORE_TABLE: Record<JudgmentResult, number> = {
+  perfect: 1000,
+  good:    700,
+  bad:     300,
+  miss:    0,
+};
+
+export const TP_TABLE: Record<JudgmentResult, number> = {
+  perfect: 1.0,
+  good:    0.7,
+  bad:     0.3,
+  miss:    0.0,
+};
 
 export interface JudgmentEvent {
   noteId: number;
@@ -32,42 +56,17 @@ export interface JudgmentEvent {
   y: number;
 }
 
-export const JUDGMENT_WINDOWS: Record<
-  Exclude<JudgmentResult, "miss">,
-  number
-> = {
-  perfect: 40, // ±ms
-  good: 90,
-  bad: 160,
-};
-
-export const SCORE_TABLE: Record<JudgmentResult, number> = {
-  perfect: 1000,
-  good: 500,
-  bad: 100,
-  miss: 0,
-};
-
-export const TP_TABLE: Record<JudgmentResult, number> = {
-  perfect: 1.0,
-  good: 0.5,
-  bad: 0.2,
-  miss: 0.0,
-};
-
-// ─── Game state ───────────────────────────────────────────────────────────────
-
 export interface GameState {
   score: number;
   combo: number;
   maxCombo: number;
-  tp: number; // 0–100
+  tp: number;
   perfects: number;
   goods: number;
   bads: number;
   misses: number;
-  elapsed: number; // ms since start
-  scanY: number; // 0–1 normalised
+  elapsed: number;  // seconds since start
+  scanY: number;    // 0..1
   running: boolean;
   paused: boolean;
   finished: boolean;
@@ -75,18 +74,9 @@ export interface GameState {
 
 export function makeInitialState(): GameState {
   return {
-    score: 0,
-    combo: 0,
-    maxCombo: 0,
-    tp: 100,
-    perfects: 0,
-    goods: 0,
-    bads: 0,
-    misses: 0,
-    elapsed: 0,
-    scanY: 0,
-    running: false,
-    paused: false,
-    finished: false,
+    score: 0, combo: 0, maxCombo: 0, tp: 100,
+    perfects: 0, goods: 0, bads: 0, misses: 0,
+    elapsed: 0, scanY: 0,
+    running: false, paused: false, finished: false,
   };
 }

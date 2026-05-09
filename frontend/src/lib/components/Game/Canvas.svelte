@@ -1,15 +1,14 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { GameEngine } from "../../game/Engine";
-  import { STARDUST } from "../../game/chart";
   import GameUI from "./UI.svelte";
   import type { Chart } from "../../game/chart";
 
   let {
-    chart = STARDUST as Chart,
-    buffer = new ArrayBuffer(0), // Placeholder, not used in this component
-    songTitle = chart.title,
-    artist = chart.artist,
+    chart = undefined as Chart | undefined,
+    buffer = new ArrayBuffer(0),
+    songTitle = "",
+    artist = "",
     difficulty = "EX",
     level = 10,
     coverSrc = "/ellasy.png",
@@ -37,9 +36,8 @@
   let audio: HTMLAudioElement | null = null;
 
   onMount(async () => {
-    // v8: creation is async
     engine = await GameEngine.create(canvas);
-    // engine.loadChart(chart);
+    if (chart) engine.loadChart(chart);
 
     const audioBlob = new Blob([buffer], { type: "audio/mp3" });
     audio = new Audio();

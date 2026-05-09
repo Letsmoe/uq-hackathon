@@ -1,786 +1,1467 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WE ARE THE ENERGY — Metrik</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap');
-  :root {
-    --cyan:#00f5ff; --cyan-dim:#00a8b5; --magenta:#ff00aa;
-    --yellow:#ffe600; --bg:#030a14;
-    --perfect:#00f5ff; --good:#a0ff80; --bad:#ff8800; --miss:#ff2244;
-  }
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:var(--bg);font-family:'Rajdhani',sans-serif;color:#fff;overflow:hidden;width:100vw;height:100vh;user-select:none;}
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WE ARE THE ENERGY — Metrik</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap");
+      :root {
+        --cyan: #00f5ff;
+        --cyan-dim: #00a8b5;
+        --magenta: #ff00aa;
+        --yellow: #ffe600;
+        --bg: #030a14;
+        --perfect: #00f5ff;
+        --good: #a0ff80;
+        --bad: #ff8800;
+        --miss: #ff2244;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        font-family: "Rajdhani", sans-serif;
+        color: #fff;
+        overflow: hidden;
+        width: 100vw;
+        height: 100vh;
+        user-select: none;
+      }
 
-  /* MENU */
-  #menu{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;position:absolute;top:0;left:0;z-index:10;background:radial-gradient(ellipse at 50% 40%,#001a33 0%,#030a14 70%);}
-  #bg-canvas{position:absolute;top:0;left:0;width:100%;height:100%;opacity:.3;pointer-events:none;}
-  .menu-content{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:28px;}
-  .title-song{font-family:'Orbitron',monospace;font-size:clamp(24px,5vw,56px);font-weight:900;letter-spacing:.12em;text-transform:uppercase;background:linear-gradient(135deg,var(--cyan) 0%,#fff 50%,var(--magenta) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 30px var(--cyan));animation:titlePulse 3s ease-in-out infinite;}
-  .title-artist{font-size:clamp(12px,2vw,20px);letter-spacing:.5em;color:var(--cyan-dim);text-transform:uppercase;margin-top:6px;text-align:center;}
-  @keyframes titlePulse{0%,100%{filter:drop-shadow(0 0 20px var(--cyan))}50%{filter:drop-shadow(0 0 50px var(--cyan)) drop-shadow(0 0 80px var(--magenta))}}
-  .scan-demo{width:clamp(220px,45vw,440px);height:140px;position:relative;overflow:hidden;border:1px solid rgba(0,245,255,.15);border-radius:4px;}
-  .scan-demo-line{position:absolute;left:0;right:0;height:2px;background:var(--cyan);box-shadow:0 0 12px var(--cyan),0 0 24px var(--cyan);animation:scanDemo 1.8s ease-in-out infinite alternate;top:0;}
-  @keyframes scanDemo{from{top:0}to{top:calc(100% - 2px)}}
-  .demo-note{position:absolute;width:20px;height:20px;border-radius:50%;border:2px solid var(--cyan);background:rgba(0,245,255,.2);transform:translate(-50%,-50%);}
-  .info-grid{display:flex;gap:40px;}
-  .info-item{text-align:center;}
-  .info-label{font-size:11px;letter-spacing:.3em;color:var(--cyan-dim);text-transform:uppercase;}
-  .info-value{font-family:'Orbitron',monospace;font-size:22px;font-weight:700;color:#fff;margin-top:4px;}
-  #start-btn{font-family:'Orbitron',monospace;font-size:15px;font-weight:700;letter-spacing:.25em;text-transform:uppercase;color:var(--bg);background:linear-gradient(135deg,var(--cyan),#0088cc);border:none;padding:16px 60px;cursor:pointer;clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%);transition:all .2s;}
-  #start-btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important;}
-  #chart-filepicker-wrap{display:none;flex-direction:column;align-items:center;gap:10px;}
-  #chart-filepicker-wrap p{font-size:12px;letter-spacing:.15em;color:rgba(255,255,255,.4);text-transform:uppercase;}
-  #chart-file-input{display:none;}
-  #chart-file-label{font-family:'Orbitron',monospace;font-size:12px;letter-spacing:.2em;color:var(--cyan);border:1px solid var(--cyan);padding:10px 28px;cursor:pointer;transition:all .2s;}
-  #chart-file-label:hover{background:rgba(0,245,255,.1);}
-  #start-btn:hover{transform:scale(1.05);box-shadow:0 0 40px var(--cyan);}
-  .controls-hint{font-size:12px;letter-spacing:.12em;color:rgba(255,255,255,.3);}
-
-  /* GAME */
-  #game{display:none;width:100%;height:100%;position:absolute;top:0;left:0;}
-  #hud{position:absolute;top:0;left:0;right:0;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:linear-gradient(180deg,rgba(3,10,20,.95) 0%,transparent 100%);z-index:20;}
-  #score-display{font-family:'Orbitron',monospace;font-size:26px;font-weight:700;color:#fff;text-shadow:0 0 20px var(--cyan);min-width:160px;}
-  #combo-display{text-align:center;}
-  #combo-number{font-family:'Orbitron',monospace;font-size:34px;font-weight:900;color:var(--cyan);text-shadow:0 0 20px var(--cyan);line-height:1;transition:transform .1s;}
-  #combo-label{font-size:10px;letter-spacing:.4em;color:var(--cyan-dim);text-transform:uppercase;}
-  #accuracy-display{font-family:'Orbitron',monospace;font-size:13px;color:var(--cyan-dim);letter-spacing:.1em;min-width:80px;text-align:right;}
-  #progress-wrap{position:absolute;top:52px;left:0;right:0;height:3px;background:rgba(255,255,255,.06);z-index:20;}
-  #progress-bar{height:100%;background:linear-gradient(90deg,var(--cyan),var(--magenta));width:0%;box-shadow:0 0 8px var(--cyan);}
-  #pause-btn{font-family:'Orbitron',monospace;font-size:11px;letter-spacing:.2em;color:rgba(255,255,255,.5);background:none;border:1px solid rgba(255,255,255,.15);padding:5px 14px;cursor:pointer;transition:all .2s;}
-  #pause-btn:hover{color:#fff;border-color:var(--cyan);}
-  #game-canvas{position:absolute;top:0;left:0;width:100%;height:100%;touch-action:none;}
-  #judge-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Orbitron',monospace;font-size:28px;font-weight:900;letter-spacing:.2em;pointer-events:none;opacity:0;z-index:30;text-transform:uppercase;white-space:nowrap;}
-
-  /* PAUSE */
-  #pause-overlay{display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(3,10,20,.88);z-index:50;flex-direction:column;align-items:center;justify-content:center;gap:24px;}
-  #pause-overlay.visible{display:flex;}
-  .pause-title{font-family:'Orbitron',monospace;font-size:40px;font-weight:900;letter-spacing:.3em;color:var(--cyan);}
-  .pause-btn-row{display:flex;gap:16px;}
-  .pause-action-btn{font-family:'Orbitron',monospace;font-size:13px;letter-spacing:.2em;color:#fff;background:rgba(0,245,255,.1);border:1px solid var(--cyan);padding:12px 28px;cursor:pointer;transition:all .2s;}
-  .pause-action-btn:hover{background:var(--cyan);color:var(--bg);}
-
-  /* RESULT */
-  #result{display:none;position:absolute;top:0;left:0;right:0;bottom:0;z-index:60;background:radial-gradient(ellipse at 50% 40%,#001a33 0%,#030a14 75%);flex-direction:column;align-items:center;justify-content:center;gap:20px;}
-  #result.visible{display:flex;}
-  .result-rank{font-family:'Orbitron',monospace;font-size:clamp(80px,14vw,130px);font-weight:900;line-height:1;animation:rankAppear .5s cubic-bezier(.34,1.56,.64,1) forwards;}
-  @keyframes rankAppear{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
-  .result-score{font-family:'Orbitron',monospace;font-size:clamp(24px,4vw,48px);font-weight:700;color:#fff;}
-  .result-stats{display:flex;gap:36px;flex-wrap:wrap;justify-content:center;}
-  .result-stat{text-align:center;min-width:80px;}
-  .result-stat-label{font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:rgba(255,255,255,.4);}
-  .result-stat-value{font-family:'Orbitron',monospace;font-size:24px;font-weight:700;color:#fff;margin-top:4px;}
-  #result-retry{font-family:'Orbitron',monospace;font-size:14px;letter-spacing:.25em;color:var(--bg);background:var(--cyan);border:none;padding:14px 44px;cursor:pointer;clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%);transition:transform .2s;margin-top:12px;}
-  #result-retry:hover{transform:scale(1.05);}
-</style>
-</head>
-<body>
-
-<audio id="game-audio" preload="auto">
-  <source src="./audios/Metrik - We Are The Energy.mp3" type="audio/mpeg">
-</audio>
-
-<div id="menu">
-  <canvas id="bg-canvas"></canvas>
-  <div class="menu-content">
-    <div>
-      <div class="title-song">We Are The Energy</div>
-      <div class="title-artist">Metrik</div>
-    </div>
-    <div class="scan-demo" id="scan-demo">
-      <div class="scan-demo-line"></div>
-    </div>
-    <div class="info-grid">
-      <div class="info-item"><div class="info-label">BPM</div><div class="info-value">172</div></div>
-      <div class="info-item"><div class="info-label">Notes</div><div class="info-value">2213</div></div>
-      <div class="info-item"><div class="info-label">Length</div><div class="info-value">4:46</div></div>
-    </div>
-    <button id="start-btn" disabled>LOADING…</button>
-    <div id="chart-filepicker-wrap">
-      <p>Chart file not found — load it manually</p>
-      <input type="file" id="chart-file-input" accept=".json" onchange="handleChartFile(this)">
-      <label for="chart-file-input" id="chart-file-label">📂 BROWSE CHART JSON</label>
-    </div>
-    <div class="controls-hint">Click / Tap when the horizontal scan line passes a note</div>
-  </div>
-</div>
-
-<div id="game">
-  <div id="hud">
-    <div id="score-display">0000000</div>
-    <div id="combo-display">
-      <div id="combo-number">0</div>
-      <div id="combo-label">Combo</div>
-    </div>
-    <div id="accuracy-display">100.00%</div>
-    <button id="pause-btn">❙❙ PAUSE</button>
-  </div>
-  <div id="progress-wrap"><div id="progress-bar"></div></div>
-  <canvas id="game-canvas"></canvas>
-  <div id="judge-text"></div>
-  <div id="pause-overlay">
-    <div class="pause-title">PAUSED</div>
-    <div class="pause-btn-row">
-      <button class="pause-action-btn" id="resume-btn">RESUME</button>
-      <button class="pause-action-btn" id="restart-btn">RESTART</button>
-      <button class="pause-action-btn" id="quit-btn">QUIT</button>
-    </div>
-  </div>
-</div>
-
-<div id="result">
-  <div class="result-rank" id="result-rank">S</div>
-  <div class="result-score" id="result-score">0000000</div>
-  <div class="result-stats">
-    <div class="result-stat"><div class="result-stat-label">Perfect</div><div class="result-stat-value" id="r-perfect">0</div></div>
-    <div class="result-stat"><div class="result-stat-label">Good</div><div class="result-stat-value" id="r-good">0</div></div>
-    <div class="result-stat"><div class="result-stat-label">Bad</div><div class="result-stat-value" id="r-bad">0</div></div>
-    <div class="result-stat"><div class="result-stat-label">Miss</div><div class="result-stat-value" id="r-miss">0</div></div>
-    <div class="result-stat"><div class="result-stat-label">Max Combo</div><div class="result-stat-value" id="r-combo">0</div></div>
-    <div class="result-stat"><div class="result-stat-label">Accuracy</div><div class="result-stat-value" id="r-acc">0%</div></div>
-  </div>
-  <button id="result-retry">PLAY AGAIN</button>
-</div>
-
-<script>
-let CHART = null;
-
-function onChartLoaded(data) {
-  CHART = data;
-  const btn = document.getElementById('start-btn');
-  btn.textContent = '\u25b6 PLAY';
-  btn.disabled = false;
-  const fp = document.getElementById('chart-filepicker-wrap');
-  if (fp) fp.style.display = 'none';
-}
-
-function showFilePicker() {
-  document.getElementById('start-btn').textContent = 'SELECT CHART FILE';
-  document.getElementById('chart-filepicker-wrap').style.display = 'flex';
-}
-
-fetch('./charts/Metrik - We Are The Energy.json')
-  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-  .then(onChartLoaded)
-  .catch(() => showFilePicker());
-
-function handleChartFile(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try { onChartLoaded(JSON.parse(e.target.result)); }
-    catch(err) { alert('Invalid JSON: ' + err.message); }
-  };
-  reader.readAsText(file);
-}
-</script>
-<script>
-// ═══════════════════════════ MENU BG ═══════════════════════════
-(function(){
-  const cvs=document.getElementById('bg-canvas');
-  const ctx=cvs.getContext('2d');
-  let W,H;
-  const pts=[];
-  function resize(){W=cvs.width=cvs.offsetWidth;H=cvs.height=cvs.offsetHeight;}
-  window.addEventListener('resize',resize); resize();
-  for(let i=0;i<70;i++) pts.push({x:Math.random()*2000,y:Math.random()*2000,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,r:Math.random()*2+.5,a:Math.random()*.7+.2});
-  let t=0;
-  function frame(){
-    ctx.clearRect(0,0,W,H); t++;
-    const sy=(Math.sin(t*.008)*.5+.5)*H;
-    const g=ctx.createLinearGradient(0,sy-40,0,sy+40);
-    g.addColorStop(0,'transparent'); g.addColorStop(.5,'rgba(0,245,255,.25)'); g.addColorStop(1,'transparent');
-    ctx.fillStyle=g; ctx.fillRect(0,sy-40,W,80);
-    for(const p of pts){
-      p.x+=p.vx; p.y+=p.vy;
-      if(p.x<0)p.x=W; if(p.x>W)p.x=0; if(p.y<0)p.y=H; if(p.y>H)p.y=0;
-      ctx.beginPath(); ctx.arc(p.x%W,p.y%H,p.r,0,Math.PI*2);
-      ctx.fillStyle=`rgba(0,245,255,${p.a*.5})`; ctx.fill();
-    }
-    requestAnimationFrame(frame);
-  }
-  frame();
-
-  // Demo notes in scan preview
-  const demo=document.getElementById('scan-demo');
-  const positions=[.18,.35,.5,.67,.82];
-  positions.forEach(x=>{
-    const d=document.createElement('div');
-    d.className='demo-note';
-    d.style.left=(x*100)+'%';
-    d.style.top=(Math.random()*60+20)+'%';
-    demo.appendChild(d);
-  });
-})();
-
-// ═══════════════════════════ GAME ═══════════════════════════
-const canvas=document.getElementById('game-canvas');
-const ctx=canvas.getContext('2d');
-let W,H,PLAY_TOP,PLAY_H; // playfield starts below HUD
-
-function resize(){
-  W=canvas.width=canvas.offsetWidth;
-  H=canvas.height=canvas.offsetHeight;
-  PLAY_TOP=60; // HUD height
-  PLAY_H=H-PLAY_TOP;
-}
-window.addEventListener('resize',resize);
-
-let BPM, TIME_BASE;
-
-function tickToTime(tick){ return tick/(TIME_BASE*(BPM/60)); }
-
-// Judgement windows
-const W_PERFECT=0.08, W_GOOD=0.15, W_BAD=0.25;
-const APPROACH_SECS=0.45; // how far ahead notes are visible
-
-// Game state
-let state='menu';
-let startTime,pauseStart,totalPaused=0,currentTime=0;
-let score=0,combo=0,maxCombo=0;
-let counts={perfect:0,good:0,bad:0,miss:0};
-let totalJudged=0;
-let noteStates=[];
-let effects=[],ripples=[];
-let rafId=null;
-
-// ── SCAN LINE Y POSITION ────────────────────────────────────────
-// direction -1: scan goes from TOP (y=0) to BOTTOM (y=1) within the page
-// direction  1: scan goes from BOTTOM (y=1) to TOP (y=0) within the page
-// Note 'x' in the chart = horizontal position 0..1
-// Note timing within a page determines its Y (where scan line is when it hits)
-
-function getScanLineY(time){
-  const pages=CHART.page_list;
-  for(let i=0;i<pages.length;i++){
-    const p=pages[i];
-    const ps=tickToTime(p.start_tick);
-    const pe=tickToTime(p.end_tick);
-    if(time>=ps && time<=pe){
-      const t=(time-ps)/(pe-ps); // 0..1 progress through page
-      // direction -1: starts at top (0), moves to bottom (1)
-      // direction  1: starts at bottom (1), moves to top (0)
-      return p.scan_line_direction===-1 ? t : 1-t;
-    }
-  }
-  return 0;
-}
-
-// Get note's Y position (where scan line is at note's tick time)
-function getNoteY(tick){
-  return getScanLineY(tickToTime(tick));
-}
-
-// ── INIT ────────────────────────────────────────────────────────
-function initGame(){
-  BPM=CHART.bpm;
-  TIME_BASE=CHART.time_base;
-  resize();
-  score=0; combo=0; maxCombo=0;
-  counts={perfect:0,good:0,bad:0,miss:0};
-  totalJudged=0;
-  effects=[]; ripples=[];
-  totalPaused=0;
-  startTime=performance.now()/1000;
-
-  // Audio playback
-  const aud=document.getElementById('game-audio');
-  aud.currentTime=0;
-  aud.play().catch(()=>{});  // autoplay may require user gesture (already satisfied by button click)
-
-  noteStates=CHART.note_list.map((n)=>{
-    if(n.type===3){
-      return {type:'chain',done:false,nodes:n.nodes.map(nd=>({tick:nd.tick,x:nd.x,judged:false}))};
-    } else if(n.type===2){
-      return {type:'hold',started:false,done:false,startTick:n.tick,endTick:n.tick+n.duration};
-    } else {
-      return {type:'tap',judged:false};
-    }
-  });
-  updateHUD();
-}
-
-// ── JUDGE ────────────────────────────────────────────────────────
-function judge(diff){
-  const a=Math.abs(diff);
-  if(a<=W_PERFECT) return 'perfect';
-  if(a<=W_GOOD)    return 'good';
-  if(a<=W_BAD)     return 'bad';
-  return null;
-}
-
-function applyJudge(j,x,y){
-  if(!j) return;
-  combo++; if(combo>maxCombo) maxCombo=combo; totalJudged++;
-  if(j==='perfect'){counts.perfect++;score+=1000;}
-  else if(j==='good'){counts.good++;score+=700;}
-  else if(j==='bad'){counts.bad++;score+=300;combo=0;}
-  addRipple(x,y,j);
-  showJudge(j.toUpperCase());
-  updateHUD();
-}
-
-function applyMiss(x,y){
-  counts.miss++; combo=0; totalJudged++;
-  addRipple(x,y,'miss');
-  showJudge('MISS');
-  updateHUD();
-}
-
-function addRipple(x,y,j){
-  const cols={perfect:'#00f5ff',good:'#a0ff80',bad:'#ff8800',miss:'#ff2244'};
-  ripples.push({x,y,t:0,color:cols[j]||'#fff'});
-}
-
-function showJudge(text){
-  const el=document.getElementById('judge-text');
-  const cols={PERFECT:'#00f5ff',GOOD:'#a0ff80',BAD:'#ff8800',MISS:'#ff2244'};
-  el.style.color=cols[text]||'#fff';
-  el.style.textShadow=`0 0 20px ${cols[text]||'#fff'}`;
-  el.textContent=text;
-  el.style.animation='none'; el.offsetHeight;
-  el.style.animation='judgeAnim .5s forwards';
-}
-
-const jstyle=document.createElement('style');
-jstyle.textContent=`@keyframes judgeAnim{0%{opacity:1;transform:translate(-50%,-50%) scale(1.3)}60%{opacity:1;transform:translate(-50%,-50%) scale(.95)}100%{opacity:0;transform:translate(-50%,-65%) scale(.9)}}`;
-document.head.appendChild(jstyle);
-
-function updateHUD(){
-  document.getElementById('score-display').textContent=String(Math.floor(score)).padStart(7,'0');
-  const cn=document.getElementById('combo-number');
-  cn.textContent=combo;
-  if(combo>0){cn.style.transform='scale(1.25)';setTimeout(()=>cn.style.transform='scale(1)',100);}
-  const acc=totalJudged>0?((counts.perfect+counts.good*.7+counts.bad*.3)/totalJudged*100).toFixed(2):'100.00';
-  document.getElementById('accuracy-display').textContent=acc+'%';
-  document.getElementById('progress-bar').style.width=Math.min(100,currentTime/CHART.length*100)+'%';
-}
-
-// ── INPUT ────────────────────────────────────────────────────────
-function onInput(){
-  if(state!=='playing') return;
-  // Try to hit the nearest-timed note that's within window
-  let bestDiff=Infinity, bestIdx=-1, bestChainNodeIdx=-1;
-
-  for(let i=0;i<CHART.note_list.length;i++){
-    const n=CHART.note_list[i];
-    const ns=noteStates[i];
-    if(n.type===3){
-      if(ns.done) continue;
-      for(let j=0;j<ns.nodes.length;j++){
-        const nd=ns.nodes[j];
-        if(nd.judged) continue;
-        const diff=currentTime-tickToTime(nd.tick);
-        if(Math.abs(diff)<=W_BAD && Math.abs(diff)<Math.abs(bestDiff)){
-          bestDiff=diff; bestIdx=i; bestChainNodeIdx=j;
+      /* MENU */
+      #menu {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 10;
+        background: radial-gradient(
+          ellipse at 50% 40%,
+          #001a33 0%,
+          #030a14 70%
+        );
+      }
+      #bg-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0.3;
+        pointer-events: none;
+      }
+      .menu-content {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 28px;
+      }
+      .title-song {
+        font-family: "Orbitron", monospace;
+        font-size: clamp(24px, 5vw, 56px);
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        background: linear-gradient(
+          135deg,
+          var(--cyan) 0%,
+          #fff 50%,
+          var(--magenta) 100%
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        filter: drop-shadow(0 0 30px var(--cyan));
+        animation: titlePulse 3s ease-in-out infinite;
+      }
+      .title-artist {
+        font-size: clamp(12px, 2vw, 20px);
+        letter-spacing: 0.5em;
+        color: var(--cyan-dim);
+        text-transform: uppercase;
+        margin-top: 6px;
+        text-align: center;
+      }
+      @keyframes titlePulse {
+        0%,
+        100% {
+          filter: drop-shadow(0 0 20px var(--cyan));
         }
-        break; // only check first unjudged
-      }
-    } else if(n.type===2){
-      if(ns.done||ns.started) continue;
-      const diff=currentTime-tickToTime(n.tick);
-      if(Math.abs(diff)<=W_BAD && Math.abs(diff)<Math.abs(bestDiff)){
-        bestDiff=diff; bestIdx=i; bestChainNodeIdx=-1;
-      }
-    } else {
-      if(ns.judged) continue;
-      const diff=currentTime-tickToTime(n.tick);
-      if(Math.abs(diff)<=W_BAD && Math.abs(diff)<Math.abs(bestDiff)){
-        bestDiff=diff; bestIdx=i; bestChainNodeIdx=-1;
-      }
-    }
-  }
-
-  if(bestIdx===-1) return;
-  const n=CHART.note_list[bestIdx];
-  const ns=noteStates[bestIdx];
-  const j=judge(bestDiff);
-  if(!j) return;
-
-  if(n.type===3){
-    const nd=ns.nodes[bestChainNodeIdx];
-    nd.judged=true;
-    const px=nd.x*W;
-    const py=PLAY_TOP+getNoteY(nd.tick)*PLAY_H;
-    applyJudge(j,px,py);
-    if(ns.nodes.every(nd=>nd.judged)) ns.done=true;
-  } else if(n.type===2){
-    ns.started=true;
-    const px=n.x*W;
-    const py=PLAY_TOP+getNoteY(n.tick)*PLAY_H;
-    applyJudge(j,px,py);
-  } else {
-    ns.judged=true;
-    const px=n.x*W;
-    const py=PLAY_TOP+getNoteY(n.tick)*PLAY_H;
-    applyJudge(j,px,py);
-  }
-}
-
-canvas.addEventListener('pointerdown',e=>{e.preventDefault();onInput();});
-canvas.addEventListener('touchstart',e=>{e.preventDefault();onInput();},{passive:false});
-document.addEventListener('keydown',e=>{
-  if(['Space','KeyD','KeyF','KeyJ','KeyK'].includes(e.code)){e.preventDefault();onInput();}
-  if(e.code==='Escape') document.getElementById('pause-btn').click();
-});
-
-// ── MISS DETECTION ────────────────────────────────────────────────
-function checkMisses(){
-  for(let i=0;i<CHART.note_list.length;i++){
-    const n=CHART.note_list[i];
-    const ns=noteStates[i];
-    if(n.type===3){
-      if(ns.done) continue;
-      let allDone=true;
-      for(const nd of ns.nodes){
-        if(nd.judged) continue;
-        allDone=false;
-        const t=tickToTime(nd.tick);
-        if(currentTime>t+W_BAD){
-          nd.judged=true;
-          applyMiss(nd.x*W, PLAY_TOP+getNoteY(nd.tick)*PLAY_H);
-        }
-        break;
-      }
-      if(allDone||ns.nodes.every(nd=>nd.judged)) ns.done=true;
-    } else if(n.type===2){
-      if(ns.done) continue;
-      if(!ns.started){
-        const t=tickToTime(n.tick);
-        if(currentTime>t+W_BAD){
-          ns.done=true;
-          applyMiss(n.x*W, PLAY_TOP+getNoteY(n.tick)*PLAY_H);
-        }
-      } else {
-        const endT=tickToTime(n.tick+n.duration);
-        if(currentTime>=endT){
-          ns.done=true;
-          counts.perfect++;score+=500;combo++;if(combo>maxCombo)maxCombo=combo;
-          updateHUD();
+        50% {
+          filter: drop-shadow(0 0 50px var(--cyan))
+            drop-shadow(0 0 80px var(--magenta));
         }
       }
-    } else {
-      if(ns.judged) continue;
-      const t=tickToTime(n.tick);
-      if(currentTime>t+W_BAD){
-        ns.judged=true;
-        applyMiss(n.x*W, PLAY_TOP+getNoteY(n.tick)*PLAY_H);
+      .scan-demo {
+        width: clamp(220px, 45vw, 440px);
+        height: 140px;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(0, 245, 255, 0.15);
+        border-radius: 4px;
       }
-    }
-  }
-}
+      .scan-demo-line {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--cyan);
+        box-shadow:
+          0 0 12px var(--cyan),
+          0 0 24px var(--cyan);
+        animation: scanDemo 1.8s ease-in-out infinite alternate;
+        top: 0;
+      }
+      @keyframes scanDemo {
+        from {
+          top: 0;
+        }
+        to {
+          top: calc(100% - 2px);
+        }
+      }
+      .demo-note {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 2px solid var(--cyan);
+        background: rgba(0, 245, 255, 0.2);
+        transform: translate(-50%, -50%);
+      }
+      .info-grid {
+        display: flex;
+        gap: 40px;
+      }
+      .info-item {
+        text-align: center;
+      }
+      .info-label {
+        font-size: 11px;
+        letter-spacing: 0.3em;
+        color: var(--cyan-dim);
+        text-transform: uppercase;
+      }
+      .info-value {
+        font-family: "Orbitron", monospace;
+        font-size: 22px;
+        font-weight: 700;
+        color: #fff;
+        margin-top: 4px;
+      }
+      #start-btn {
+        font-family: "Orbitron", monospace;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.25em;
+        text-transform: uppercase;
+        color: var(--bg);
+        background: linear-gradient(135deg, var(--cyan), #0088cc);
+        border: none;
+        padding: 16px 60px;
+        cursor: pointer;
+        clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+        transition: all 0.2s;
+      }
+      #start-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        transform: none !important;
+        box-shadow: none !important;
+      }
+      #chart-filepicker-wrap {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+      #chart-filepicker-wrap p {
+        font-size: 12px;
+        letter-spacing: 0.15em;
+        color: rgba(255, 255, 255, 0.4);
+        text-transform: uppercase;
+      }
+      #chart-file-input {
+        display: none;
+      }
+      #chart-file-label {
+        font-family: "Orbitron", monospace;
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--cyan);
+        border: 1px solid var(--cyan);
+        padding: 10px 28px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      #chart-file-label:hover {
+        background: rgba(0, 245, 255, 0.1);
+      }
+      #start-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 40px var(--cyan);
+      }
+      .controls-hint {
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        color: rgba(255, 255, 255, 0.3);
+      }
 
-// ── DRAW ────────────────────────────────────────────────────────
-function draw(){
-  ctx.clearRect(0,0,W,H);
+      /* GAME */
+      #game {
+        display: none;
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+      #hud {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        background: linear-gradient(
+          180deg,
+          rgba(3, 10, 20, 0.95) 0%,
+          transparent 100%
+        );
+        z-index: 20;
+      }
+      #score-display {
+        font-family: "Orbitron", monospace;
+        font-size: 26px;
+        font-weight: 700;
+        color: #fff;
+        text-shadow: 0 0 20px var(--cyan);
+        min-width: 160px;
+      }
+      #combo-display {
+        text-align: center;
+      }
+      #combo-number {
+        font-family: "Orbitron", monospace;
+        font-size: 34px;
+        font-weight: 900;
+        color: var(--cyan);
+        text-shadow: 0 0 20px var(--cyan);
+        line-height: 1;
+        transition: transform 0.1s;
+      }
+      #combo-label {
+        font-size: 10px;
+        letter-spacing: 0.4em;
+        color: var(--cyan-dim);
+        text-transform: uppercase;
+      }
+      #accuracy-display {
+        font-family: "Orbitron", monospace;
+        font-size: 13px;
+        color: var(--cyan-dim);
+        letter-spacing: 0.1em;
+        min-width: 80px;
+        text-align: right;
+      }
+      #progress-wrap {
+        position: absolute;
+        top: 52px;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.06);
+        z-index: 20;
+      }
+      #progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, var(--cyan), var(--magenta));
+        width: 0%;
+        box-shadow: 0 0 8px var(--cyan);
+      }
+      #pause-btn {
+        font-family: "Orbitron", monospace;
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        color: rgba(255, 255, 255, 0.5);
+        background: none;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        padding: 5px 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      #pause-btn:hover {
+        color: #fff;
+        border-color: var(--cyan);
+      }
+      #game-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+      }
+      #judge-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-family: "Orbitron", monospace;
+        font-size: 28px;
+        font-weight: 900;
+        letter-spacing: 0.2em;
+        pointer-events: none;
+        opacity: 0;
+        z-index: 30;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
 
-  // Dark background
-  ctx.fillStyle='#030a14';
-  ctx.fillRect(0,0,W,H);
+      /* PAUSE */
+      #pause-overlay {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(3, 10, 20, 0.88);
+        z-index: 50;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+      }
+      #pause-overlay.visible {
+        display: flex;
+      }
+      .pause-title {
+        font-family: "Orbitron", monospace;
+        font-size: 40px;
+        font-weight: 900;
+        letter-spacing: 0.3em;
+        color: var(--cyan);
+      }
+      .pause-btn-row {
+        display: flex;
+        gap: 16px;
+      }
+      .pause-action-btn {
+        font-family: "Orbitron", monospace;
+        font-size: 13px;
+        letter-spacing: 0.2em;
+        color: #fff;
+        background: rgba(0, 245, 255, 0.1);
+        border: 1px solid var(--cyan);
+        padding: 12px 28px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .pause-action-btn:hover {
+        background: var(--cyan);
+        color: var(--bg);
+      }
 
-  // Subtle grid
-  ctx.strokeStyle='rgba(0,245,255,.03)';
-  ctx.lineWidth=1;
-  for(let i=1;i<10;i++){
-    ctx.beginPath();ctx.moveTo(W*i/10,PLAY_TOP);ctx.lineTo(W*i/10,H);ctx.stroke();
-  }
-  for(let i=1;i<8;i++){
-    ctx.beginPath();ctx.moveTo(0,PLAY_TOP+PLAY_H*i/8);ctx.lineTo(W,PLAY_TOP+PLAY_H*i/8);ctx.stroke();
-  }
+      /* RESULT */
+      #result {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 60;
+        background: radial-gradient(
+          ellipse at 50% 40%,
+          #001a33 0%,
+          #030a14 75%
+        );
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+      }
+      #result.visible {
+        display: flex;
+      }
+      .result-rank {
+        font-family: "Orbitron", monospace;
+        font-size: clamp(80px, 14vw, 130px);
+        font-weight: 900;
+        line-height: 1;
+        animation: rankAppear 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+      @keyframes rankAppear {
+        from {
+          transform: scale(0.3);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      .result-score {
+        font-family: "Orbitron", monospace;
+        font-size: clamp(24px, 4vw, 48px);
+        font-weight: 700;
+        color: #fff;
+      }
+      .result-stats {
+        display: flex;
+        gap: 36px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .result-stat {
+        text-align: center;
+        min-width: 80px;
+      }
+      .result-stat-label {
+        font-size: 10px;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.4);
+      }
+      .result-stat-value {
+        font-family: "Orbitron", monospace;
+        font-size: 24px;
+        font-weight: 700;
+        color: #fff;
+        margin-top: 4px;
+      }
+      #result-retry {
+        font-family: "Orbitron", monospace;
+        font-size: 14px;
+        letter-spacing: 0.25em;
+        color: var(--bg);
+        background: var(--cyan);
+        border: none;
+        padding: 14px 44px;
+        cursor: pointer;
+        clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+        transition: transform 0.2s;
+        margin-top: 12px;
+      }
+      #result-retry:hover {
+        transform: scale(1.05);
+      }
+    </style>
+  </head>
+  <body>
+    <audio id="game-audio" preload="auto">
+      <source src="./audios/Metrik - We Are The Energy.mp3" type="audio/mpeg" />
+    </audio>
 
-  const scanY01=getScanLineY(currentTime);
-  const scanPx=PLAY_TOP+scanY01*PLAY_H;
+    <div id="menu">
+      <canvas id="bg-canvas"></canvas>
+      <div class="menu-content">
+        <div>
+          <div class="title-song">We Are The Energy</div>
+          <div class="title-artist">Metrik</div>
+        </div>
+        <div class="scan-demo" id="scan-demo">
+          <div class="scan-demo-line"></div>
+        </div>
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">BPM</div>
+            <div class="info-value">172</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Notes</div>
+            <div class="info-value">2213</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Length</div>
+            <div class="info-value">4:46</div>
+          </div>
+        </div>
+        <button id="start-btn" disabled>LOADING…</button>
+        <div id="chart-filepicker-wrap">
+          <p>Chart file not found — load it manually</p>
+          <input
+            type="file"
+            id="chart-file-input"
+            accept=".json"
+            onchange="handleChartFile(this)"
+          />
+          <label for="chart-file-input" id="chart-file-label"
+            >📂 BROWSE CHART JSON</label
+          >
+        </div>
+        <div class="controls-hint">
+          Click / Tap when the horizontal scan line passes a note
+        </div>
+      </div>
+    </div>
 
-  // Draw notes (all visible ones)
-  for(let i=0;i<CHART.note_list.length;i++){
-    const n=CHART.note_list[i];
-    const ns=noteStates[i];
-    if(n.type===3) drawChain(n,ns);
-    else if(n.type===2) drawHold(n,ns);
-    else drawTap(n,ns);
-  }
+    <div id="game">
+      <div id="hud">
+        <div id="score-display">0000000</div>
+        <div id="combo-display">
+          <div id="combo-number">0</div>
+          <div id="combo-label">Combo</div>
+        </div>
+        <div id="accuracy-display">100.00%</div>
+        <button id="pause-btn">❙❙ PAUSE</button>
+      </div>
+      <div id="progress-wrap"><div id="progress-bar"></div></div>
+      <canvas id="game-canvas"></canvas>
+      <div id="judge-text"></div>
+      <div id="pause-overlay">
+        <div class="pause-title">PAUSED</div>
+        <div class="pause-btn-row">
+          <button class="pause-action-btn" id="resume-btn">RESUME</button>
+          <button class="pause-action-btn" id="restart-btn">RESTART</button>
+          <button class="pause-action-btn" id="quit-btn">QUIT</button>
+        </div>
+      </div>
+    </div>
 
-  // Scan line (drawn on top of notes)
-  drawScanLine(scanPx);
+    <div id="result">
+      <div class="result-rank" id="result-rank">S</div>
+      <div class="result-score" id="result-score">0000000</div>
+      <div class="result-stats">
+        <div class="result-stat">
+          <div class="result-stat-label">Perfect</div>
+          <div class="result-stat-value" id="r-perfect">0</div>
+        </div>
+        <div class="result-stat">
+          <div class="result-stat-label">Good</div>
+          <div class="result-stat-value" id="r-good">0</div>
+        </div>
+        <div class="result-stat">
+          <div class="result-stat-label">Bad</div>
+          <div class="result-stat-value" id="r-bad">0</div>
+        </div>
+        <div class="result-stat">
+          <div class="result-stat-label">Miss</div>
+          <div class="result-stat-value" id="r-miss">0</div>
+        </div>
+        <div class="result-stat">
+          <div class="result-stat-label">Max Combo</div>
+          <div class="result-stat-value" id="r-combo">0</div>
+        </div>
+        <div class="result-stat">
+          <div class="result-stat-label">Accuracy</div>
+          <div class="result-stat-value" id="r-acc">0%</div>
+        </div>
+      </div>
+      <button id="result-retry">PLAY AGAIN</button>
+    </div>
 
-  // Ripple effects
-  for(let i=ripples.length-1;i>=0;i--){
-    const r=ripples[i];
-    r.t+=0.045;
-    const alpha=1-r.t;
-    if(alpha<=0){ripples.splice(i,1);continue;}
-    const hex=Math.floor(alpha*255).toString(16).padStart(2,'0');
-    ctx.beginPath();ctx.arc(r.x,r.y,r.t*70,0,Math.PI*2);
-    ctx.strokeStyle=r.color+hex;ctx.lineWidth=2.5;ctx.stroke();
-    ctx.beginPath();ctx.arc(r.x,r.y,r.t*40,0,Math.PI*2);
-    ctx.strokeStyle=r.color+Math.floor(alpha*140).toString(16).padStart(2,'0');
-    ctx.lineWidth=1;ctx.stroke();
-  }
-}
+    <script>
+      let CHART = null;
 
-function noteVisible(tick){
-  const t=tickToTime(tick);
-  return t>currentTime-0.12 && t<currentTime+APPROACH_SECS+0.4;
-}
+      function onChartLoaded(data) {
+        CHART = data;
+        const btn = document.getElementById("start-btn");
+        btn.textContent = "\u25b6 PLAY";
+        btn.disabled = false;
+        const fp = document.getElementById("chart-filepicker-wrap");
+        if (fp) fp.style.display = "none";
+      }
 
-function approachAlpha(tick){
-  const timeLeft=tickToTime(tick)-currentTime;
-  if(timeLeft>APPROACH_SECS) return Math.max(0,(1-(timeLeft-APPROACH_SECS)/.3));
-  return Math.min(1,Math.max(0,1-(-timeLeft)/.15));
-}
+      function showFilePicker() {
+        document.getElementById("start-btn").textContent = "SELECT CHART FILE";
+        document.getElementById("chart-filepicker-wrap").style.display = "flex";
+      }
 
-function drawTap(n,ns){
-  if(ns.judged) return;
-  if(!noteVisible(n.tick)) return;
-  const px=n.x*W;
-  const py=PLAY_TOP+getNoteY(n.tick)*PLAY_H;
-  const alpha=approachAlpha(n.tick);
-  if(alpha<=0) return;
+      fetch("./charts/Metrik - We Are The Energy.json")
+        .then((r) => {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then(onChartLoaded)
+        .catch(() => showFilePicker());
 
-  const timeLeft=tickToTime(n.tick)-currentTime;
-  const approach=Math.max(0,Math.min(1,1-timeLeft/APPROACH_SECS));
-  const isFlick=n.type===1;
-  const col=isFlick?'#ff00aa':'#00f5ff';
+      function handleChartFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            onChartLoaded(JSON.parse(e.target.result));
+          } catch (err) {
+            alert("Invalid JSON: " + err.message);
+          }
+        };
+        reader.readAsText(file);
+      }
+    </script>
+    <script>
+      // ═══════════════════════════ MENU BG ═══════════════════════════
+      (function () {
+        const cvs = document.getElementById("bg-canvas");
+        const ctx = cvs.getContext("2d");
+        let W, H;
+        const pts = [];
+        function resize() {
+          W = cvs.width = cvs.offsetWidth;
+          H = cvs.height = cvs.offsetHeight;
+        }
+        window.addEventListener("resize", resize);
+        resize();
+        for (let i = 0; i < 70; i++)
+          pts.push({
+            x: Math.random() * 2000,
+            y: Math.random() * 2000,
+            vx: (Math.random() - 0.5) * 0.3,
+            vy: (Math.random() - 0.5) * 0.3,
+            r: Math.random() * 2 + 0.5,
+            a: Math.random() * 0.7 + 0.2,
+          });
+        let t = 0;
+        function frame() {
+          ctx.clearRect(0, 0, W, H);
+          t++;
+          const sy = (Math.sin(t * 0.008) * 0.5 + 0.5) * H;
+          const g = ctx.createLinearGradient(0, sy - 40, 0, sy + 40);
+          g.addColorStop(0, "transparent");
+          g.addColorStop(0.5, "rgba(0,245,255,.25)");
+          g.addColorStop(1, "transparent");
+          ctx.fillStyle = g;
+          ctx.fillRect(0, sy - 40, W, 80);
+          for (const p of pts) {
+            p.x += p.vx;
+            p.y += p.vy;
+            if (p.x < 0) p.x = W;
+            if (p.x > W) p.x = 0;
+            if (p.y < 0) p.y = H;
+            if (p.y > H) p.y = 0;
+            ctx.beginPath();
+            ctx.arc(p.x % W, p.y % H, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(0,245,255,${p.a * 0.5})`;
+            ctx.fill();
+          }
+          requestAnimationFrame(frame);
+        }
+        frame();
 
-  ctx.save();ctx.globalAlpha=alpha;
+        // Demo notes in scan preview
+        const demo = document.getElementById("scan-demo");
+        const positions = [0.18, 0.35, 0.5, 0.67, 0.82];
+        positions.forEach((x) => {
+          const d = document.createElement("div");
+          d.className = "demo-note";
+          d.style.left = x * 100 + "%";
+          d.style.top = Math.random() * 60 + 20 + "%";
+          demo.appendChild(d);
+        });
+      })();
 
-  // Approach ring (shrinks toward note)
-  const ringR=14+Math.max(0,(1-approach))*30;
-  ctx.beginPath();ctx.arc(px,py,ringR,0,Math.PI*2);
-  ctx.strokeStyle=col+'99';ctx.lineWidth=1.5;ctx.stroke();
+      // ═══════════════════════════ GAME ═══════════════════════════
+      const canvas = document.getElementById("game-canvas");
+      const ctx = canvas.getContext("2d");
+      let W, H, PLAY_TOP, PLAY_H; // playfield starts below HUD
 
-  // Glow
-  const glow=ctx.createRadialGradient(px,py,0,px,py,28);
-  glow.addColorStop(0,col+'44');glow.addColorStop(1,'transparent');
-  ctx.fillStyle=glow;ctx.beginPath();ctx.arc(px,py,28,0,Math.PI*2);ctx.fill();
+      function resize() {
+        W = canvas.width = canvas.offsetWidth;
+        H = canvas.height = canvas.offsetHeight;
+        PLAY_TOP = 60; // HUD height
+        PLAY_H = H - PLAY_TOP;
+      }
+      window.addEventListener("resize", resize);
 
-  // Main circle
-  ctx.beginPath();ctx.arc(px,py,14,0,Math.PI*2);
-  ctx.strokeStyle=col;ctx.lineWidth=2.5;ctx.stroke();
+      let BPM, TIME_BASE;
 
-  // Inner fill
-  ctx.beginPath();ctx.arc(px,py,7,0,Math.PI*2);
-  ctx.fillStyle=col;ctx.fill();
+      function tickToTime(tick) {
+        return tick / (TIME_BASE * (BPM / 60));
+      }
 
-  if(isFlick){
-    ctx.strokeStyle='#fff';ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(px-10,py);ctx.lineTo(px+10,py);
-    ctx.moveTo(px+4,py-5);ctx.lineTo(px+10,py);ctx.lineTo(px+4,py+5);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
+      // Judgement windows
+      const W_PERFECT = 0.08,
+        W_GOOD = 0.15,
+        W_BAD = 0.25;
+      const APPROACH_SECS = 0.45; // how far ahead notes are visible
 
-function drawHold(n,ns){
-  if(ns.done) return;
-  const startT=tickToTime(n.tick);
-  const endT=tickToTime(n.tick+n.duration);
-  if(startT>currentTime+APPROACH_SECS+.4) return;
-  if(endT<currentTime-.1){ns.done=true;return;}
+      // Game state
+      let state = "menu";
+      let startTime,
+        pauseStart,
+        totalPaused = 0,
+        currentTime = 0;
+      let score = 0,
+        combo = 0,
+        maxCombo = 0;
+      let counts = { perfect: 0, good: 0, bad: 0, miss: 0 };
+      let totalJudged = 0;
+      let noteStates = [];
+      let effects = [],
+        ripples = [];
+      let rafId = null;
 
-  const px=n.x*W;
-  const startY01=getNoteY(n.tick);
-  const endY01=getNoteY(n.tick+n.duration);
-  const startPy=PLAY_TOP+startY01*PLAY_H;
-  const endPy=PLAY_TOP+endY01*PLAY_H;
-  const alpha=approachAlpha(n.tick);
-  if(alpha<=0) return;
+      // ── SCAN LINE Y POSITION ────────────────────────────────────────
+      // direction -1: scan goes from TOP (y=0) to BOTTOM (y=1) within the page
+      // direction  1: scan goes from BOTTOM (y=1) to TOP (y=0) within the page
+      // Note 'x' in the chart = horizontal position 0..1
+      // Note timing within a page determines its Y (where scan line is when it hits)
 
-  ctx.save();ctx.globalAlpha=alpha;
+      function getScanLineY(time) {
+        const pages = CHART.page_list;
+        for (let i = 0; i < pages.length; i++) {
+          const p = pages[i];
+          const ps = tickToTime(p.start_tick);
+          const pe = tickToTime(p.end_tick);
+          if (time >= ps && time <= pe) {
+            const t = (time - ps) / (pe - ps); // 0..1 progress through page
+            // direction -1: starts at top (0), moves to bottom (1)
+            // direction  1: starts at bottom (1), moves to top (0)
+            return p.scan_line_direction === -1 ? t : 1 - t;
+          }
+        }
+        return 0;
+      }
 
-  // Hold body (vertical bar between start and end Y)
-  const minY=Math.min(startPy,endPy);
-  const maxY=Math.max(startPy,endPy);
-  const barW=8;
-  ctx.fillStyle='rgba(0,200,220,.2)';
-  ctx.fillRect(px-barW/2,minY,barW,maxY-minY);
-  if(ns.started){
-    const prog=Math.min(1,(currentTime-startT)/(endT-startT));
-    ctx.fillStyle='rgba(0,245,255,.5)';
-    ctx.fillRect(px-barW/2,minY,barW,(maxY-minY)*prog);
-  }
+      // Get note's Y position (where scan line is at note's tick time)
+      function getNoteY(tick) {
+        return getScanLineY(tickToTime(tick));
+      }
 
-  // Head circle
-  const r=16;
-  const glow=ctx.createRadialGradient(px,startPy,0,px,startPy,r*2);
-  glow.addColorStop(0,'rgba(0,245,255,.4)');glow.addColorStop(1,'transparent');
-  ctx.fillStyle=glow;ctx.beginPath();ctx.arc(px,startPy,r*2,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(px,startPy,r,0,Math.PI*2);
-  ctx.strokeStyle='#00f5ff';ctx.lineWidth=ns.started?3:2;ctx.stroke();
-  ctx.beginPath();ctx.arc(px,startPy,8,0,Math.PI*2);
-  ctx.fillStyle=ns.started?'#fff':'#00f5ff';ctx.fill();
+      // ── INIT ────────────────────────────────────────────────────────
+      function initGame() {
+        BPM = CHART.bpm;
+        TIME_BASE = CHART.time_base;
+        resize();
+        score = 0;
+        combo = 0;
+        maxCombo = 0;
+        counts = { perfect: 0, good: 0, bad: 0, miss: 0 };
+        totalJudged = 0;
+        effects = [];
+        ripples = [];
+        totalPaused = 0;
+        startTime = performance.now() / 1000;
 
-  ctx.restore();
-}
+        // Audio playback
+        const aud = document.getElementById("game-audio");
+        aud.currentTime = 0;
+        aud.play().catch(() => {}); // autoplay may require user gesture (already satisfied by button click)
 
-function drawChain(n,ns){
-  if(ns.done) return;
-  const nodes=ns.nodes;
-  const firstUnjudged=nodes.findIndex(nd=>!nd.judged);
-  if(firstUnjudged===-1){ns.done=true;return;}
-  const firstTick=nodes[firstUnjudged].tick;
-  if(tickToTime(firstTick)>currentTime+APPROACH_SECS+.4) return;
+        noteStates = CHART.note_list.map((n) => {
+          if (n.type === 3) {
+            return {
+              type: "chain",
+              done: false,
+              nodes: n.nodes.map((nd) => ({
+                tick: nd.tick,
+                x: nd.x,
+                judged: false,
+              })),
+            };
+          } else if (n.type === 2) {
+            return {
+              type: "hold",
+              started: false,
+              done: false,
+              startTick: n.tick,
+              endTick: n.tick + n.duration,
+            };
+          } else {
+            return { type: "tap", judged: false };
+          }
+        });
+        updateHUD();
+      }
 
-  ctx.save();
+      // ── JUDGE ────────────────────────────────────────────────────────
+      function judge(diff) {
+        const a = Math.abs(diff);
+        if (a <= W_PERFECT) return "perfect";
+        if (a <= W_GOOD) return "good";
+        if (a <= W_BAD) return "bad";
+        return null;
+      }
 
-  // Path line between unjudged nodes
-  const visible=nodes.filter(nd=>!nd.judged && noteVisible(nd.tick));
-  if(visible.length>1){
-    ctx.beginPath();
-    ctx.moveTo(visible[0].x*W, PLAY_TOP+getNoteY(visible[0].tick)*PLAY_H);
-    for(let j=1;j<visible.length;j++){
-      ctx.lineTo(visible[j].x*W, PLAY_TOP+getNoteY(visible[j].tick)*PLAY_H);
-    }
-    ctx.strokeStyle='rgba(255,220,0,.35)';ctx.lineWidth=2;
-    ctx.setLineDash([5,4]);ctx.stroke();ctx.setLineDash([]);
-  }
+      function applyJudge(j, x, y) {
+        if (!j) return;
+        combo++;
+        if (combo > maxCombo) maxCombo = combo;
+        totalJudged++;
+        if (j === "perfect") {
+          counts.perfect++;
+          score += 1000;
+        } else if (j === "good") {
+          counts.good++;
+          score += 700;
+        } else if (j === "bad") {
+          counts.bad++;
+          score += 300;
+          combo = 0;
+        }
+        addRipple(x, y, j);
+        showJudge(j.toUpperCase());
+        updateHUD();
+      }
 
-  // Nodes
-  for(let j=firstUnjudged;j<nodes.length;j++){
-    const nd=nodes[j];
-    if(nd.judged) continue;
-    if(!noteVisible(nd.tick)) continue;
-    const px=nd.x*W;
-    const py=PLAY_TOP+getNoteY(nd.tick)*PLAY_H;
-    const alpha=approachAlpha(nd.tick);
-    if(alpha<=0) continue;
+      function applyMiss(x, y) {
+        counts.miss++;
+        combo = 0;
+        totalJudged++;
+        addRipple(x, y, "miss");
+        showJudge("MISS");
+        updateHUD();
+      }
 
-    ctx.globalAlpha=alpha;
+      function addRipple(x, y, j) {
+        const cols = {
+          perfect: "#00f5ff",
+          good: "#a0ff80",
+          bad: "#ff8800",
+          miss: "#ff2244",
+        };
+        ripples.push({ x, y, t: 0, color: cols[j] || "#fff" });
+      }
 
-    const glow=ctx.createRadialGradient(px,py,0,px,py,20);
-    glow.addColorStop(0,'rgba(255,220,0,.3)');glow.addColorStop(1,'transparent');
-    ctx.fillStyle=glow;ctx.beginPath();ctx.arc(px,py,20,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(px,py,12,0,Math.PI*2);
-    ctx.strokeStyle='#ffe600';ctx.lineWidth=2;ctx.stroke();
-    ctx.beginPath();ctx.arc(px,py,6,0,Math.PI*2);
-    ctx.fillStyle='#ffe600';ctx.fill();
-  }
-  ctx.restore();
-}
+      function showJudge(text) {
+        const el = document.getElementById("judge-text");
+        const cols = {
+          PERFECT: "#00f5ff",
+          GOOD: "#a0ff80",
+          BAD: "#ff8800",
+          MISS: "#ff2244",
+        };
+        el.style.color = cols[text] || "#fff";
+        el.style.textShadow = `0 0 20px ${cols[text] || "#fff"}`;
+        el.textContent = text;
+        el.style.animation = "none";
+        el.offsetHeight;
+        el.style.animation = "judgeAnim .5s forwards";
+      }
 
-function drawScanLine(py){
-  // Glow area
-  const grad=ctx.createLinearGradient(0,py-50,0,py+50);
-  grad.addColorStop(0,'transparent');
-  grad.addColorStop(.4,'rgba(0,245,255,.07)');
-  grad.addColorStop(.5,'rgba(0,245,255,.16)');
-  grad.addColorStop(.6,'rgba(0,245,255,.07)');
-  grad.addColorStop(1,'transparent');
-  ctx.fillStyle=grad;ctx.fillRect(0,py-50,W,100);
+      const jstyle = document.createElement("style");
+      jstyle.textContent = `@keyframes judgeAnim{0%{opacity:1;transform:translate(-50%,-50%) scale(1.3)}60%{opacity:1;transform:translate(-50%,-50%) scale(.95)}100%{opacity:0;transform:translate(-50%,-65%) scale(.9)}}`;
+      document.head.appendChild(jstyle);
 
-  // Line
-  ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);
-  ctx.strokeStyle='#00f5ff';ctx.lineWidth=2;
-  ctx.shadowColor='#00f5ff';ctx.shadowBlur=14;ctx.stroke();ctx.shadowBlur=0;
+      function updateHUD() {
+        document.getElementById("score-display").textContent = String(
+          Math.floor(score),
+        ).padStart(7, "0");
+        const cn = document.getElementById("combo-number");
+        cn.textContent = combo;
+        if (combo > 0) {
+          cn.style.transform = "scale(1.25)";
+          setTimeout(() => (cn.style.transform = "scale(1)"), 100);
+        }
+        const acc =
+          totalJudged > 0
+            ? (
+                ((counts.perfect + counts.good * 0.7 + counts.bad * 0.3) /
+                  totalJudged) *
+                100
+              ).toFixed(2)
+            : "100.00";
+        document.getElementById("accuracy-display").textContent = acc + "%";
+        document.getElementById("progress-bar").style.width =
+          Math.min(100, (currentTime / CHART.length) * 100) + "%";
+      }
 
-  // Small arrows on sides showing direction
-  const dir=getCurrentPageDir();
-  const arrowSize=10;
-  // left arrow
-  ctx.fillStyle='rgba(0,245,255,.7)';
-  ctx.beginPath();
-  if(dir===-1){// going down, arrow points down
-    ctx.moveTo(16,py);ctx.lineTo(10,py-arrowSize);ctx.lineTo(22,py-arrowSize);
-  } else {
-    ctx.moveTo(16,py);ctx.lineTo(10,py+arrowSize);ctx.lineTo(22,py+arrowSize);
-  }
-  ctx.closePath();ctx.fill();
-  // right arrow
-  ctx.beginPath();
-  if(dir===-1){
-    ctx.moveTo(W-16,py);ctx.lineTo(W-10,py-arrowSize);ctx.lineTo(W-22,py-arrowSize);
-  } else {
-    ctx.moveTo(W-16,py);ctx.lineTo(W-10,py+arrowSize);ctx.lineTo(W-22,py+arrowSize);
-  }
-  ctx.closePath();ctx.fill();
-}
+      // ── INPUT ────────────────────────────────────────────────────────
+      function onInput() {
+        if (state !== "playing") return;
+        // Try to hit the nearest-timed note that's within window
+        let bestDiff = Infinity,
+          bestIdx = -1,
+          bestChainNodeIdx = -1;
 
-function getCurrentPageDir(){
-  const pages=CHART.page_list;
-  for(const p of pages){
-    const ps=tickToTime(p.start_tick);
-    const pe=tickToTime(p.end_tick);
-    if(currentTime>=ps&&currentTime<=pe) return p.scan_line_direction;
-  }
-  return -1;
-}
+        for (let i = 0; i < CHART.note_list.length; i++) {
+          const n = CHART.note_list[i];
+          const ns = noteStates[i];
+          if (n.type === 3) {
+            if (ns.done) continue;
+            for (let j = 0; j < ns.nodes.length; j++) {
+              const nd = ns.nodes[j];
+              if (nd.judged) continue;
+              const diff = currentTime - tickToTime(nd.tick);
+              if (
+                Math.abs(diff) <= W_BAD &&
+                Math.abs(diff) < Math.abs(bestDiff)
+              ) {
+                bestDiff = diff;
+                bestIdx = i;
+                bestChainNodeIdx = j;
+              }
+              break; // only check first unjudged
+            }
+          } else if (n.type === 2) {
+            if (ns.done || ns.started) continue;
+            const diff = currentTime - tickToTime(n.tick);
+            if (
+              Math.abs(diff) <= W_BAD &&
+              Math.abs(diff) < Math.abs(bestDiff)
+            ) {
+              bestDiff = diff;
+              bestIdx = i;
+              bestChainNodeIdx = -1;
+            }
+          } else {
+            if (ns.judged) continue;
+            const diff = currentTime - tickToTime(n.tick);
+            if (
+              Math.abs(diff) <= W_BAD &&
+              Math.abs(diff) < Math.abs(bestDiff)
+            ) {
+              bestDiff = diff;
+              bestIdx = i;
+              bestChainNodeIdx = -1;
+            }
+          }
+        }
 
-// ── LOOP ────────────────────────────────────────────────────────
-function loop(){
-  if(state!=='playing') return;
-  currentTime=performance.now()/1000-startTime-totalPaused;
-  checkMisses();
-  draw();
-  updateHUD();
-  if(currentTime>=CHART.length+0.5){endGame();return;}
-  rafId=requestAnimationFrame(loop);
-}
+        if (bestIdx === -1) return;
+        const n = CHART.note_list[bestIdx];
+        const ns = noteStates[bestIdx];
+        const j = judge(bestDiff);
+        if (!j) return;
 
-// ── RESULT ────────────────────────────────────────────────────────
-function endGame(){
-  state='result'; cancelAnimationFrame(rafId);
-  const acc=totalJudged>0?((counts.perfect+counts.good*.7+counts.bad*.3)/totalJudged*100):100;
-  let rank;
-  if(counts.miss===0&&counts.bad===0&&counts.good===0) rank='S';
-  else if(acc>=95) rank='A';
-  else if(acc>=85) rank='B';
-  else if(acc>=70) rank='C';
-  else rank='D';
-  const rc={S:'#00f5ff',A:'#a0ff80',B:'#ffe600',C:'#ff8800',D:'#ff2244'};
-  const re=document.getElementById('result-rank');
-  re.textContent=rank; re.style.color=rc[rank]; re.style.textShadow=`0 0 60px ${rc[rank]}`;
-  document.getElementById('result-score').textContent=String(Math.floor(score)).padStart(7,'0');
-  document.getElementById('r-perfect').textContent=counts.perfect;
-  document.getElementById('r-good').textContent=counts.good;
-  document.getElementById('r-bad').textContent=counts.bad;
-  document.getElementById('r-miss').textContent=counts.miss;
-  document.getElementById('r-combo').textContent=maxCombo;
-  document.getElementById('r-acc').textContent=acc.toFixed(2)+'%';
-  document.getElementById('game').style.display='none';
-  document.getElementById('result').classList.add('visible');
-}
+        if (n.type === 3) {
+          const nd = ns.nodes[bestChainNodeIdx];
+          nd.judged = true;
+          const px = nd.x * W;
+          const py = PLAY_TOP + getNoteY(nd.tick) * PLAY_H;
+          applyJudge(j, px, py);
+          if (ns.nodes.every((nd) => nd.judged)) ns.done = true;
+        } else if (n.type === 2) {
+          ns.started = true;
+          const px = n.x * W;
+          const py = PLAY_TOP + getNoteY(n.tick) * PLAY_H;
+          applyJudge(j, px, py);
+        } else {
+          ns.judged = true;
+          const px = n.x * W;
+          const py = PLAY_TOP + getNoteY(n.tick) * PLAY_H;
+          applyJudge(j, px, py);
+        }
+      }
 
-// ── UI WIRING ────────────────────────────────────────────────────
-document.getElementById('start-btn').addEventListener('click',()=>{
-  document.getElementById('menu').style.display='none';
-  document.getElementById('game').style.display='block';
-  state='playing'; initGame(); loop();
-});
-document.getElementById('pause-btn').addEventListener('click',()=>{
-  if(state!=='playing') return;
-  state='paused'; pauseStart=performance.now()/1000; cancelAnimationFrame(rafId);
-  document.getElementById('game-audio').pause();
-  document.getElementById('pause-overlay').classList.add('visible');
-});
-document.getElementById('resume-btn').addEventListener('click',()=>{
-  if(state!=='paused') return;
-  totalPaused+=(performance.now()/1000-pauseStart);
-  state='playing'; document.getElementById('pause-overlay').classList.remove('visible');
-  document.getElementById('game-audio').play().catch(()=>{});
-  loop();
-});
-document.getElementById('restart-btn').addEventListener('click',()=>{
-  document.getElementById('pause-overlay').classList.remove('visible');
-  state='playing'; initGame(); loop();
-});
-document.getElementById('quit-btn').addEventListener('click',()=>{
-  state='menu'; cancelAnimationFrame(rafId);
-  const aud=document.getElementById('game-audio');
-  aud.pause(); aud.currentTime=0;
-  document.getElementById('pause-overlay').classList.remove('visible');
-  document.getElementById('game').style.display='none';
-  document.getElementById('menu').style.display='flex';
-});
-document.getElementById('result-retry').addEventListener('click',()=>{
-  document.getElementById('result').classList.remove('visible');
-  document.getElementById('game').style.display='block';
-  state='playing'; initGame(); loop();
-});
+      canvas.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        onInput();
+      });
+      canvas.addEventListener(
+        "touchstart",
+        (e) => {
+          e.preventDefault();
+          onInput();
+        },
+        { passive: false },
+      );
+      document.addEventListener("keydown", (e) => {
+        if (["Space", "KeyD", "KeyF", "KeyJ", "KeyK"].includes(e.code)) {
+          e.preventDefault();
+          onInput();
+        }
+        if (e.code === "Escape") document.getElementById("pause-btn").click();
+      });
 
-resize();
-</script>
-</body>
+      // ── MISS DETECTION ────────────────────────────────────────────────
+      function checkMisses() {
+        for (let i = 0; i < CHART.note_list.length; i++) {
+          const n = CHART.note_list[i];
+          const ns = noteStates[i];
+          if (n.type === 3) {
+            if (ns.done) continue;
+            let allDone = true;
+            for (const nd of ns.nodes) {
+              if (nd.judged) continue;
+              allDone = false;
+              const t = tickToTime(nd.tick);
+              if (currentTime > t + W_BAD) {
+                nd.judged = true;
+                applyMiss(nd.x * W, PLAY_TOP + getNoteY(nd.tick) * PLAY_H);
+              }
+              break;
+            }
+            if (allDone || ns.nodes.every((nd) => nd.judged)) ns.done = true;
+          } else if (n.type === 2) {
+            if (ns.done) continue;
+            if (!ns.started) {
+              const t = tickToTime(n.tick);
+              if (currentTime > t + W_BAD) {
+                ns.done = true;
+                applyMiss(n.x * W, PLAY_TOP + getNoteY(n.tick) * PLAY_H);
+              }
+            } else {
+              const endT = tickToTime(n.tick + n.duration);
+              if (currentTime >= endT) {
+                ns.done = true;
+                counts.perfect++;
+                score += 500;
+                combo++;
+                if (combo > maxCombo) maxCombo = combo;
+                updateHUD();
+              }
+            }
+          } else {
+            if (ns.judged) continue;
+            const t = tickToTime(n.tick);
+            if (currentTime > t + W_BAD) {
+              ns.judged = true;
+              applyMiss(n.x * W, PLAY_TOP + getNoteY(n.tick) * PLAY_H);
+            }
+          }
+        }
+      }
+
+      // ── DRAW ────────────────────────────────────────────────────────
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        // Dark background
+        ctx.fillStyle = "#030a14";
+        ctx.fillRect(0, 0, W, H);
+
+        // Subtle grid
+        ctx.strokeStyle = "rgba(0,245,255,.03)";
+        ctx.lineWidth = 1;
+        for (let i = 1; i < 10; i++) {
+          ctx.beginPath();
+          ctx.moveTo((W * i) / 10, PLAY_TOP);
+          ctx.lineTo((W * i) / 10, H);
+          ctx.stroke();
+        }
+        for (let i = 1; i < 8; i++) {
+          ctx.beginPath();
+          ctx.moveTo(0, PLAY_TOP + (PLAY_H * i) / 8);
+          ctx.lineTo(W, PLAY_TOP + (PLAY_H * i) / 8);
+          ctx.stroke();
+        }
+
+        const scanY01 = getScanLineY(currentTime);
+        const scanPx = PLAY_TOP + scanY01 * PLAY_H;
+
+        // Draw notes (all visible ones)
+        for (let i = 0; i < CHART.note_list.length; i++) {
+          const n = CHART.note_list[i];
+          const ns = noteStates[i];
+          if (n.type === 3) drawChain(n, ns);
+          else if (n.type === 2) drawHold(n, ns);
+          else drawTap(n, ns);
+        }
+
+        // Scan line (drawn on top of notes)
+        drawScanLine(scanPx);
+
+        // Ripple effects
+        for (let i = ripples.length - 1; i >= 0; i--) {
+          const r = ripples[i];
+          r.t += 0.045;
+          const alpha = 1 - r.t;
+          if (alpha <= 0) {
+            ripples.splice(i, 1);
+            continue;
+          }
+          const hex = Math.floor(alpha * 255)
+            .toString(16)
+            .padStart(2, "0");
+          ctx.beginPath();
+          ctx.arc(r.x, r.y, r.t * 70, 0, Math.PI * 2);
+          ctx.strokeStyle = r.color + hex;
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(r.x, r.y, r.t * 40, 0, Math.PI * 2);
+          ctx.strokeStyle =
+            r.color +
+            Math.floor(alpha * 140)
+              .toString(16)
+              .padStart(2, "0");
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      }
+
+      function noteVisible(tick) {
+        const t = tickToTime(tick);
+        return t > currentTime - 0.12 && t < currentTime + APPROACH_SECS + 0.4;
+      }
+
+      function approachAlpha(tick) {
+        const timeLeft = tickToTime(tick) - currentTime;
+        if (timeLeft > APPROACH_SECS)
+          return Math.max(0, 1 - (timeLeft - APPROACH_SECS) / 0.3);
+        return Math.min(1, Math.max(0, 1 - -timeLeft / 0.15));
+      }
+
+      function drawTap(n, ns) {
+        if (ns.judged) return;
+        if (!noteVisible(n.tick)) return;
+        const px = n.x * W;
+        const py = PLAY_TOP + getNoteY(n.tick) * PLAY_H;
+        const alpha = approachAlpha(n.tick);
+        if (alpha <= 0) return;
+
+        const timeLeft = tickToTime(n.tick) - currentTime;
+        const approach = Math.max(0, Math.min(1, 1 - timeLeft / APPROACH_SECS));
+        const isFlick = n.type === 1;
+        const col = isFlick ? "#ff00aa" : "#00f5ff";
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+
+        // Approach ring (shrinks toward note)
+        const ringR = 14 + Math.max(0, 1 - approach) * 30;
+        ctx.beginPath();
+        ctx.arc(px, py, ringR, 0, Math.PI * 2);
+        ctx.strokeStyle = col + "99";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Glow
+        const glow = ctx.createRadialGradient(px, py, 0, px, py, 28);
+        glow.addColorStop(0, col + "44");
+        glow.addColorStop(1, "transparent");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(px, py, 28, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Main circle
+        ctx.beginPath();
+        ctx.arc(px, py, 14, 0, Math.PI * 2);
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // Inner fill
+        ctx.beginPath();
+        ctx.arc(px, py, 7, 0, Math.PI * 2);
+        ctx.fillStyle = col;
+        ctx.fill();
+
+        if (isFlick) {
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(px - 10, py);
+          ctx.lineTo(px + 10, py);
+          ctx.moveTo(px + 4, py - 5);
+          ctx.lineTo(px + 10, py);
+          ctx.lineTo(px + 4, py + 5);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawHold(n, ns) {
+        if (ns.done) return;
+        const startT = tickToTime(n.tick);
+        const endT = tickToTime(n.tick + n.duration);
+        if (startT > currentTime + APPROACH_SECS + 0.4) return;
+        if (endT < currentTime - 0.1) {
+          ns.done = true;
+          return;
+        }
+
+        const px = n.x * W;
+        const startY01 = getNoteY(n.tick);
+        const endY01 = getNoteY(n.tick + n.duration);
+        const startPy = PLAY_TOP + startY01 * PLAY_H;
+        const endPy = PLAY_TOP + endY01 * PLAY_H;
+        const alpha = approachAlpha(n.tick);
+        if (alpha <= 0) return;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+
+        // Hold body (vertical bar between start and end Y)
+        const minY = Math.min(startPy, endPy);
+        const maxY = Math.max(startPy, endPy);
+        const barW = 8;
+        ctx.fillStyle = "rgba(0,200,220,.2)";
+        ctx.fillRect(px - barW / 2, minY, barW, maxY - minY);
+        if (ns.started) {
+          const prog = Math.min(1, (currentTime - startT) / (endT - startT));
+          ctx.fillStyle = "rgba(0,245,255,.5)";
+          ctx.fillRect(px - barW / 2, minY, barW, (maxY - minY) * prog);
+        }
+
+        // Head circle
+        const r = 16;
+        const glow = ctx.createRadialGradient(
+          px,
+          startPy,
+          0,
+          px,
+          startPy,
+          r * 2,
+        );
+        glow.addColorStop(0, "rgba(0,245,255,.4)");
+        glow.addColorStop(1, "transparent");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(px, startPy, r * 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(px, startPy, r, 0, Math.PI * 2);
+        ctx.strokeStyle = "#00f5ff";
+        ctx.lineWidth = ns.started ? 3 : 2;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(px, startPy, 8, 0, Math.PI * 2);
+        ctx.fillStyle = ns.started ? "#fff" : "#00f5ff";
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      function drawChain(n, ns) {
+        if (ns.done) return;
+        const nodes = ns.nodes;
+        const firstUnjudged = nodes.findIndex((nd) => !nd.judged);
+        if (firstUnjudged === -1) {
+          ns.done = true;
+          return;
+        }
+        const firstTick = nodes[firstUnjudged].tick;
+        if (tickToTime(firstTick) > currentTime + APPROACH_SECS + 0.4) return;
+
+        ctx.save();
+
+        // Path line between unjudged nodes
+        const visible = nodes.filter(
+          (nd) => !nd.judged && noteVisible(nd.tick),
+        );
+        if (visible.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(
+            visible[0].x * W,
+            PLAY_TOP + getNoteY(visible[0].tick) * PLAY_H,
+          );
+          for (let j = 1; j < visible.length; j++) {
+            ctx.lineTo(
+              visible[j].x * W,
+              PLAY_TOP + getNoteY(visible[j].tick) * PLAY_H,
+            );
+          }
+          ctx.strokeStyle = "rgba(255,220,0,.35)";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // Nodes
+        for (let j = firstUnjudged; j < nodes.length; j++) {
+          const nd = nodes[j];
+          if (nd.judged) continue;
+          if (!noteVisible(nd.tick)) continue;
+          const px = nd.x * W;
+          const py = PLAY_TOP + getNoteY(nd.tick) * PLAY_H;
+          const alpha = approachAlpha(nd.tick);
+          if (alpha <= 0) continue;
+
+          ctx.globalAlpha = alpha;
+
+          const glow = ctx.createRadialGradient(px, py, 0, px, py, 20);
+          glow.addColorStop(0, "rgba(255,220,0,.3)");
+          glow.addColorStop(1, "transparent");
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(px, py, 20, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(px, py, 12, 0, Math.PI * 2);
+          ctx.strokeStyle = "#ffe600";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(px, py, 6, 0, Math.PI * 2);
+          ctx.fillStyle = "#ffe600";
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function drawScanLine(py) {
+        // Glow area
+        const grad = ctx.createLinearGradient(0, py - 50, 0, py + 50);
+        grad.addColorStop(0, "transparent");
+        grad.addColorStop(0.4, "rgba(0,245,255,.07)");
+        grad.addColorStop(0.5, "rgba(0,245,255,.16)");
+        grad.addColorStop(0.6, "rgba(0,245,255,.07)");
+        grad.addColorStop(1, "transparent");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, py - 50, W, 100);
+
+        // Line
+        ctx.beginPath();
+        ctx.moveTo(0, py);
+        ctx.lineTo(W, py);
+        ctx.strokeStyle = "#00f5ff";
+        ctx.lineWidth = 2;
+        ctx.shadowColor = "#00f5ff";
+        ctx.shadowBlur = 14;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // Small arrows on sides showing direction
+        const dir = getCurrentPageDir();
+        const arrowSize = 10;
+        // left arrow
+        ctx.fillStyle = "rgba(0,245,255,.7)";
+        ctx.beginPath();
+        if (dir === -1) {
+          // going down, arrow points down
+          ctx.moveTo(16, py);
+          ctx.lineTo(10, py - arrowSize);
+          ctx.lineTo(22, py - arrowSize);
+        } else {
+          ctx.moveTo(16, py);
+          ctx.lineTo(10, py + arrowSize);
+          ctx.lineTo(22, py + arrowSize);
+        }
+        ctx.closePath();
+        ctx.fill();
+        // right arrow
+        ctx.beginPath();
+        if (dir === -1) {
+          ctx.moveTo(W - 16, py);
+          ctx.lineTo(W - 10, py - arrowSize);
+          ctx.lineTo(W - 22, py - arrowSize);
+        } else {
+          ctx.moveTo(W - 16, py);
+          ctx.lineTo(W - 10, py + arrowSize);
+          ctx.lineTo(W - 22, py + arrowSize);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      function getCurrentPageDir() {
+        const pages = CHART.page_list;
+        for (const p of pages) {
+          const ps = tickToTime(p.start_tick);
+          const pe = tickToTime(p.end_tick);
+          if (currentTime >= ps && currentTime <= pe)
+            return p.scan_line_direction;
+        }
+        return -1;
+      }
+
+      // ── LOOP ────────────────────────────────────────────────────────
+      function loop() {
+        if (state !== "playing") return;
+        currentTime = performance.now() / 1000 - startTime - totalPaused;
+        checkMisses();
+        draw();
+        updateHUD();
+        if (currentTime >= CHART.length + 0.5) {
+          endGame();
+          return;
+        }
+        rafId = requestAnimationFrame(loop);
+      }
+
+      // ── RESULT ────────────────────────────────────────────────────────
+      function endGame() {
+        state = "result";
+        cancelAnimationFrame(rafId);
+        const acc =
+          totalJudged > 0
+            ? ((counts.perfect + counts.good * 0.7 + counts.bad * 0.3) /
+                totalJudged) *
+              100
+            : 100;
+        let rank;
+        if (counts.miss === 0 && counts.bad === 0 && counts.good === 0)
+          rank = "S";
+        else if (acc >= 95) rank = "A";
+        else if (acc >= 85) rank = "B";
+        else if (acc >= 70) rank = "C";
+        else rank = "D";
+        const rc = {
+          S: "#00f5ff",
+          A: "#a0ff80",
+          B: "#ffe600",
+          C: "#ff8800",
+          D: "#ff2244",
+        };
+        const re = document.getElementById("result-rank");
+        re.textContent = rank;
+        re.style.color = rc[rank];
+        re.style.textShadow = `0 0 60px ${rc[rank]}`;
+        document.getElementById("result-score").textContent = String(
+          Math.floor(score),
+        ).padStart(7, "0");
+        document.getElementById("r-perfect").textContent = counts.perfect;
+        document.getElementById("r-good").textContent = counts.good;
+        document.getElementById("r-bad").textContent = counts.bad;
+        document.getElementById("r-miss").textContent = counts.miss;
+        document.getElementById("r-combo").textContent = maxCombo;
+        document.getElementById("r-acc").textContent = acc.toFixed(2) + "%";
+        document.getElementById("game").style.display = "none";
+        document.getElementById("result").classList.add("visible");
+      }
+
+      // ── UI WIRING ────────────────────────────────────────────────────
+      document.getElementById("start-btn").addEventListener("click", () => {
+        document.getElementById("menu").style.display = "none";
+        document.getElementById("game").style.display = "block";
+        state = "playing";
+        initGame();
+        loop();
+      });
+      document.getElementById("pause-btn").addEventListener("click", () => {
+        if (state !== "playing") return;
+        state = "paused";
+        pauseStart = performance.now() / 1000;
+        cancelAnimationFrame(rafId);
+        document.getElementById("game-audio").pause();
+        document.getElementById("pause-overlay").classList.add("visible");
+      });
+      document.getElementById("resume-btn").addEventListener("click", () => {
+        if (state !== "paused") return;
+        totalPaused += performance.now() / 1000 - pauseStart;
+        state = "playing";
+        document.getElementById("pause-overlay").classList.remove("visible");
+        document
+          .getElementById("game-audio")
+          .play()
+          .catch(() => {});
+        loop();
+      });
+      document.getElementById("restart-btn").addEventListener("click", () => {
+        document.getElementById("pause-overlay").classList.remove("visible");
+        state = "playing";
+        initGame();
+        loop();
+      });
+      document.getElementById("quit-btn").addEventListener("click", () => {
+        state = "menu";
+        cancelAnimationFrame(rafId);
+        const aud = document.getElementById("game-audio");
+        aud.pause();
+        aud.currentTime = 0;
+        document.getElementById("pause-overlay").classList.remove("visible");
+        document.getElementById("game").style.display = "none";
+        document.getElementById("menu").style.display = "flex";
+      });
+      document.getElementById("result-retry").addEventListener("click", () => {
+        document.getElementById("result").classList.remove("visible");
+        document.getElementById("game").style.display = "block";
+        state = "playing";
+        initGame();
+        loop();
+      });
+
+      resize();
+    </script>
+  </body>
 </html>

@@ -1,355 +1,298 @@
-import {
-  Application, Container, Geometry, GlProgram, Shader, Mesh, Text, TextStyle,
-} from 'pixi.js'
-import type { RuntimeNote, JudgmentResult } from './types'
+import { Application, Container, Graphics, Text, TextStyle } from "pixi.js";
+import type { RuntimeNote, JudgmentResult } from "./types";
 
-// ─── Shaders ──────────────────────────────────────────────────────────────────
+const NOTE_R = 64;
+const APPROACH_S = 1.8;
 
-const VERT = /* glsl */`#version 300 es
-precision highp float;
+// App design tokens (from global.css)
+const COL = {
+  tap: 0xe8e8ee, // near-white — clean default
+  flick: 0xff3f80, // accent-pink
+  hold: 0x3e9bff, // accent-blue
+  chain: 0x00d4e8, // accent-cyan
+} as const;
 
-in vec2 aPosition;
-in vec2 aUvs;
+const NOTE_COLOR: Record<0 | 1 | 2 | 3, number> = {
+  0: COL.tap,
+  1: COL.flick,
+  2: COL.hold,
+  3: COL.chain,
+};
 
-uniform float uX;
-uniform float uY;
-uniform float uSize;
-uniform vec2  uResolution;
+// Judgment result colors
+const HIT_COLOR: Record<JudgmentResult, number> = {
+  perfect: 0xe8e8ee,
+  good: 0x3e9bff,
+  bad: 0xff3f80,
+  miss: 0xff3f5a,
+};
 
-out vec2 vUvs;
+const HIT_COLOR_STR: Record<JudgmentResult, string> = {
+  perfect: "#e8e8ee",
+  good: "#3e9bff",
+  bad: "#ff3f80",
+  miss: "#ff3f5a",
+};
 
-void main(void) {
-  vUvs        = aUvs;
-  vec2 world  = aPosition * uSize + vec2(uX, uY);
-  vec2 ndc    = (world / uResolution) * 2.0 - 1.0;
-  ndc.y       = -ndc.y;
-  gl_Position = vec4(ndc, 0.0, 1.0);
+interface Popup {
+  text: Text;
+  life: number;
 }
-`
-
-const NOTE_FRAG = /* glsl */`#version 300 es
-precision highp float;
-
-in  vec2 vUvs;
-out vec4 fragColor;
-
-uniform float uTime;
-uniform float uActive;
-uniform vec3  uColor;
-uniform float uNoteType;
-uniform float uSwipeDir;
-uniform float uHitFlash;
-
-void main(void) {
-  vec2  uv   = vUvs * 2.0 - 1.0;
-  float dist = length(uv);
-  if (dist > 1.0) discard;
-
-  float angle     = atan(uv.y, uv.x);
-
-  // ── Zones ──────────────────────────────────────────────────────────────────
-  float ringInner = 0.64;
-  float ringOuter = 0.88;
-
-  // Smooth 0→1 weight for being inside the ring interior
-  float wInner = 1.0 - smoothstep(ringInner, ringInner + 0.03, dist);
-  // Smooth 0→1 weight for being on the ring band itself
-  float wRing  = smoothstep(ringInner - 0.01, ringInner + 0.02, dist)
-               * (1.0 - smoothstep(ringOuter - 0.01, ringOuter + 0.03, dist));
-  // Weight for being outside the ring (disc fringe between ringOuter and 1.0)
-  float wOuter = smoothstep(ringOuter - 0.01, ringOuter + 0.02, dist);
-
-  // ── Tick notches (16 evenly spaced) ────────────────────────────────────────
-  float tick = step(0.91, abs(cos(angle * 8.0))) * wRing;
-
-  // ── Inner fill colour ───────────────────────────────────────────────────────
-  // Very dark navy at rest, blooms to hue colour when active
-  float falloff  = 1.0 - smoothstep(0.0, ringInner, dist);
-  vec3  innerCol = mix(
-    vec3(0.05, 0.05, 0.11),            // rest:   almost black
-    uColor * (0.6 + 0.4 * falloff),    // active: hue glow
-    uActive
-  );
-  // Add a sharp bright core
-  float coreFall = 1.0 - smoothstep(0.0, 0.20, dist);
-  innerCol       = mix(innerCol, vec3(1.0, 0.95, 1.0), coreFall * uActive * 0.90);
-
-  // ── Ring colour ─────────────────────────────────────────────────────────────
-  // Dark by default so it reads clearly on a light background
-  vec3 ringBase  = vec3(0.15, 0.14, 0.22);   // dark navy-purple ring
-  vec3 ringTick  = vec3(0.30, 0.28, 0.42);   // slightly lighter for ticks
-  vec3 ringCol   = mix(ringBase, ringTick, tick);
-  // Ring glows faintly with hue when active
-  ringCol        = mix(ringCol, uColor * 0.85, uActive * 0.30);
-
-  // ── Outer disc fringe (very dark, fades to transparent) ────────────────────
-  vec3 outerCol  = vec3(0.08, 0.08, 0.14);
-
-  // ── Compose with mix() – no additive overflow ───────────────────────────────
-  vec3 color = outerCol;
-  color      = mix(color, ringCol,  wRing);
-  color      = mix(color, innerCol, wInner);
-
-  // ── Swipe arrow ─────────────────────────────────────────────────────────────
-  if (uNoteType > 1.5) {
-    vec2  au    = uv * vec2(uSwipeDir, 1.0);
-    float arrow = step(0.10, au.x)
-                * (1.0 - smoothstep(0.0, 0.22, abs(au.y) - (au.x - 0.10)));
-    color       = mix(color, uColor * 1.3, arrow * wInner * 0.75);
-  }
-
-  // ── Hit burst ───────────────────────────────────────────────────────────────
-  if (uHitFlash > 0.01) {
-    float ring = smoothstep(uHitFlash - 0.10, uHitFlash,        dist)
-               * (1.0 - smoothstep(uHitFlash, uHitFlash + 0.05, dist));
-    color = mix(color, uColor + 0.25, ring * (1.0 - uHitFlash));
-  }
-
-  // ── Alpha: solid disc with soft outer edge ───────────────────────────────────
-  float alpha = 0.93 * (1.0 - smoothstep(0.90, 1.0, dist));
-
-  fragColor = vec4(color, alpha);
+interface Ripple {
+  x: number;
+  y: number;
+  t: number;
+  color: number;
 }
-`
-
-const HOLD_FRAG = /* glsl */`#version 300 es
-precision highp float;
-
-in  vec2 vUvs;
-out vec4 fragColor;
-
-uniform float uProgress;
-uniform float uTime;
-uniform vec3  uColor;
-
-void main(void) {
-  float fill  = step(1.0 - uProgress, vUvs.y);
-  float edge  = smoothstep(0.0, 0.15, vUvs.x) * (1.0 - smoothstep(0.85, 1.0, vUvs.x));
-  float pulse = 0.5 + 0.5 * sin(uTime * 5.0 + vUvs.y * 10.0);
-  vec3  col   = mix(uColor * 0.4, uColor, vUvs.y * uProgress);
-  fragColor   = vec4(col, fill * edge * 0.55 * pulse);
-}
-`
-
-// ─── Geometry — explicit format so PixiJS v8 doesn't misread the buffers ──────
-
-function makeQuad(): Geometry {
-  return new Geometry({
-    attributes: {
-      aPosition: {
-        buffer: new Float32Array([-0.5, -0.5,  0.5, -0.5,  0.5, 0.5, -0.5, 0.5]),
-        format: 'float32x2',
-        stride: 8,
-        offset: 0,
-      },
-      aUvs: {
-        buffer: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
-        format: 'float32x2',
-        stride: 8,
-        offset: 0,
-      },
-    },
-    indexBuffer: new Uint16Array([0, 1, 2, 0, 2, 3]),
-  })
-}
-
-function makeTrail(): Geometry {
-  return new Geometry({
-    attributes: {
-      aPosition: {
-        buffer: new Float32Array([-0.1, -0.5,  0.1, -0.5,  0.1, 0.5, -0.1, 0.5]),
-        format: 'float32x2',
-        stride: 8,
-        offset: 0,
-      },
-      aUvs: {
-        buffer: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
-        format: 'float32x2',
-        stride: 8,
-        offset: 0,
-      },
-    },
-    indexBuffer: new Uint16Array([0, 1, 2, 0, 2, 3]),
-  })
-}
-
-// ─── Shader factories ─────────────────────────────────────────────────────────
-
-const TYPE_COLOR: Record<RuntimeNote['type'], [number, number, number]> = {
-  tap  : [0.40, 0.50, 1.00],
-  hold : [0.55, 0.32, 1.00],
-  swipe: [0.20, 0.75, 1.00],
-}
-
-function makeNoteShader(note: RuntimeNote, size: number, res: [number, number]): Shader {
-  const col = TYPE_COLOR[note.type]
-  return new Shader({
-    glProgram: new GlProgram({ vertex: VERT, fragment: NOTE_FRAG }),
-    resources: {
-      uniforms: {
-        uX        : { value: note.pixelX, type: 'f32'       },
-        uY        : { value: note.pixelY, type: 'f32'       },
-        uSize     : { value: size,        type: 'f32'       },
-        uResolution:{ value: res,         type: 'vec2<f32>' },
-        uTime     : { value: 0,           type: 'f32'       },
-        uActive   : { value: 0,           type: 'f32'       },
-        uColor    : { value: col,         type: 'vec3<f32>' },
-        uNoteType : { value: note.type === 'tap' ? 0 : note.type === 'hold' ? 1 : 2, type: 'f32' },
-        uSwipeDir : { value: note.swipeDir === 'left' ? -1 : 1, type: 'f32' },
-        uHitFlash : { value: 0,           type: 'f32'       },
-      },
-    },
-  })
-}
-
-function makeHoldShader(note: RuntimeNote, h: number, res: [number, number]): Shader {
-  const col = TYPE_COLOR[note.type]
-  return new Shader({
-    glProgram: new GlProgram({ vertex: VERT, fragment: HOLD_FRAG }),
-    resources: {
-      uniforms: {
-        uX        : { value: note.pixelX,       type: 'f32'       },
-        uY        : { value: note.pixelY - h/2,  type: 'f32'       },
-        uSize     : { value: h,                  type: 'f32'       },
-        uResolution:{ value: res,                type: 'vec2<f32>' },
-        uProgress : { value: 0,                  type: 'f32'       },
-        uTime     : { value: 0,                  type: 'f32'       },
-        uColor    : { value: col,                type: 'vec3<f32>' },
-      },
-    },
-  })
-}
-
-// ─── Popups ───────────────────────────────────────────────────────────────────
-
-interface Popup { text: Text; life: number; vy: number }
-
-const POPUP_FILL: Record<JudgmentResult, string> = {
-  perfect: '#a87cff',
-  good   : '#5cb8ff',
-  bad    : '#ff8c4a',
-  miss   : '#ff4466',
-}
-
-// ─── NoteRenderer ─────────────────────────────────────────────────────────────
 
 export class NoteRenderer {
-  private container  : Container
-  private popupLayer : Container
-  private meshes     : Map<number, Mesh<Geometry, Shader>> = new Map()
-  private holdMeshes : Map<number, Mesh<Geometry, Shader>> = new Map()
-  private popups     : Popup[] = []
-  private noteGeo    : Geometry
-  private NOTE_SIZE  : number
-  private RES        : [number, number]
+  private gfx: Graphics;
+  private popupLayer: Container;
+  private popups: Popup[] = [];
+  private ripples: Ripple[] = [];
 
   constructor(
-    _app       : Application,
-    stage      : Container,
-    private W  : number,
-    private H  : number,
-    _lanes     = 8,
+    _app: Application,
+    stage: Container,
+    private W: number,
+    private H: number,
   ) {
-    this.NOTE_SIZE = Math.min(W, H) * 0.10
-    this.RES       = [W, H]
-    this.container  = new Container()
-    this.popupLayer = new Container()
-    stage.addChild(this.container)
-    stage.addChild(this.popupLayer)
-    this.noteGeo    = makeQuad()
+    this.gfx = new Graphics();
+    this.popupLayer = new Container();
+    // Insert at 0 so Scanner (added after) renders on top
+    stage.addChildAt(this.gfx, 0);
+    stage.addChild(this.popupLayer);
   }
 
-  loadNotes(notes: RuntimeNote[]) {
-    this.clearAll()
-    notes.forEach(n => this.addNote(n))
-  }
+  update(
+    notes: RuntimeNote[],
+    _scanPixelY: number,
+    elapsed: number,
+    deltaMs: number,
+  ) {
+    const g = this.gfx;
+    g.clear();
 
-  private addNote(note: RuntimeNote) {
-    if (note.type === 'hold' && note.holdDuration) {
-      const h     = (note.holdDuration / 2000) * this.H * 0.45
-      const trail = new Mesh({ geometry: makeTrail(), shader: makeHoldShader(note, h, this.RES) })
-      this.container.addChildAt(trail, 0)
-      this.holdMeshes.set(note.id, trail)
+    // Holds first (below heads)
+    for (const n of notes) if (n.type === 2) this.drawHoldBody(g, n, elapsed);
+
+    // Chain connectors
+    for (const n of notes) if (n.type === 3) this.drawChainPath(g, n, elapsed);
+    debugger;
+
+    // Note heads
+    for (const n of notes) this.drawHead(g, n, elapsed);
+
+    // Ripples
+    for (let i = this.ripples.length - 1; i >= 0; i--) {
+      const r = this.ripples[i];
+      r.t += deltaMs / 800;
+      const a = Math.max(0, 1 - r.t);
+      if (a <= 0) {
+        this.ripples.splice(i, 1);
+        continue;
+      }
+      g.circle(r.x, r.y, r.t * 56);
+      g.stroke({ width: 1.5, color: r.color, alpha: a * 0.7 });
     }
-    const mesh = new Mesh({ geometry: this.noteGeo, shader: makeNoteShader(note, this.NOTE_SIZE, this.RES) })
-    this.container.addChild(mesh)
-    this.meshes.set(note.id, mesh)
-  }
 
-  update(notes: RuntimeNote[], scanPixelY: number, elapsed: number, deltaMs: number) {
-    for (const note of notes) {
-      if (note.hit || note.missed) { this.removeMesh(note.id); continue }
-      const mesh = this.meshes.get(note.id)
-      if (!mesh) continue
-
-      const u   = mesh.shader.resources.uniforms.uniforms
-      const raw = Math.abs(scanPixelY - note.pixelY) / (this.H * 0.14)
-      u.uActive = parseFloat(Math.max(0, 1.0 - Math.min(1.0, raw)).toFixed(4))
-      u.uTime   = elapsed / 1000
-
-      if (note.type === 'hold' && note.holdActive) {
-        const hold = this.holdMeshes.get(note.id)
-        if (hold) {
-          hold.shader.resources.uniforms.uniforms.uProgress = note.holdProgress
-          hold.shader.resources.uniforms.uniforms.uTime     = elapsed / 1000
-        }
+    // Popups
+    for (let i = this.popups.length - 1; i >= 0; i--) {
+      const p = this.popups[i];
+      p.life -= deltaMs;
+      p.text.y -= 0.06 * deltaMs;
+      p.text.alpha = Math.max(0, p.life / 550);
+      if (p.life <= 0) {
+        p.text.destroy();
+        this.popups.splice(i, 1);
       }
     }
-    this.updatePopups(deltaMs)
   }
 
-  triggerHitFlash(noteId: number, result: JudgmentResult, x: number, y: number) {
-    const mesh = this.meshes.get(noteId)
-    if (mesh) mesh.shader.resources.uniforms.uniforms.uHitFlash = 0.01
-    this.spawnPopup(result, x, y)
+  // ── Alpha helpers ──────────────────────────────────────────────────────────
+
+  private alpha(timeSeconds: number, elapsed: number): number {
+    const tl = timeSeconds - elapsed;
+    if (tl > APPROACH_S) return Math.max(0, 1 - (tl - APPROACH_S) / 0.1);
+    // Stay visible until past bad window (0.25s) so notes don't vanish before miss fires
+    return Math.min(1, Math.max(0, 1 - -tl / 0.25));
   }
 
-  animateHitFlash(noteId: number, t: number) {
-    const mesh = this.meshes.get(noteId)
-    if (mesh) mesh.shader.resources.uniforms.uniforms.uHitFlash = t
-  }
+  // ── Tap / Flick head ───────────────────────────────────────────────────────
 
-  private spawnPopup(result: JudgmentResult, x: number, y: number) {
-    const text = new Text({
-      text : result.toUpperCase(),
-      style: new TextStyle({
-        fontFamily   : 'sans-serif',
-        fontWeight   : '300',
-        fontSize     : result === 'perfect' ? 52 : 42,
-        letterSpacing: 14,
-        fill         : POPUP_FILL[result],
-      }),
-    })
-    text.anchor.set(0.5)
-    text.position.set(x, y)
-    this.popupLayer.addChild(text)
-    this.popups.push({ text, life: 700, vy: -0.10 })
-  }
+  private drawHead(g: Graphics, note: RuntimeNote, elapsed: number) {
+    if (note.missed) {
+      return;
+    }
+    if (note.hit && note.type !== 2) return;
+    if (note.type === 3) {
+      this.drawChainNodes(g, note, elapsed);
+      return;
+    }
+    if (note.type === 2) {
+      this.drawHoldHead(g, note, elapsed);
+      return;
+    }
 
-  private updatePopups(deltaMs: number) {
-    for (let i = this.popups.length - 1; i >= 0; i--) {
-      const p   = this.popups[i]
-      p.life   -= deltaMs
-      p.text.y += p.vy * deltaMs
-      p.text.alpha = Math.max(0, p.life / 700)
-      if (p.life <= 0) { p.text.destroy(); this.popups.splice(i, 1) }
+    const alpha = this.alpha(note.timeSeconds, elapsed);
+    if (alpha <= 0) return;
+
+    const { pixelX: px, pixelY: py } = note;
+    const tl = note.timeSeconds - elapsed;
+    const approach = Math.max(0, Math.min(1, 1 - tl / APPROACH_S));
+    const col = NOTE_COLOR[note.type];
+
+    // Approach ring — shrinks toward note circle
+    const ringR = NOTE_R + (1 - approach) * 400;
+    g.circle(px, py, ringR);
+    g.stroke({ width: 2, color: col, alpha: alpha * 0.6 });
+
+    // Subtle fill behind ring
+    g.circle(px, py, NOTE_R);
+    g.fill({ color: col, alpha: alpha * 0.08 });
+
+    // Main ring
+    g.circle(px, py, NOTE_R);
+    g.stroke({ width: 2, color: col, alpha: alpha * 0.9 });
+
+    // Centre dot
+    g.circle(px, py, NOTE_R * 0.4);
+    g.fill({ color: col, alpha: alpha });
+
+    // Flick arrow (small, clean)
+    if (note.type === 1) {
+      const aw = 9,
+        ah = 5;
+      g.moveTo(px - aw, py);
+      g.lineTo(px + aw, py);
+      g.moveTo(px + aw - ah, py - ah);
+      g.lineTo(px + aw, py);
+      g.lineTo(px + aw - ah, py + ah);
+      g.stroke({ width: 1.5, color: 0xffffff, alpha: alpha * 0.85 });
     }
   }
 
-  private removeMesh(id: number) {
-    const m = this.meshes.get(id);     if (m) { m.destroy(true); this.meshes.delete(id)     }
-    const h = this.holdMeshes.get(id); if (h) { h.destroy(true); this.holdMeshes.delete(id) }
+  // ── Hold body (bar between start and end Y) ────────────────────────────────
+
+  private drawHoldBody(g: Graphics, note: RuntimeNote, elapsed: number) {
+    if (note.missed) return;
+    if (note.hit && !note.holdActive) return;
+    const a = this.alpha(note.timeSeconds, elapsed);
+    if (a <= 0) return;
+
+    const px = note.pixelX;
+    const minY = Math.min(note.pixelY, note.endPixelY);
+    const maxY = Math.max(note.pixelY, note.endPixelY);
+    const bh = maxY - minY;
+    if (bh <= 0) return;
+    const bw = 18;
+
+    // Track (thin background line)
+    g.rect(px - bw / 2, minY, bw, bh);
+    g.fill({ color: COL.hold, alpha: a * 0.18 });
+
+    // Fill progress
+    if (note.holdActive) {
+      g.rect(px - bw / 2, minY, bw, bh * note.holdProgress);
+      g.fill({ color: COL.hold, alpha: a * 0.6 });
+    }
   }
 
-  clearAll() {
-    this.container.removeChildren().forEach(c => c.destroy(true))
-    this.meshes.clear()
-    this.holdMeshes.clear()
+  private drawHoldHead(g: Graphics, note: RuntimeNote, elapsed: number) {
+    if (note.hit && !note.holdActive) return;
+    const a = this.alpha(note.timeSeconds, elapsed);
+    if (a <= 0) return;
+
+    const { pixelX: px, pixelY: py } = note;
+
+    // Subtle outer glow
+    g.circle(px, py, NOTE_R * 1.5);
+    g.fill({ color: COL.hold, alpha: a * 0.07 });
+
+    // Ring — thicker when held
+    g.circle(px, py, NOTE_R);
+    g.stroke({
+      width: note.holdActive ? 2.5 : 1.8,
+      color: COL.hold,
+      alpha: a * 0.9,
+    });
+
+    // Centre
+    g.circle(px, py, NOTE_R * 0.32);
+    g.fill({ color: note.holdActive ? 0xffffff : COL.hold, alpha: a });
+  }
+
+  // ── Chain ──────────────────────────────────────────────────────────────────
+
+  private drawChainPath(g: Graphics, note: RuntimeNote, elapsed: number) {
+    if (!note.nodes) return;
+    const visible = note.nodes.filter(
+      (node) =>
+        !node.judged &&
+        node.timeSeconds > elapsed - 0.1 &&
+        node.timeSeconds < elapsed + APPROACH_S + 0.4,
+    );
+    for (let i = 0; i < visible.length - 1; i++) {
+      g.moveTo(visible[i].pixelX, visible[i].pixelY);
+      g.lineTo(visible[i + 1].pixelX, visible[i + 1].pixelY);
+      g.stroke({ width: 10, color: COL.chain, alpha: 0.3 });
+    }
+  }
+
+  private drawChainNodes(g: Graphics, note: RuntimeNote, elapsed: number) {
+    if (!note.nodes) return;
+    for (const node of note.nodes) {
+      if (node.judged) continue;
+      if (
+        node.timeSeconds < elapsed - 0.1 ||
+        node.timeSeconds > elapsed + APPROACH_S + 0.4
+      )
+        continue;
+      const alpha = this.alpha(node.timeSeconds, elapsed);
+      if (alpha <= 0) continue;
+
+      // Small ring
+      g.circle(node.pixelX, node.pixelY, NOTE_R * 0.6);
+      g.stroke({ width: 1.5, color: COL.chain, alpha: alpha * 0.9 });
+
+      // Centre dot
+      g.circle(node.pixelX, node.pixelY, NOTE_R * 0.22);
+      g.fill({ color: COL.chain, alpha });
+    }
+  }
+
+  // ── Hit feedback ───────────────────────────────────────────────────────────
+
+  triggerHit(noteId: number, result: JudgmentResult, x: number, y: number) {
+    this.ripples.push({ x, y, t: 0, color: HIT_COLOR[result] });
+
+    const label =
+      result === "perfect"
+        ? "PERFECT"
+        : result === "good"
+          ? "GOOD"
+          : result === "bad"
+            ? "BAD"
+            : "MISS";
+
+    const text = new Text({
+      text: label,
+      style: new TextStyle({
+        fontFamily: '"Rajdhani", "Inter", system-ui, sans-serif',
+        fontWeight: "300",
+        fontSize: result === "perfect" ? 44 : 34,
+        letterSpacing: result === "perfect" ? 10 : 8,
+        fill: HIT_COLOR_STR[result],
+      }),
+    });
+    text.anchor.set(0.5);
+    text.position.set(x, y - 16);
+    this.popupLayer.addChild(text);
+    this.popups.push({ text, life: 550 });
   }
 
   destroy() {
-    this.clearAll();
-    this.container.destroy(true);
+    this.gfx.destroy();
     this.popupLayer.destroy(true);
   }
 }

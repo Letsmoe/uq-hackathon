@@ -123,7 +123,7 @@ void main() {
   float crosses = plusMark(majorCell, 0.035, 0.003);
 
   // Cursor effects
-  float cursorRing = 1.0 - smoothstep(0.003, 0.008, abs(distToMouse - 0.115));
+  float cursorRing = 1.0 - smoothstep(0.0001, 0.008, abs(distToMouse - 0.015));
   cursorRing *= u_mouseActive;
 
   float cursorGlow = exp(-distToMouse * 10.0) * u_mouseActive;

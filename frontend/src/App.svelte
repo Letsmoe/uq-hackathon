@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import ShaderGrid from "./lib/ShaderGrid.svelte";
+
   import UserHeader from "./lib/components/UserHeader.svelte";
   import NavButtons from "./lib/components/NavButtons.svelte";
   import SongCarousel from "./lib/components/SongCarousel.svelte";
@@ -209,7 +210,7 @@
             coverSrc={songs[selected].cover}
             onpause={() => (page = "Menu")}
             onfinish={(stats) => console.log("Final stats:", stats)}
-          />
+          ></Canvas>
         </div>
       {/if}
     </div>
@@ -245,5 +246,30 @@
     top: 0;
     transform-origin: top left;
     background-color: #fff;
+  }
+
+  .install-btn {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 9999;
+    padding: 0.6rem 1.2rem;
+    background: rgba(16, 17, 28, 0.92);
+    border: 1px solid rgba(62, 155, 255, 0.4);
+    color: #e8e8ee;
+    font-family: "Rajdhani", system-ui, sans-serif;
+    font-size: 0.85rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    border-radius: 4px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition:
+      border-color 150ms,
+      background 150ms;
+  }
+  .install-btn:hover {
+    background: rgba(62, 155, 255, 0.12);
+    border-color: rgba(62, 155, 255, 0.7);
   }
 </style>

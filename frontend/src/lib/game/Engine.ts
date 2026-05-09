@@ -1,206 +1,286 @@
-import { Application }       from 'pixi.js'
-import type { Chart }         from './chart'
-import type { RuntimeNote, GameState, JudgmentEvent } from './types'
-import { makeInitialState }   from './types'
-import { Scanner }            from './Scanner'
-import { NoteRenderer }       from './NoteRenderer'
-import { InputHandler }       from './InputHandler'
-import { JudgmentSystem }     from './Judgment'
+import { Application } from "pixi.js";
+import type { Chart, ChartNote } from "./chart";
+import { tickToSeconds, getScanLineY } from "./chart";
+import type {
+  RuntimeNote,
+  RuntimeChainNode,
+  GameState,
+  JudgmentEvent,
+} from "./types";
+import { makeInitialState, JUDGMENT_WINDOWS } from "./types";
+import { Scanner } from "./Scanner";
+import { NoteRenderer } from "./NoteRenderer";
+import { InputHandler } from "./InputHandler";
+import { JudgmentSystem } from "./Judgment";
 
-const LANES = 8
+const APPROACH_S = 0.45;
+const HUD_H = 0; // HUD is a CSS overlay — PixiJS uses the full canvas height
 
 export class GameEngine {
-  // ── PixiJS ─────────────────────────────────────────────────────────────────
-  private app     : Application
-  private W       : number = 0
-  private H       : number = 0
+  private app: Application;
+  private W = 0;
+  private H = 0;
+  private PLAY_TOP = HUD_H;
+  private PLAY_H = 0;
 
-  // ── Subsystems ─────────────────────────────────────────────────────────────
-  private scanner : Scanner   | null = null
-  private renderer: NoteRenderer | null = null
-  private input   : InputHandler | null = null
-  private judgment: JudgmentSystem | null = null
+  private scanner: Scanner | null = null;
+  private renderer: NoteRenderer | null = null;
+  private input: InputHandler | null = null;
+  private judgment: JudgmentSystem | null = null;
 
-  // ── State ──────────────────────────────────────────────────────────────────
-  readonly state : GameState = makeInitialState()
-  private chart  : Chart | null = null
-  private notes  : RuntimeNote[] = []
-  private hitFlash: Map<number, number> = new Map()
-  private _lastSweep = -1
+  readonly state: GameState = makeInitialState();
+  private chart: Chart | null = null;
+  private notes: RuntimeNote[] = [];
 
-  // ── Callbacks ──────────────────────────────────────────────────────────────
-  onStateChange : (() => void) | null = null
-  onJudgment    : ((e: JudgmentEvent) => void) | null = null
-  onFinish      : (() => void) | null = null
+  onStateChange: (() => void) | null = null;
+  onJudgment: ((e: JudgmentEvent) => void) | null = null;
+  onFinish: (() => void) | null = null;
 
   private constructor(app: Application) {
-    this.app = app
+    this.app = app;
   }
-
-  // ── Async factory (v8 requires await app.init) ─────────────────────────────
 
   static async create(canvas: HTMLCanvasElement): Promise<GameEngine> {
-    const app = new Application()
+    const app = new Application();
     await app.init({
       canvas,
-      width          : canvas.offsetWidth  || 1920,
-      height         : canvas.offsetHeight || 1200,
+      width: canvas.offsetWidth || 1920,
+      height: canvas.offsetHeight || 1080,
       backgroundAlpha: 0,
-      antialias      : true,
-      resolution     : window.devicePixelRatio || 1,
-      autoDensity    : true,
-    })
-
-    const engine   = new GameEngine(app)
-    engine.W       = app.screen.width
-    engine.H       = app.screen.height
-    return engine
+      antialias: true,
+      resolution: window.devicePixelRatio || 1,
+      autoDensity: true,
+    });
+    const e = new GameEngine(app);
+    e.W = app.screen.width;
+    e.H = app.screen.height;
+    e.PLAY_H = e.H - HUD_H;
+    return e;
   }
 
-  // ── Chart loading ──────────────────────────────────────────────────────────
-
   loadChart(chart: Chart) {
-    this.chart = chart
+    this.chart = chart;
 
-    // Tear down old subsystems
-    this.scanner?.destroy()
-    this.renderer?.destroy()
-    this.input?.detach()
+    this.scanner?.destroy();
+    this.renderer?.destroy();
+    this.input?.detach();
 
-    this.scanner  = new Scanner(this.app, chart.sweepDuration)
-    this.renderer = new NoteRenderer(this.app, this.app.stage, this.W, this.H, LANES)
+    // Scanner added to stage first; NoteRenderer inserts below it via addChildAt(0)
+    this.scanner = new Scanner(this.app);
+    this.renderer = new NoteRenderer(this.app, this.app.stage, this.W, this.H);
 
-    this.judgment = new JudgmentSystem(
-      this.state,
-      (e) => {
-        this.renderer!.triggerHitFlash(e.noteId, e.result, e.x, e.y)
-        this.hitFlash.set(e.noteId, 0)
-        this.onJudgment?.(e)
-        this.onStateChange?.()
-      },
-      chart.notes.length,
-    )
+    this.judgment = new JudgmentSystem(this.state, (e) => {
+      this.renderer!.triggerHit(e.noteId, e.result, e.x, e.y);
+      this.onJudgment?.(e);
+      this.onStateChange?.();
+    });
 
-    // Pre-compute note pixel positions
-    this.notes = chart.notes.map(n => ({
-      ...n,
-      pixelX      : ((n.lane + 0.5) / LANES) * this.W,
-      pixelY      : this.scanner!.notePixelY(n.time, this.H),
-      sweepIndex  : this.scanner!.noteSweepIndex(n.time),
-      hit         : false,
-      missed      : false,
-      holdActive  : false,
-      holdProgress: 0,
-    }))
+    let autoId = 0;
+    this.notes = chart.note_list.map((n) => this.buildNote(n, chart, autoId++));
 
     this.input = new InputHandler(
       this.app.canvas as HTMLCanvasElement,
-      this.W, this.H,
-      // onTap
-      (id) => {
-        const note = this.notes.find(n => n.id === id)
-        if (note) this.judgment!.judgeNote(note, this.state.elapsed)
-      },
-      // onSwipe
-      (id, dir) => {
-        const note = this.notes.find(n => n.id === id)
-        if (!note || note.hit) return
-        if (note.swipeDir === dir) {
-          this.judgment!.judgeNote(note, this.state.elapsed)
-        } else {
-          note.hit = true
-          this.onStateChange?.()
-        }
-      },
-      // onHold
+      () => this.handleInput(),
       (id, held) => {
-        const note = this.notes.find(n => n.id === id)
-        if (!note) return
-        if (held) this.judgment!.judgeHoldStart(note, this.state.elapsed)
-        else      this.judgment!.judgeHoldEnd(note, this.state.elapsed)
+        if (held) {
+          const note = this.notes.find((n) => n.id === id);
+          if (note) this.judgment!.judgeHoldStart(note, this.state.elapsed);
+        } else {
+          const note = this.notes.find((n) => n.id === id);
+          if (note) this.judgment!.judgeHoldEnd(note);
+        }
+        this.onStateChange?.();
       },
-      LANES,
-    )
+    );
 
-    Object.assign(this.state, makeInitialState())
-    this._lastSweep = -1
-    this.judgment.reset(chart.notes.length)
+    Object.assign(this.state, makeInitialState());
+    this.judgment.reset();
   }
 
-  // ── Controls ───────────────────────────────────────────────────────────────
+  private buildNote(n: ChartNote, chart: Chart, autoId: number): RuntimeNote {
+    const id = n.id ?? autoId;
+    const tick = n.tick ?? 0;
+    const x = n.x ?? 0.5;
+    const duration = n.duration ?? 0;
+    const bpm = chart.bpm;
+    const tb = chart.time_base;
 
-  start() {
-    this.state.running = true
-    this.state.paused  = false
-    this.app.ticker.add(this.tick)
-  }
+    const timeSeconds = tickToSeconds(tick, bpm, tb);
+    const endTimeSeconds =
+      n.type === 2 ? tickToSeconds(tick + duration, bpm, tb) : timeSeconds;
 
-  pause() {
-    this.state.paused = true
-    this.app.ticker.remove(this.tick)
-  }
+    const scanY = getScanLineY(timeSeconds, chart.page_list, bpm, tb);
+    const endScanY =
+      n.type === 2
+        ? getScanLineY(endTimeSeconds, chart.page_list, bpm, tb)
+        : scanY;
 
-  resume() {
-    this.state.paused = false
-    this.app.ticker.add(this.tick)
-  }
+    const pixelX = x * this.W;
+    const pixelY = this.PLAY_TOP + scanY * this.PLAY_H;
+    const endPixelY = this.PLAY_TOP + endScanY * this.PLAY_H;
 
-  // ── Main loop ──────────────────────────────────────────────────────────────
-
-  private tick = (ticker: { deltaMS: number }) => {
-    if (!this.state.running || this.state.paused || this.state.finished) return
-    if (!this.scanner || !this.renderer || !this.judgment || !this.chart) return
-
-    // v8 ticker provides deltaMS directly
-    const deltaMs = ticker.deltaMS
-    this.state.elapsed += deltaMs
-
-    if (this.state.elapsed >= this.chart.totalDuration + 1500) {
-      this.state.finished = true
-      this.onFinish?.()
-      return
+    let nodes: RuntimeChainNode[] | undefined;
+    if (n.type === 3 && n.nodes) {
+      nodes = n.nodes.map((nd) => {
+        const ndTime = tickToSeconds(nd.tick, bpm, tb);
+        const ndScanY = getScanLineY(ndTime, chart.page_list, bpm, tb);
+        return {
+          tick: nd.tick,
+          x: nd.x,
+          pixelX: nd.x * this.W,
+          pixelY: this.PLAY_TOP + ndScanY * this.PLAY_H,
+          timeSeconds: ndTime,
+          judged: false,
+        };
+      });
     }
 
-    // ── Scanner update ──────────────────────────────────────────────────────
-    const currentSweep = Math.floor(this.state.elapsed / this.chart.sweepDuration)
-    const scanPixelY   = this.scanner.scanY * this.H
-    const visibleNotes = this.notes.filter(n => n.sweepIndex === currentSweep && !n.missed)
+    return {
+      id,
+      type: n.type,
+      tick,
+      x,
+      duration,
+      nodes,
+      pixelX,
+      pixelY,
+      endPixelY,
+      timeSeconds,
+      endTimeSeconds,
+      hit: false,
+      missed: false,
+      holdActive: false,
+      holdProgress: 0,
+      chainNodeIdx: 0,
+    };
+  }
 
-    const nearNote = visibleNotes.some(n => Math.abs(n.pixelY - scanPixelY) < this.H * 0.08)
-    this.scanner.update(this.state.elapsed, nearNote ? 1 : 0)
-    this.state.scanY = this.scanner.scanY
+  private handleInput() {
+    if (!this.judgment) return;
+    const elapsed = this.state.elapsed;
+    let bestDiff = Infinity;
+    let bestNote: RuntimeNote | null = null;
 
-    // ── Reload meshes on sweep change ───────────────────────────────────────
-    if (currentSweep !== this._lastSweep) {
-      this.renderer.loadNotes(visibleNotes)
-      this._lastSweep = currentSweep
-    }
+    for (const note of this.notes) {
+      if (note.hit || note.missed) continue;
 
-    // ── Note rendering ──────────────────────────────────────────────────────
-    this.renderer.update(visibleNotes, scanPixelY, this.state.elapsed, deltaMs)
-
-    // ── Hold ticks ──────────────────────────────────────────────────────────
-    for (const note of visibleNotes) {
-      if (note.type === 'hold' && note.holdActive) {
-        this.judgment.updateHold(note, this.state.elapsed)
+      if (note.type === 3) {
+        if (!note.nodes || note.chainNodeIdx >= note.nodes.length) continue;
+        const nd = note.nodes[note.chainNodeIdx];
+        const diff = Math.abs(elapsed - nd.timeSeconds);
+        if (diff < JUDGMENT_WINDOWS.bad && diff < bestDiff) {
+          bestDiff = diff;
+          bestNote = note;
+        }
+      } else if (note.type === 2) {
+        if (note.holdActive) continue;
+        const diff = Math.abs(elapsed - note.timeSeconds);
+        if (diff < JUDGMENT_WINDOWS.bad && diff < bestDiff) {
+          bestDiff = diff;
+          bestNote = note;
+        }
+      } else {
+        const diff = Math.abs(elapsed - note.timeSeconds);
+        if (diff < JUDGMENT_WINDOWS.bad && diff < bestDiff) {
+          bestDiff = diff;
+          bestNote = note;
+        }
       }
     }
 
-    // ── Miss detection ──────────────────────────────────────────────────────
-    this.judgment.checkMisses(visibleNotes, this.state.elapsed)
+    if (!bestNote) return;
 
-    // ── Hit flash animation ─────────────────────────────────────────────────
-    for (const [id, t] of this.hitFlash) {
-      const next = t + deltaMs / 300
-      if (next >= 1) { this.hitFlash.delete(id) }
-      else { this.hitFlash.set(id, next); this.renderer.animateHitFlash(id, next) }
+    if (bestNote.type === 3) {
+      this.judgment.judgeChainNode(bestNote, elapsed);
+    } else if (bestNote.type === 2) {
+      this.judgment.judgeHoldStart(bestNote, elapsed);
+    } else {
+      this.judgment.judgeNote(bestNote, elapsed);
+    }
+    this.onStateChange?.();
+  }
+
+  start() {
+    this.state.running = true;
+    this.state.paused = false;
+    this.app.ticker.add(this.tick);
+  }
+
+  pause() {
+    this.state.paused = true;
+    this.app.ticker.remove(this.tick);
+  }
+
+  resume() {
+    this.state.paused = false;
+    this.app.ticker.add(this.tick);
+  }
+
+  private tick = (ticker: { deltaMS: number }) => {
+    if (!this.state.running || this.state.paused || this.state.finished) return;
+    if (!this.scanner || !this.renderer || !this.judgment || !this.chart)
+      return;
+
+    this.state.elapsed += ticker.deltaMS / 1000;
+
+    if (this.state.elapsed >= this.chart.length + 0.5) {
+      this.state.finished = true;
+      this.app.ticker.remove(this.tick);
+      this.onFinish?.();
+      return;
     }
 
-    // ── Feed input handler ──────────────────────────────────────────────────
-    this.input!.setActiveNotes(visibleNotes, scanPixelY);
-  };
+    this.scanner.update(
+      this.state.elapsed,
+      this.chart.page_list,
+      this.chart.bpm,
+      this.chart.time_base,
+    );
+    this.state.scanY = this.scanner.scanY;
 
-  // ── Cleanup ────────────────────────────────────────────────────────────────
+    // Note types
+    // 0 = tap, 1 = flick, 2 = hold, 3 = chain
+    // Visible notes: within approach window (and not fully done)
+    const visible = this.notes.filter((note) => {
+      // Exclude fully judged notes
+      if (note.missed) return false;
+      // For taps and holds, hide immediately on hit; for chains, wait until all nodes hit so they don't vanish mid-chain
+      if (note.hit && note.type !== 2) return false;
+      if (note.hit && note.type === 2 && !note.holdActive) return false;
+      const earliest =
+        note.type === 3 && note.nodes
+          ? (note.nodes[note.chainNodeIdx]?.timeSeconds ?? Infinity)
+          : note.timeSeconds;
+      const latest =
+        note.type === 2
+          ? note.endTimeSeconds
+          : note.nodes?.[note.nodes.length - 1].timeSeconds || note.timeSeconds;
+
+      return (
+        earliest < this.state.elapsed + APPROACH_S + 0.4 &&
+        latest > this.state.elapsed - 0.15
+      );
+    });
+
+    this.renderer.update(
+      visible,
+      this.scanner.scanPixelY,
+      this.state.elapsed,
+      ticker.deltaMS,
+    );
+
+    // Hold updates
+    for (const note of this.notes) {
+      if (note.type === 2 && note.holdActive) {
+        if (this.judgment.updateHold(note, this.state.elapsed)) {
+          this.onStateChange?.();
+        }
+      }
+    }
+
+    this.judgment.checkMisses(this.notes, this.state.elapsed);
+    this.input?.setActiveNotes(visible, this.scanner.scanPixelY);
+  };
 
   destroy() {
     this.app.ticker.remove(this.tick);

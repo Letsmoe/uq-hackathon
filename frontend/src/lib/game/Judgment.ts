@@ -1,147 +1,117 @@
-import type {
-  RuntimeNote,
-  GameState,
-  JudgmentResult,
-  JudgmentEvent,
-} from "./types";
-import { JUDGMENT_WINDOWS, SCORE_TABLE, TP_TABLE } from "./types";
+import type { RuntimeNote, RuntimeChainNode, GameState, JudgmentResult, JudgmentEvent } from './types';
+import { JUDGMENT_WINDOWS, SCORE_TABLE, TP_TABLE } from './types';
 
 export type JudgmentCallback = (event: JudgmentEvent) => void;
 
 export class JudgmentSystem {
-  private totalNotes: number;
-  private tpSum: number = 0; // accumulated TP points
+  private tpSum = 0;
 
   constructor(
     private state: GameState,
     private onJudge: JudgmentCallback,
-    totalNotes: number,
-  ) {
-    this.totalNotes = totalNotes;
-  }
+  ) {}
 
-  // ── Called by InputHandler callbacks ─────────────────────────────────────
-
-  /**
-   * Judge a tap or swipe at the current scan time.
-   * elapsed = ms from song start at moment of input
-   */
   judgeNote(note: RuntimeNote, elapsed: number): JudgmentResult {
-    if (note.hit || note.missed) return "miss";
-
-    const offset = Math.abs(elapsed - note.time);
-    const result = this.resultFromOffset(offset);
-
+    if (note.hit || note.missed) return 'miss';
+    const result = this.resultFromOffset(Math.abs(elapsed - note.timeSeconds));
     note.hit = true;
     this.applyResult(result, note.pixelX, note.pixelY, note.id);
     return result;
   }
 
-  /**
-   * Begin a hold note. Full scoring happens on release (judgeHoldEnd).
-   */
-  judgeHoldStart(note: RuntimeNote, elapsed: number) {
-    if (note.hit || note.missed) return;
-    note.holdActive = true;
-    note.holdProgress = 0;
+  judgeChainNode(note: RuntimeNote, elapsed: number): boolean {
+    if (!note.nodes || note.chainNodeIdx >= note.nodes.length) return false;
+    const nd = note.nodes[note.chainNodeIdx];
+    if (nd.judged) return false;
+    const result = this.resultFromOffset(Math.abs(elapsed - nd.timeSeconds));
+    if (result === 'miss') return false;
+    nd.judged = true;
+    note.chainNodeIdx++;
+    this.applyResult(result, nd.pixelX, nd.pixelY, note.id);
+    if (note.chainNodeIdx >= note.nodes.length) note.hit = true;
+    return true;
   }
 
-  /**
-   * Update hold progress each frame. Returns true when hold completes.
-   */
+  judgeHoldStart(note: RuntimeNote, elapsed: number) {
+    if (note.hit || note.missed || note.holdActive) return;
+    const result = this.resultFromOffset(Math.abs(elapsed - note.timeSeconds));
+    if (result === 'miss') return;
+    note.holdActive = true;
+    note.holdProgress = 0;
+    this.applyResult(result, note.pixelX, note.pixelY, note.id);
+  }
+
   updateHold(note: RuntimeNote, elapsed: number): boolean {
-    if (!note.holdActive || !note.holdDuration) return false;
-
-    const held = elapsed - note.time;
-    note.holdProgress = Math.min(1, held / note.holdDuration);
-
+    if (!note.holdActive) return false;
+    const dur = note.endTimeSeconds - note.timeSeconds;
+    note.holdProgress = Math.min(1, (elapsed - note.timeSeconds) / dur);
     if (note.holdProgress >= 1) {
       note.holdActive = false;
       note.hit = true;
-      this.applyResult("perfect", note.pixelX, note.pixelY, note.id);
       return true;
     }
     return false;
   }
 
-  /**
-   * Player released hold early.
-   */
-  judgeHoldEnd(note: RuntimeNote, elapsed: number) {
+  judgeHoldEnd(note: RuntimeNote) {
     if (!note.holdActive) return;
     note.holdActive = false;
     note.hit = true;
-
-    // Score proportional to how long they held
-    const result: JudgmentResult =
-      note.holdProgress > 0.85
-        ? "perfect"
-        : note.holdProgress > 0.5
-          ? "good"
-          : "bad";
-
-    this.applyResult(result, note.pixelX, note.pixelY, note.id);
   }
-
-  // ── Miss detection (called each frame) ───────────────────────────────────
 
   checkMisses(notes: RuntimeNote[], elapsed: number) {
     for (const note of notes) {
       if (note.hit || note.missed) continue;
 
-      const offset = elapsed - note.time;
-      // Past the bad window and scan line has moved on
-      if (offset > JUDGMENT_WINDOWS.bad + 50) {
-        note.missed = true;
-        this.applyResult("miss", note.pixelX, note.pixelY, note.id);
+      if (note.type === 3) {
+        if (!note.nodes) continue;
+        const nd = note.nodes[note.chainNodeIdx];
+        if (!nd || nd.judged) continue;
+        if (elapsed > nd.timeSeconds + JUDGMENT_WINDOWS.bad) {
+          nd.judged = true;
+          note.chainNodeIdx++;
+          this.applyResult('miss', nd.pixelX, nd.pixelY, note.id);
+          if (note.chainNodeIdx >= note.nodes.length) note.hit = true;
+        }
+      } else if (note.type === 2) {
+        if (!note.holdActive && elapsed > note.timeSeconds + JUDGMENT_WINDOWS.bad) {
+          note.missed = true;
+          this.applyResult('miss', note.pixelX, note.pixelY, note.id);
+        }
+      } else {
+        if (elapsed > note.timeSeconds + JUDGMENT_WINDOWS.bad) {
+          note.missed = true;
+          this.applyResult('miss', note.pixelX, note.pixelY, note.id);
+        }
       }
     }
   }
 
-  // ── Internals ─────────────────────────────────────────────────────────────
-
-  private resultFromOffset(ms: number): JudgmentResult {
-    if (ms <= JUDGMENT_WINDOWS.perfect) return "perfect";
-    if (ms <= JUDGMENT_WINDOWS.good) return "good";
-    if (ms <= JUDGMENT_WINDOWS.bad) return "bad";
-    return "miss";
+  private resultFromOffset(s: number): JudgmentResult {
+    if (s <= JUDGMENT_WINDOWS.perfect) return 'perfect';
+    if (s <= JUDGMENT_WINDOWS.good)    return 'good';
+    if (s <= JUDGMENT_WINDOWS.bad)     return 'bad';
+    return 'miss';
   }
 
-  private applyResult(
-    result: JudgmentResult,
-    x: number,
-    y: number,
-    noteId: number,
-  ) {
+  private applyResult(result: JudgmentResult, x: number, y: number, noteId: number) {
     const s = this.state;
-
-    if (result === "miss" || result === "bad") {
+    if (result === 'miss' || result === 'bad') {
       s.combo = 0;
     } else {
       s.combo++;
       if (s.combo > s.maxCombo) s.maxCombo = s.combo;
     }
-
-    // Combo multiplier caps at ×4
-    const multi = Math.min(4, 1 + Math.floor(s.combo / 20) * 0.5);
-    s.score += Math.round(SCORE_TABLE[result] * multi);
-
-    // Tally
-    if (result === "perfect") s.perfects++;
-    else if (result === "good") s.goods++;
-    else if (result === "bad") s.bads++;
-    else s.misses++;
-
-    // TP
+    s.score += SCORE_TABLE[result];
+    if      (result === 'perfect') s.perfects++;
+    else if (result === 'good')    s.goods++;
+    else if (result === 'bad')     s.bads++;
+    else                           s.misses++;
     const judged = s.perfects + s.goods + s.bads + s.misses;
     this.tpSum += TP_TABLE[result];
     s.tp = parseFloat(((this.tpSum / judged) * 100).toFixed(2));
-
     this.onJudge({ noteId, result, x, y });
   }
 
-  reset(totalNotes: number) {
-    this.totalNotes = totalNotes;
-    this.tpSum = 0;
-  }
+  reset() { this.tpSum = 0; }
 }
