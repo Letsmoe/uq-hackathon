@@ -14,20 +14,34 @@
   /* Backgrounds */
   --color-surface-base: #eceae4; /* main page bg — warm off-white grid */
   --color-surface-raised: #f4f2ed; /* slightly lighter lifted panels     */
-  --color-surface-dark: #0d0d14; /* full-dark panels (event sidebar)   */
+  --color-surface-dark: rgba(
+    16,
+    17,
+    28,
+    1
+  ); /* full-dark panels (event sidebar)   */
   --color-surface-dark-muted: #161622; /* secondary dark panel bg            */
 
   /* Brand accents */
   --color-accent-blue: #3e9bff; /* rating, selected item, progress fill  */
   --color-accent-pink: #ff3f80; /* music library / secondary nav accent  */
   --color-accent-cyan: #00d4e8; /* options / tertiary nav accent         */
-  --color-accent-purple: #7c5aff; /* event art / rare highlight            */
+  --color-accent-purple: rgba(
+    125,
+    103,
+    210,
+    1
+  ); /* event art / rare highlight            */
 
   /* Text */
   --color-text-primary: #1a1a22; /* main body text on light bg            */
   --color-text-secondary: #6b6b7a; /* subtitles, captions, muted labels     */
   --color-text-inverse: #e8e8ee; /* text on dark panels                   */
   --color-text-muted: #9a9aa8; /* placeholders, disabled states         */
+
+  /* On Surface / Text */
+  --color-on-surface-dark: rgba(211, 212, 219, 1);
+  --color-on-surface-light: rgba(26, 26, 34, 1);
 
   /* Semantic */
   --color-success: #00c97a;

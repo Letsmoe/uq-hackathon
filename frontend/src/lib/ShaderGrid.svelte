@@ -99,7 +99,7 @@ void main() {
   // -----------------------------
   // Minor dot grid (small dots inside)
   // -----------------------------
-  float minorScale = 88.0;
+  float minorScale = 64.0;
   vec2 minorGrid = p * minorScale;
   vec2 minorCell = fract(minorGrid) - 0.5;
 
@@ -109,18 +109,18 @@ void main() {
   // -----------------------------
   // Major grid (dotted lines + plus intersections)
   // -----------------------------
-  float majorScale = 11.0;
+  float majorScale = 8.0;
   vec2 majorGrid = p * majorScale;
   vec2 majorCell = fract(majorGrid) - 0.5;
 
-  float gridLines = dottedGrid(majorGrid, 0.006, 0.05, 0.08);
+  float gridLines = dottedGrid(majorGrid, 0.003, 0.05, 0.08);
 
   // Clear the dotted lines near each intersection
   // so the plus mark stands out clearly
   float centerGap = smoothstep(0.05, 0.11, max(abs(majorCell.x), abs(majorCell.y)));
   gridLines *= centerGap;
 
-  float crosses = plusMark(majorCell, 0.035, 0.006);
+  float crosses = plusMark(majorCell, 0.035, 0.003);
 
   // Cursor effects
   float cursorRing = 1.0 - smoothstep(0.003, 0.008, abs(distToMouse - 0.115));

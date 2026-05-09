@@ -34,6 +34,8 @@
   let resultsData = $state<ResultsSnapshot | null>(null);
   let showPause = $state(false);
 
+
+  
   // ── Layout constants (logical pixels, DPR-independent) ────────
   const PAD_X = 0.07; // fraction of width
   const LANE_TOP = 0.08; // fraction of height
@@ -101,7 +103,6 @@
 
   // ── Scanner math ───────────────────────────────────────────────
   // Returns normalised Y in [0,1] (0=bottom, 1=top) at song time t.
-  let lastScannerYPosition = 1
   function getScannerYPosition(song: Song, time: number): number {
   	// We need to search through all the pages and check which page we're on and then calculate the scanner position from there.
    const tick = time / (60 / song.bpm) * song.player.time_base;
@@ -150,7 +151,7 @@
     scanFlash = 0;
 
     // Callbacks → push HUD updates to Svelte state
-    onJudge: (q: Quality, px: number, py: number) => void = () => {};
+    onJudge: (quality: Quality, px: number, py: number) => void = () => {};
     onFinish: (snap: ResultsSnapshot) => void = () => {};
 
     constructor(song: Song) {
@@ -214,6 +215,30 @@
           }
         }
       }
+
+      const now = performance.now();
+      
+      for (const f of floats) {
+        const elapsed = now - f.born;
+        if (elapsed >= f.life) continue;
+      
+        const t     = elapsed / f.life;           // 0 → 1
+        const alpha = 1 - t * t;                  // quadratic fade-out
+        const drift = t * 40;                     // floats upward 40px over lifetime
+      
+        const label = f.text.toUpperCase();
+        const { w, h } = FLOAT_TEX_SIZE[label];
+      
+        renderer?.drawRect(
+          "fx",
+          { x: f.x - w / 2, y: f.y - drift - h / 2, w, h },
+          [1, 1, 1, alpha],                        // tint white; alpha drives fade
+          `float_${label}`,
+        );
+      }
+      
+      // Prune dead floats
+      floats = floats.filter(f => (now - f.born) < f.life);
 
       // Signal end-of-song
       return songTime >= songLength;
@@ -370,8 +395,17 @@
   let songTime = 0;
   let countdownTimer = 0;
 
+  const JUDGMENT_LABELS = ["PERFECT", "GOOD", "BAD", "MISS"] as const;
+  const JUDGMENT_COLORS: Record<string, string> = {
+    PERFECT: "#00FFFF",
+    GOOD:    "#66FF99",
+    BAD:     "#FFAA33",
+    MISS:    "#FF4455",
+  };
+  const FLOAT_TEX_SIZE: Record<string, { w: number; h: number }> = {};
+  
   // Floating judgement texts (Canvas 2D overlay, not WebGL)
-  const floats: FloatingText[] = [];
+  let floats: FloatingText[] = [];
 
   // ── onMount ─────────────────────────────────────────────────────
   onMount(() => {
@@ -379,8 +413,28 @@
     gameState = new GameState(song);
     const songLength = song.length * (60 / song.bpm);
 
+    for (const label of JUDGMENT_LABELS) {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d")!;
+      const font = "bold 28px 'Arial', sans-serif";
+      ctx.font = font;
+      const m = ctx.measureText(label);
+      canvas.width  = Math.ceil(m.width) + 16;
+      canvas.height = 40;
+      ctx.font = font;
+      ctx.fillStyle = JUDGMENT_COLORS[label];
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      // optional: soft shadow for depth
+      ctx.shadowColor = JUDGMENT_COLORS[label];
+      ctx.shadowBlur  = 8;
+      ctx.fillText(label, canvas.width / 2, canvas.height / 2);
+      renderer.uploadBitmap(`float_${label}`, canvas);
+      FLOAT_TEX_SIZE[label] = { w: canvas.width, h: canvas.height };
+    }
+    
     // Wire callbacks that push data into Svelte state
-    gameState.onJudge = (q, lx, ly) => {
+    gameState.onJudge = (q, px, py) => {
       // Update HUD reactives
       score = gameState!.scoreValue;
       combo = gameState!.comboValue;
@@ -394,19 +448,19 @@
       );
 
       // Floating text
-      if (lx > 0 || ly > 0) {
+      if (px > 0 || py > 0) {
+      
         floats.push({
-          text: q === "miss" ? "MISS" : q.toUpperCase(),
+          text: q.toUpperCase(),
           color:
-            q === "perfect"
-              ? "#00FFFF"
-              : q === "good"
-                ? "#66FF99"
-                : q === "bad"
-                  ? "#FFAA33"
-                  : "#FF4455",
-          x: lx,
-          y: ly - NOTE_R - 8,
+          {
+          "perfect": "#00FFFF",
+          "good": "#66FF99",
+          "bad": "#FFAA33",
+          "miss": "#FF4455",
+          }[q],
+          x: px,
+          y: py - NOTE_R - 8,
           born: performance.now(),
           life: 700,
         });
