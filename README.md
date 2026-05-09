@@ -1,3 +1,19 @@
+## Usage
+- `./main audios/[FILENAME]`
+- output JSON `charts/[FILENAME]`
+
+- `bun install`
+- `bun run dev`
+
+## ISSUES
+### Frontend
+- Music not playing
+- nowhere to set scanline speed(?) currently one page is approx two pages (at least on mac)
+- Drags (type 3) and swipes (type 1) not rendering successfully
+### Backend
+- the pattern generator is trash
+
+
 ## Dependencies
 
 ### Backend
@@ -6,7 +22,7 @@
 - `nlohmann-json`
 ### Frontend
 - ~[](https://docs.nativescript.org/setup/macos)~ FUCK THIS WE DOING WEBAPP
-
+- [Bun](https://bun.sh/)
 
 ## JSON
 - scanline (can have multiples)
@@ -76,8 +92,8 @@ TBD units
 	- 2: hold
 	- 3: drag (nested)
 
-TBD what do if a hold goes more than one page
-
+TBD what do if a hold goes more than one page - fron
+Page redundent?
 ```json
 {
 	"time_base": 480,
@@ -97,7 +113,6 @@ TBD what do if a hold goes more than one page
 	],
 	"note_list": [
 		{
-	      "page_index": 0,
 	      "type": 0,
 	      "id": 0,
 	      "tick": 69,
@@ -105,7 +120,6 @@ TBD what do if a hold goes more than one page
 	      "duration": 0
 	    },
 	    {
-	      "page_index": 0,
 	      "type": 2,
 	      "id": 1,
 	      "tick": 420,
@@ -113,7 +127,6 @@ TBD what do if a hold goes more than one page
 	      "duration": 240
 	    },
 	    {
-		  "page_index": 1,
 		  "type": 3,
 		  "id": 2,
 		  "nodes": [
@@ -131,14 +144,14 @@ TBD what do if a hold goes more than one page
 ### Main
 - EZ Mode (Half speed scanlines)
 - HD Mode (Full speed scanlines)
-- Scanline
+- **Scanline**
 	- Formulas
 	`time_in_sec = 60*tick/bpm/time_base`
 
 - Tap note at beats
 - Reasonable layout of notes for gameplay
 	- [Patterns](https://sites.google.com/site/cytoidcommunity/charting/extra-information-on-charting/patterns)
-- Audio upload & send to backend
+- **Audio upload & send to backend**
 - A scoring system
 	- Hit accuracy metric
 	- counter

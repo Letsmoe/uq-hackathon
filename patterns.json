@@ -1,0 +1,616 @@
+{
+  "patterns": {
+
+    "level_1": {
+
+      "single_note": [
+        { "type": 0, "id": 0, "tick": 0, "x": 0.0, "duration": 0 }
+      ],
+
+      "chords": {
+
+        "double": [
+          { "type": 0, "id": 0, "tick": 0, "x": 0.0, "duration": 0 },
+          { "type": 0, "id": 1, "tick": 0, "x": 0.3,  "duration": 0 }
+        ],
+
+        "triple": [
+          { "type": 0, "id": 0, "tick": 0, "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 1, "tick": 0, "x": 0.25, "duration": 0 },
+          { "type": 0, "id": 2, "tick": 0, "x": 0.5,  "duration": 0 }
+        ],
+
+        "quadruple": [
+          { "type": 0, "id": 0, "tick": 0, "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 1, "tick": 0, "x": 0.2,  "duration": 0 },
+          { "type": 0, "id": 2, "tick": 0, "x": 0.4,  "duration": 0 },
+          { "type": 0, "id": 3, "tick": 0, "x": 0.6,  "duration": 0 }
+        ]
+      },
+
+      "simple_long_note": [
+        { "type": 2, "id": 0, "tick": 0, "x": 0.0, "duration": 240 }
+      ],
+
+      "straight_drag": [
+        {
+          "type": 3, "id": 0,
+          "nodes": [
+            { "tick": 0,   "x": 0.0, "duration": 0 },
+            { "tick": 30,  "x": 0.0, "duration": 0 },
+            { "tick": 60,  "x": 0.0, "duration": 0 },
+            { "tick": 90,  "x": 0.0, "duration": 0 },
+            { "tick": 120, "x": 0.0, "duration": 0 }
+          ]
+        }
+      ]
+    },
+
+    "level_2": {
+
+      "grace_notes": {
+        "_note": "Two notes almost simultaneous — 1/16 beat (15 ticks) apart.",
+        "notes": [
+          { "type": 0, "id": 0, "tick": 0,  "x": 0.0, "duration": 0 },
+          { "type": 0, "id": 1, "tick": 15, "x": 0.5, "duration": 0 }
+        ]
+      },
+
+      "alternating": {
+        "_note": "L/R alternating taps at 1/4 beat (60 ticks) intervals.",
+        "notes": [
+          { "type": 0, "id": 0, "tick": 0,   "x": 0.0, "duration": 0 },
+          { "type": 0, "id": 1, "tick": 60,  "x": 0.2, "duration": 0 },
+          { "type": 0, "id": 2, "tick": 120, "x": 0.0, "duration": 0 },
+          { "type": 0, "id": 3, "tick": 180, "x": 0.2, "duration": 0 },
+          { "type": 0, "id": 4, "tick": 240, "x": 0.0, "duration": 0 },
+          { "type": 0, "id": 5, "tick": 300, "x": 0.2, "duration": 0 }
+        ]
+      },
+
+      "trills": {
+        "_note": "Fast alternating at 1/8 beat (30 ticks). Two columns separated by 0.2 x-offset.",
+        "notes": [
+          { "type": 0, "id": 0, "tick": 0,   "x": 0.0, "duration": 0 },
+          { "type": 0, "id": 1, "tick": 30,  "x": 0.2, "duration": 0 },
+          { "type": 0, "id": 2, "tick": 60,  "x": 0.0, "duration": 0 },
+          { "type": 0, "id": 3, "tick": 90,  "x": 0.2, "duration": 0 },
+          { "type": 0, "id": 4, "tick": 120, "x": 0.0, "duration": 0 },
+          { "type": 0, "id": 5, "tick": 150, "x": 0.2, "duration": 0 },
+          { "type": 0, "id": 6, "tick": 180, "x": 0.0, "duration": 0 },
+          { "type": 0, "id": 7, "tick": 210, "x": 0.2, "duration": 0 }
+        ]
+      },
+
+      "jack_patterns": {
+
+        "minijack": {
+          "_note": "1 finger, same x, 1/8 beat apart — 2 notes.",
+          "notes": [
+            { "type": 0, "id": 0, "tick": 0,  "x": 0.0, "duration": 0 },
+            { "type": 0, "id": 1, "tick": 30, "x": 0.0, "duration": 0 }
+          ]
+        },
+
+        "normal_jack": {
+          "_note": "1 finger, same x, 1/8 beat apart — 3-5 notes.",
+          "notes": [
+            { "type": 0, "id": 0, "tick": 0,   "x": 0.0, "duration": 0 },
+            { "type": 0, "id": 1, "tick": 30,  "x": 0.0, "duration": 0 },
+            { "type": 0, "id": 2, "tick": 60,  "x": 0.0, "duration": 0 },
+            { "type": 0, "id": 3, "tick": 90,  "x": 0.0, "duration": 0 }
+          ]
+        },
+
+        "jackhammer": {
+          "_note": "1 finger, same x, 1/8 beat apart — 6+ notes.",
+          "notes": [
+            { "type": 0, "id": 0, "tick": 0,   "x": 0.0, "duration": 0 },
+            { "type": 0, "id": 1, "tick": 30,  "x": 0.0, "duration": 0 },
+            { "type": 0, "id": 2, "tick": 60,  "x": 0.0, "duration": 0 },
+            { "type": 0, "id": 3, "tick": 90,  "x": 0.0, "duration": 0 },
+            { "type": 0, "id": 4, "tick": 120, "x": 0.0, "duration": 0 },
+            { "type": 0, "id": 5, "tick": 150, "x": 0.0, "duration": 0 },
+            { "type": 0, "id": 6, "tick": 180, "x": 0.0, "duration": 0 }
+          ]
+        }
+      },
+
+      "diagonal_drag": {
+        "_note": "Drag moving steadily in one horizontal direction.",
+        "notes": [
+          {
+            "type": 3, "id": 0,
+            "nodes": [
+              { "tick": 0,   "x": 0.0, "duration": 0 },
+              { "tick": 30,  "x": 0.1, "duration": 0 },
+              { "tick": 60,  "x": 0.2, "duration": 0 },
+              { "tick": 90,  "x": 0.3, "duration": 0 },
+              { "tick": 120, "x": 0.4, "duration": 0 }
+            ]
+          }
+        ]
+      },
+
+      "zigzag_drag": {
+        "_note": "Drag alternating left/right in a zigzag shape.",
+        "notes": [
+          {
+            "type": 3, "id": 0,
+            "nodes": [
+              { "tick": 0,   "x":  0.0, "duration": 0 },
+              { "tick": 60,  "x":  0.3, "duration": 0 },
+              { "tick": 120, "x":  0.0, "duration": 0 },
+              { "tick": 180, "x":  0.3, "duration": 0 },
+              { "tick": 240, "x":  0.0, "duration": 0 }
+            ]
+          }
+        ]
+      },
+
+      "shields": {
+
+        "type_a_tap_before_hold": {
+          "_note": "Tap immediately followed by hold at same x — requires two touches at same spot.",
+          "notes": [
+            { "type": 0, "id": 0, "tick": 0,  "x": 0.0, "duration": 0   },
+            { "type": 2, "id": 1, "tick": 30, "x": 0.0, "duration": 120 }
+          ]
+        },
+
+        "type_b_hold_then_tap": {
+          "_note": "Hold releases exactly when tap arrives.",
+          "notes": [
+            { "type": 2, "id": 0, "tick": 0,   "x": 0.0, "duration": 120 },
+            { "type": 0, "id": 1, "tick": 120, "x": 0.0, "duration": 0   }
+          ]
+        }
+      },
+
+      "flick_drags": {
+        "_note": "Short, fast drag in one direction — like a flick. Paired, alternating directions.",
+        "notes": [
+          {
+            "type": 3, "id": 0,
+            "nodes": [
+              { "tick": 0,  "x":  0.0,  "duration": 0 },
+              { "tick": 15, "x":  0.35, "duration": 0 }
+            ]
+          },
+          {
+            "type": 3, "id": 1,
+            "nodes": [
+              { "tick": 60, "x":  0.35, "duration": 0 },
+              { "tick": 75, "x":  0.0,  "duration": 0 }
+            ]
+          }
+        ]
+      },
+
+      "burst": {
+        "_note": "Quick cluster of 1/16 beat (15 tick) taps, spreading slightly in x.",
+        "notes": [
+          { "type": 0, "id": 0, "tick": 0,  "x":  0.0,  "duration": 0 },
+          { "type": 0, "id": 1, "tick": 15, "x": -0.13, "duration": 0 },
+          { "type": 0, "id": 2, "tick": 30, "x":  0.0,  "duration": 0 },
+          { "type": 0, "id": 3, "tick": 45, "x":  0.13, "duration": 0 },
+          { "type": 0, "id": 4, "tick": 60, "x":  0.26, "duration": 0 }
+        ]
+      }
+    },
+
+    "level_3": {
+
+      "note_layering": {
+        "_note": "Simultaneous patterns per hand: taps (left) + hold + diagonal drag (right).",
+        "notes": [
+          { "type": 0, "id": 0, "tick": 0,   "x": 0.0,  "duration": 0   },
+          { "type": 2, "id": 1, "tick": 0,   "x": 0.35, "duration": 120 },
+          { "type": 0, "id": 2, "tick": 120, "x": 0.0,  "duration": 0   },
+          {
+            "type": 3, "id": 3,
+            "nodes": [
+              { "tick": 120, "x": 0.4,  "duration": 0 },
+              { "tick": 150, "x": 0.52, "duration": 0 },
+              { "tick": 180, "x": 0.44, "duration": 0 },
+              { "tick": 210, "x": 0.56, "duration": 0 }
+            ]
+          }
+        ]
+      },
+
+      "pedal_points": {
+        "_note": "Left hand repeats same x (pedal/bass). Right hand plays varying notes (melody).",
+        "notes": [
+          { "type": 0, "id": 0, "tick": 0,   "x": 0.0, "duration": 0 },
+          { "type": 0, "id": 1, "tick": 0,   "x": 0.3, "duration": 0 },
+          { "type": 0, "id": 2, "tick": 120, "x": 0.0, "duration": 0 },
+          { "type": 0, "id": 3, "tick": 120, "x": 0.4, "duration": 0 },
+          { "type": 0, "id": 4, "tick": 240, "x": 0.0, "duration": 0 },
+          { "type": 0, "id": 5, "tick": 240, "x": 0.3, "duration": 0 },
+          { "type": 0, "id": 6, "tick": 360, "x": 0.0, "duration": 0 },
+          { "type": 0, "id": 7, "tick": 360, "x": 0.4, "duration": 0 }
+        ]
+      },
+
+      "stairs": {
+        "_note": "Click notes ascending diagonally at 1/4 beat (60 ticks) steps.",
+        "notes": [
+          { "type": 0, "id": 0, "tick": 0,   "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 1, "tick": 60,  "x": 0.13, "duration": 0 },
+          { "type": 0, "id": 2, "tick": 120, "x": 0.26, "duration": 0 },
+          { "type": 0, "id": 3, "tick": 180, "x": 0.39, "duration": 0 }
+        ]
+      },
+
+      "reverting_stairs": {
+        "_note": "Stairs that reverse direction mid-way — diagonal up then back down.",
+        "notes": [
+          { "type": 0, "id": 0, "tick": 0,   "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 1, "tick": 60,  "x": 0.13, "duration": 0 },
+          { "type": 0, "id": 2, "tick": 120, "x": 0.26, "duration": 0 },
+          { "type": 0, "id": 3, "tick": 180, "x": 0.13, "duration": 0 },
+          { "type": 0, "id": 4, "tick": 240, "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 5, "tick": 300, "x": 0.13, "duration": 0 }
+        ]
+      },
+
+      "roll": {
+        "_note": "Repeating stair cycle at 1/8 beat (30 ticks). L→M→R→M→L pattern.",
+        "notes": [
+          { "type": 0, "id": 0, "tick": 0,   "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 1, "tick": 30,  "x": 0.13, "duration": 0 },
+          { "type": 0, "id": 2, "tick": 60,  "x": 0.26, "duration": 0 },
+          { "type": 0, "id": 3, "tick": 90,  "x": 0.13, "duration": 0 },
+          { "type": 0, "id": 4, "tick": 120, "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 5, "tick": 150, "x": 0.13, "duration": 0 },
+          { "type": 0, "id": 6, "tick": 180, "x": 0.26, "duration": 0 },
+          { "type": 0, "id": 7, "tick": 210, "x": 0.13, "duration": 0 }
+        ]
+      },
+
+      "bracket": {
+        "_note": "Three columns of simultaneous taps — left, center, right — crossing bracket shape.",
+        "notes": [
+          { "type": 0, "id": 0, "tick": 0,   "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 1, "tick": 0,   "x": 0.15, "duration": 0 },
+          { "type": 0, "id": 2, "tick": 0,   "x": 0.3,  "duration": 0 },
+          { "type": 0, "id": 3, "tick": 120, "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 4, "tick": 120, "x": 0.15, "duration": 0 },
+          { "type": 0, "id": 5, "tick": 120, "x": 0.3,  "duration": 0 }
+        ]
+      },
+
+      "wall": {
+        "_note": "Multiple simultaneous holds spanning the full page — forms a wall of held notes.",
+        "notes": [
+          { "type": 2, "id": 0, "tick": 0, "x": 0.0,  "duration": 480 },
+          { "type": 2, "id": 1, "tick": 0, "x": 0.2,  "duration": 480 },
+          { "type": 2, "id": 2, "tick": 0, "x": 0.4,  "duration": 480 },
+          { "type": 2, "id": 3, "tick": 0, "x": 0.6,  "duration": 480 }
+        ]
+      },
+
+      "trees": {
+        "_note": "Two drag chains: one stays on a straight vertical line, one wanders randomly.",
+        "notes": [
+          {
+            "type": 3, "id": 0,
+            "_comment": "Straight column (the trunk)",
+            "nodes": [
+              { "tick": 0,   "x": 0.0, "duration": 0 },
+              { "tick": 30,  "x": 0.0, "duration": 0 },
+              { "tick": 60,  "x": 0.0, "duration": 0 },
+              { "tick": 90,  "x": 0.0, "duration": 0 },
+              { "tick": 120, "x": 0.0, "duration": 0 }
+            ]
+          },
+          {
+            "type": 3, "id": 1,
+            "_comment": "Random wandering column (the branches)",
+            "nodes": [
+              { "tick": 0,   "x": 0.35, "duration": 0 },
+              { "tick": 30,  "x": 0.2,  "duration": 0 },
+              { "tick": 60,  "x": 0.4,  "duration": 0 },
+              { "tick": 90,  "x": 0.25, "duration": 0 },
+              { "tick": 120, "x": 0.35, "duration": 0 }
+            ]
+          }
+        ]
+      },
+
+      "jumptrills": {
+        "_note": "Both drag chains wander randomly — neither is straight.",
+        "notes": [
+          {
+            "type": 3, "id": 0,
+            "nodes": [
+              { "tick": 0,   "x": 0.0,  "duration": 0 },
+              { "tick": 30,  "x": 0.15, "duration": 0 },
+              { "tick": 60,  "x": 0.05, "duration": 0 },
+              { "tick": 90,  "x": 0.2,  "duration": 0 },
+              { "tick": 120, "x": 0.0,  "duration": 0 }
+            ]
+          },
+          {
+            "type": 3, "id": 1,
+            "nodes": [
+              { "tick": 0,   "x": 0.35, "duration": 0 },
+              { "tick": 30,  "x": 0.5,  "duration": 0 },
+              { "tick": 60,  "x": 0.4,  "duration": 0 },
+              { "tick": 90,  "x": 0.55, "duration": 0 },
+              { "tick": 120, "x": 0.35, "duration": 0 }
+            ]
+          }
+        ]
+      },
+
+      "half_chain_drag": {
+        "_note": "Single drag node sequence: R → L → L → R (right-left-left-right).",
+        "notes": [
+          {
+            "type": 3, "id": 0,
+            "nodes": [
+              { "tick": 0,   "x":  0.0,  "duration": 0 },
+              { "tick": 60,  "x": -0.3,  "duration": 0 },
+              { "tick": 120, "x": -0.3,  "duration": 0 },
+              { "tick": 180, "x":  0.0,  "duration": 0 }
+            ]
+          }
+        ]
+      },
+
+      "chain_drag": {
+        "_note": "Two half-chains combined: R→L→L→R→R→L→L→R.",
+        "notes": [
+          {
+            "type": 3, "id": 0,
+            "nodes": [
+              { "tick": 0,   "x":  0.0,  "duration": 0 },
+              { "tick": 60,  "x": -0.3,  "duration": 0 },
+              { "tick": 120, "x": -0.3,  "duration": 0 },
+              { "tick": 180, "x":  0.0,  "duration": 0 },
+              { "tick": 240, "x":  0.0,  "duration": 0 },
+              { "tick": 300, "x": -0.3,  "duration": 0 },
+              { "tick": 360, "x": -0.3,  "duration": 0 },
+              { "tick": 420, "x":  0.0,  "duration": 0 }
+            ]
+          }
+        ]
+      }
+    },
+
+    "level_4": {
+
+      "streams": {
+        "_note": "Dense chords at 1/8 beat (30 ticks) — trills + chords mixed.",
+        "notes": [
+          { "type": 0, "id": 0, "tick": 0,   "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 1, "tick": 0,   "x": 0.3,  "duration": 0 },
+          { "type": 0, "id": 2, "tick": 30,  "x": 0.15, "duration": 0 },
+          { "type": 0, "id": 3, "tick": 30,  "x": 0.45, "duration": 0 },
+          { "type": 0, "id": 4, "tick": 60,  "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 5, "tick": 60,  "x": 0.3,  "duration": 0 },
+          { "type": 0, "id": 6, "tick": 90,  "x": 0.15, "duration": 0 },
+          { "type": 0, "id": 7, "tick": 90,  "x": 0.45, "duration": 0 },
+          { "type": 0, "id": 8, "tick": 120, "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 9, "tick": 120, "x": 0.3,  "duration": 0 }
+        ]
+      },
+
+      "advanced_drag_layering": {
+        "_note": "Three simultaneous drag chains running in parallel — each at a different x band.",
+        "notes": [
+          {
+            "type": 3, "id": 0,
+            "_comment": "Left band, small oscillation",
+            "nodes": [
+              { "tick": 0,   "x":  0.0,  "duration": 0 },
+              { "tick": 30,  "x":  0.05, "duration": 0 },
+              { "tick": 60,  "x":  0.0,  "duration": 0 },
+              { "tick": 90,  "x": -0.05, "duration": 0 },
+              { "tick": 120, "x":  0.0,  "duration": 0 }
+            ]
+          },
+          {
+            "type": 3, "id": 1,
+            "_comment": "Center band",
+            "nodes": [
+              { "tick": 0,   "x": 0.3,  "duration": 0 },
+              { "tick": 30,  "x": 0.4,  "duration": 0 },
+              { "tick": 60,  "x": 0.35, "duration": 0 },
+              { "tick": 90,  "x": 0.45, "duration": 0 },
+              { "tick": 120, "x": 0.3,  "duration": 0 }
+            ]
+          },
+          {
+            "type": 3, "id": 2,
+            "_comment": "Right band",
+            "nodes": [
+              { "tick": 0,   "x": 0.55, "duration": 0 },
+              { "tick": 30,  "x": 0.5,  "duration": 0 },
+              { "tick": 60,  "x": 0.6,  "duration": 0 },
+              { "tick": 90,  "x": 0.55, "duration": 0 },
+              { "tick": 120, "x": 0.65, "duration": 0 }
+            ]
+          }
+        ]
+      },
+
+      "advanced_hold_layering": {
+        "_note": "Multiple overlapping holds of varying lengths — dense sustained layer.",
+        "notes": [
+          { "type": 2, "id": 0, "tick": 0,   "x": 0.0,  "duration": 480 },
+          { "type": 2, "id": 1, "tick": 0,   "x": 0.27, "duration": 240 },
+          { "type": 2, "id": 2, "tick": 120, "x": 0.14, "duration": 360 },
+          { "type": 2, "id": 3, "tick": 240, "x": 0.41, "duration": 240 },
+          { "type": 2, "id": 4, "tick": 0,   "x": 0.55, "duration": 480 }
+        ]
+      },
+
+      "wave_drags": {
+        "_note": "Drag oscillating sinusoidally left/right at 1/8 beat intervals.",
+        "notes": [
+          {
+            "type": 3, "id": 0,
+            "nodes": [
+              { "tick": 0,   "x":  0.0,  "duration": 0 },
+              { "tick": 30,  "x":  0.2,  "duration": 0 },
+              { "tick": 60,  "x":  0.0,  "duration": 0 },
+              { "tick": 90,  "x": -0.2,  "duration": 0 },
+              { "tick": 120, "x":  0.0,  "duration": 0 },
+              { "tick": 150, "x":  0.2,  "duration": 0 },
+              { "tick": 180, "x":  0.0,  "duration": 0 },
+              { "tick": 210, "x": -0.2,  "duration": 0 }
+            ]
+          }
+        ]
+      },
+
+      "convex_drag": {
+        "_note": "Parabolic arc curving outward (away from center) then returning.",
+        "notes": [
+          {
+            "type": 3, "id": 0,
+            "nodes": [
+              { "tick": 0,   "x":  0.0,  "duration": 0 },
+              { "tick": 30,  "x":  0.1,  "duration": 0 },
+              { "tick": 60,  "x":  0.18, "duration": 0 },
+              { "tick": 90,  "x":  0.22, "duration": 0 },
+              { "tick": 120, "x":  0.18, "duration": 0 },
+              { "tick": 150, "x":  0.1,  "duration": 0 },
+              { "tick": 180, "x":  0.0,  "duration": 0 }
+            ]
+          }
+        ]
+      },
+
+      "concave_drag": {
+        "_note": "Parabolic arc curving inward (toward center).",
+        "notes": [
+          {
+            "type": 3, "id": 0,
+            "nodes": [
+              { "tick": 0,   "x":  0.0,  "duration": 0 },
+              { "tick": 30,  "x": -0.1,  "duration": 0 },
+              { "tick": 60,  "x": -0.18, "duration": 0 },
+              { "tick": 90,  "x": -0.22, "duration": 0 },
+              { "tick": 120, "x": -0.18, "duration": 0 },
+              { "tick": 150, "x": -0.1,  "duration": 0 },
+              { "tick": 180, "x":  0.0,  "duration": 0 }
+            ]
+          }
+        ]
+      },
+
+      "velocity_changing_drags": {
+        "_note": "Uneven node spacing creates fast-slow-fast speed changes. Typical in dubstep drops.",
+        "notes": [
+          {
+            "type": 3, "id": 0,
+            "nodes": [
+              { "tick": 0,   "x":  0.0,  "duration": 0 },
+              { "tick": 15,  "x":  0.3,  "duration": 0 },
+              { "tick": 135, "x":  0.35, "duration": 0 },
+              { "tick": 150, "x":  0.0,  "duration": 0 },
+              { "tick": 165, "x": -0.3,  "duration": 0 },
+              { "tick": 375, "x": -0.35, "duration": 0 },
+              { "tick": 390, "x":  0.0,  "duration": 0 }
+            ]
+          }
+        ]
+      },
+
+      "bricks": {
+        "_note": "Multiple short straight drags staggered like rows of bricks.",
+        "notes": [
+          {
+            "type": 3, "id": 0,
+            "nodes": [
+              { "tick": 0,  "x": 0.0,  "duration": 0 },
+              { "tick": 60, "x": 0.0,  "duration": 0 }
+            ]
+          },
+          {
+            "type": 3, "id": 1,
+            "nodes": [
+              { "tick": 60,  "x": 0.15, "duration": 0 },
+              { "tick": 120, "x": 0.15, "duration": 0 }
+            ]
+          },
+          {
+            "type": 3, "id": 2,
+            "nodes": [
+              { "tick": 120, "x": 0.0,  "duration": 0 },
+              { "tick": 180, "x": 0.0,  "duration": 0 }
+            ]
+          },
+          {
+            "type": 3, "id": 3,
+            "nodes": [
+              { "tick": 180, "x": 0.15, "duration": 0 },
+              { "tick": 240, "x": 0.15, "duration": 0 }
+            ]
+          }
+        ]
+      },
+
+      "revolving_drag_click": {
+        "_note": "Drag sweeps in an arc/circle while simultaneous tap notes fire at fixed positions.",
+        "notes": [
+          { "type": 0, "id": 0, "tick": 0,   "x": 0.0,  "duration": 0 },
+          {
+            "type": 3, "id": 1,
+            "_comment": "Revolving arc drag (right half)",
+            "nodes": [
+              { "tick": 0,   "x": 0.3,  "duration": 0 },
+              { "tick": 30,  "x": 0.15, "duration": 0 },
+              { "tick": 60,  "x": 0.0,  "duration": 0 },
+              { "tick": 90,  "x": 0.15, "duration": 0 },
+              { "tick": 120, "x": 0.3,  "duration": 0 }
+            ]
+          },
+          { "type": 0, "id": 2, "tick": 60,  "x": 0.1,  "duration": 0 },
+          { "type": 0, "id": 3, "tick": 120, "x": 0.05, "duration": 0 },
+          { "type": 0, "id": 4, "tick": 180, "x": 0.2,  "duration": 0 }
+        ]
+      }
+    },
+
+    "level_5": {
+
+      "easter_egg": {
+        "_note": "Notes arranged to form a visible shape or symbol when viewed in the editor. Example: symmetric wing shape (convergence at center tick).",
+        "notes": [
+          { "type": 0, "id": 0, "tick": 0,   "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 1, "tick": 0,   "x": 0.7,  "duration": 0 },
+          { "type": 0, "id": 2, "tick": 60,  "x": 0.1,  "duration": 0 },
+          { "type": 0, "id": 3, "tick": 60,  "x": 0.6,  "duration": 0 },
+          { "type": 0, "id": 4, "tick": 120, "x": 0.2,  "duration": 0 },
+          { "type": 0, "id": 5, "tick": 120, "x": 0.5,  "duration": 0 },
+          { "type": 0, "id": 6, "tick": 180, "x": 0.35, "duration": 0 }
+        ]
+      },
+
+      "polyrhythm": {
+        "_note": "Two rhythmic streams playing simultaneously with conflicting beat divisions. Left hand: 1/4 beat (60 ticks). Right hand: 1/3 beat (80 ticks triplet).",
+        "notes": [
+          { "type": 0, "id": 0,  "tick": 0,   "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 1,  "tick": 0,   "x": 0.5,  "duration": 0 },
+          { "type": 0, "id": 2,  "tick": 60,  "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 3,  "tick": 80,  "x": 0.5,  "duration": 0 },
+          { "type": 0, "id": 4,  "tick": 120, "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 5,  "tick": 160, "x": 0.5,  "duration": 0 },
+          { "type": 0, "id": 6,  "tick": 180, "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 7,  "tick": 240, "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 8,  "tick": 240, "x": 0.5,  "duration": 0 },
+          { "type": 0, "id": 9,  "tick": 300, "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 10, "tick": 320, "x": 0.5,  "duration": 0 },
+          { "type": 0, "id": 11, "tick": 360, "x": 0.0,  "duration": 0 },
+          { "type": 0, "id": 12, "tick": 400, "x": 0.5,  "duration": 0 },
+          { "type": 0, "id": 13, "tick": 420, "x": 0.0,  "duration": 0 }
+        ]
+      }
+    }
+  }
+}
