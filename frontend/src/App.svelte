@@ -84,15 +84,15 @@
           <!-- ── Row 1: Logo + Header ──────────────────────────────────────── -->
           <Logo></Logo>
           <div class="col-span-2">
-            <!-- <UserHeader -->
-            <!--   username="ink" -->
-            <!--   rating={12.41} -->
-            <!--   ratingCurrent={2430} -->
-            <!--   ratingMax={8000} -->
-            <!--   fragments={8756} -->
-            <!--   memories={315} -->
-            <!--   avatarSrc="/ellasy.png" -->
-            <!-- /> -->
+            <UserHeader
+              username="ink"
+              rating={12.41}
+              ratingCurrent={2430}
+              ratingMax={8000}
+              fragments={8756}
+              memories={315}
+              avatarSrc="/ellasy.png"
+            />
           </div>
 
           <!-- ── Row 2: Main area ──────────────────────────────────────────── -->
@@ -135,13 +135,12 @@
                 onquickplay={() => {
                   selected = Math.floor(Math.random() * songs.length);
                 }}
-                onupload={(chart, buffer, file: File) => {
-                  /* open upload modal */
+                onupload={(chart, buffer, file: File, coverUrl: string | null) => {
                   songs.push({
-                    title: file.name,
+                    title: file.name.replace(/\.[^.]+$/, ""),
                     artist: "UNKNOWN",
                     badge: "C",
-                    cover: "/cover/placeholder.png",
+                    cover: coverUrl ?? "/cover/placeholder.png",
                     description: "A newly uploaded song.",
                     difficulty: "normal",
                     level: 7,
@@ -149,6 +148,7 @@
                     chart,
                     buffer,
                   });
+                  selected = songs.length - 1;
                 }}
               />
             </div>

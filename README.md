@@ -35,6 +35,7 @@
 
 - ~https://docs.nativescript.org/setup/macos~ FUCK THIS WE DOING WEBAPP
 - [Bun](https://bun.sh/)
+- `npm install pixi.js`
 
 ## JSON
 
