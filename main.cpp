@@ -5,7 +5,9 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <map>
 #include <random>
+#include <set>
 
 #include <fstream>
 #include <iostream>
@@ -221,6 +223,46 @@ static int patternSpan(const nlohmann::json& notes)
     return last;
 }
 
+// Returns true if any two tap notes (non-drag) share the same unscaled tick.
+// These are "stream" patterns that deserve special placement treatment.
+static bool isStreamPattern(const nlohmann::json& notes)
+{
+    std::set<int> seen;
+    for (auto& n : notes) {
+        if (n.contains("nodes")) continue;
+        int t = n["tick"];
+        if (!seen.insert(t).second) return true;
+    }
+    return false;
+}
+
+// Returns the relative-x pairs {x1, x2} for every tick that has exactly two
+// simultaneous tap notes (unscaled). Used to validate close/mirror placement.
+static std::vector<std::pair<float,float>> simultaneousPairs(const nlohmann::json& notes)
+{
+    std::map<int, std::vector<float>> by_tick;
+    for (auto& n : notes) {
+        if (!n.contains("nodes"))
+            by_tick[(int)n["tick"]].push_back((float)n["x"]);
+    }
+    std::vector<std::pair<float,float>> pairs;
+    for (auto& [t, xs] : by_tick)
+        if (xs.size() >= 2)
+            pairs.push_back({xs[0], xs[1]});
+    return pairs;
+}
+
+// Returns true if the pattern contains any plain tap note
+// (no drag nodes, duration == 0). Used to block tap patterns during streams.
+static bool hasTapNotes(const nlohmann::json& notes)
+{
+    for (auto& n : notes) {
+        if (!n.contains("nodes") && n.value("duration", 0) == 0)
+            return true;
+    }
+    return false;
+}
+
 nlohmann::json buildNoteList(float bpm, float duration_sec,
                              const nlohmann::json& patterns_json,
                              int time_base = 480,
@@ -242,14 +284,17 @@ nlohmann::json buildNoteList(float bpm, float duration_sec,
 
     // precompute x-extents and spans (unscaled ticks)
     struct PatternMeta {
-        float lo, hi;   // relative x extent (first-note x = 0)
-        int   span;     // last tick (unscaled)
+        float lo, hi;                           // relative x extent
+        int   span;                             // last tick (unscaled)
+        bool  is_stream;                        // has simultaneous tap notes
+        std::vector<std::pair<float,float>> sim_pairs; // relative-x pairs at same tick
     };
     std::vector<PatternMeta> meta;
     meta.reserve(pool.size());
     for (auto& p : pool) {
         auto [lo, hi] = patternXExtent(p);
-        meta.push_back({lo, hi, patternSpan(p)});
+        meta.push_back({lo, hi, patternSpan(p),
+                        isStreamPattern(p), simultaneousPairs(p)});
     }
 
     // precompute page directions
@@ -259,11 +304,12 @@ nlohmann::json buildNoteList(float bpm, float duration_sec,
         return (page % 2 == 0) ? -1 : 1;
     };
 
-    // Walk beats, placing patterns spatially ────────────────────────────
+    // Walk beats, placing patterns spatially
     // Active placements: track which x-intervals are occupied and until when.
     struct Active {
         float lo, hi;      // absolute x interval
         int   ends_at;     // tick at which this pattern finishes
+        bool  is_stream;   // true → no tap patterns may be placed while this runs
     };
     std::vector<Active> active;
 
@@ -273,7 +319,7 @@ nlohmann::json buildNoteList(float bpm, float duration_sec,
     std::mt19937 rng(42069);
     std::uniform_int_distribution<int> pickPat(0, (int)pool.size() - 1);
 
-    //  Tick density tracking (hard cap: max 3 notes share any one tick)
+    // Tick density tracking (hard cap: max 3 notes share any one tick)
     std::map<int, int> tick_counts;
 
     // Spatial continuity state
@@ -284,6 +330,9 @@ nlohmann::json buildNoteList(float bpm, float duration_sec,
     bool  has_prev    = false;
     bool  next_mirror = true;
 
+    // Stream pattern throttle
+    int stream_streak = 0;
+
     nlohmann::json note_list = nlohmann::json::array();
     int id = 0;
 
@@ -292,6 +341,11 @@ nlohmann::json buildNoteList(float bpm, float duration_sec,
         active.erase(std::remove_if(active.begin(), active.end(),
             [&](const Active& a){ return a.ends_at <= beat_tick; }),
             active.end());
+
+        // If any running pattern is a stream, only holds/drags may be placed
+        // alongside it — no additional tap notes allowed.
+        bool stream_active = std::any_of(active.begin(), active.end(),
+            [](const Active& a){ return a.is_stream; });
 
         // Collect free x-intervals (gaps between / around active patterns)
         std::vector<std::pair<float,float>> occupied;
@@ -321,17 +375,20 @@ nlohmann::json buildNoteList(float bpm, float duration_sec,
             int pi = pickPat(rng);
             PatternMeta& pm = meta[pi];
 
-            // prefer mirror or gradient of previous
-            // pat_center_offset: distance from anchor to the pattern's x-center.
+            // Skip stream patterns once they've run 4 beats in a row.
+            if (pm.is_stream && stream_streak >= 4) continue;
+
+            // While a stream is running, only holds/drags may be placed.
+            if (stream_active && hasTapNotes(pool[pi])) continue;
+
+            // mirror or gradient of previous
             float pat_center_offset = (pm.lo + pm.hi) / 2.0f;
             float preferred_center;
             if (!has_prev) {
                 preferred_center = 0.5f;
             } else if (next_mirror) {
-                // Mirror: reflect the previous center around the screen midpoint.
                 preferred_center = 1.0f - prev_center;
             } else {
-                // Gradient: small continuous drift from the previous center.
                 std::uniform_real_distribution<float> drift(-0.15f, 0.15f);
                 preferred_center = prev_center + drift(rng);
             }
@@ -346,8 +403,7 @@ nlohmann::json buildNoteList(float bpm, float duration_sec,
             }
             if (candidates.empty()) continue;
 
-            // Pick the candidate segment whose valid anchor range is closest to
-            // preferred_anchor (spatial coherence beats pure randomness).
+            // Pick the candidate segment closest to preferred_anchor.
             int best_si = candidates[0];
             float best_dist = std::numeric_limits<float>::max();
             for (int si : candidates) {
@@ -362,15 +418,40 @@ nlohmann::json buildNoteList(float bpm, float duration_sec,
             float anchor_min = fs - pm.lo;
             float anchor_max = fe - pm.hi;
 
-            // Clamp to valid range then add a small jitter so it isn't mechanical.
+            // Clamp preferred anchor into the valid range + small jitter.
             float anchor_base  = std::clamp(preferred_anchor, anchor_min, anchor_max);
             float jitter_range = std::min(0.1f, (anchor_max - anchor_min) * 0.5f);
             std::uniform_real_distribution<float> jitter(-jitter_range, jitter_range);
             float anchor = std::clamp(anchor_base + jitter(rng), anchor_min, anchor_max);
 
+            // enforce close-or-mirrored for simultaneous pairs of streams
+            // For every pair of notes that share a tick, their absolute x values
+            // must be either close  (|x1-x2| < 0.4) or mirrored (x1+x2 ≈ 1.0).
+            // Since the difference is fixed by the pattern, only the mirror
+            // condition depends on anchor. If the current anchor fails, try to
+            // recompute it for perfect mirroring.
+            if (pm.is_stream && !pm.sim_pairs.empty()) {
+                bool pairs_ok = true;
+                for (auto& [x1r, x2r] : pm.sim_pairs) {
+                    float diff   = std::abs(x1r - x2r);
+                    float sum    = (anchor + x1r) + (anchor + x2r); // 2*anchor + x1r+x2r
+                    bool close    = diff < 0.4f;
+                    bool mirrored = std::abs(sum - 1.0f) < 0.25f;
+                    if (!close && !mirrored) { pairs_ok = false; break; }
+                }
+                if (!pairs_ok) {
+                    // Try to fix: compute anchor that mirrors the first pair around 0.5.
+                    // (anchor + x1r) + (anchor + x2r) = 1.0  →  anchor = (1 - x1r - x2r) / 2
+                    auto& [x1r, x2r] = pm.sim_pairs[0];
+                    float mirror_anchor = (1.0f - x1r - x2r) / 2.0f;
+                    if (mirror_anchor >= anchor_min && mirror_anchor <= anchor_max)
+                        anchor = mirror_anchor;
+                    else
+                        continue; // can't satisfy constraint in this segment
+                }
+            }
+
             // tick density cap
-            // Count ticks this candidate would add; reject if any tick would
-            // exceed 3 total notes (across all simultaneously active patterns).
             int direction     = directionAt(beat_tick);
             int unscaled_span = pm.span;
             int scaled_span   = unscaled_span * scale;
@@ -402,8 +483,6 @@ nlohmann::json buildNoteList(float bpm, float duration_sec,
             int n_notes = (int)notes.size();
 
             for (int ni = 0; ni < n_notes; ++ni) {
-                // When direction == -1, reverse tick order so the pattern plays
-                // "upside-down" along the scanline.
                 int src = (direction == -1) ? (n_notes - 1 - ni) : ni;
                 nlohmann::json note = notes[src];
 
@@ -431,12 +510,42 @@ nlohmann::json buildNoteList(float bpm, float duration_sec,
                 note_list.push_back(note);
             }
 
-            // Register as active and update spatial continuity state
+            // A long hold on the far side balances the visual load and gives the
+            // player's other hand something gentle to do during a dense stream
+            if (pm.is_stream && scaled_span > 0) {
+                float stream_center = anchor + pat_center_offset;
+                float hold_x = std::clamp(1.0f - stream_center, 0.05f, 0.95f);
+
+                // Only emit if hold_x is not inside any currently active interval.
+                bool hold_free = true;
+                for (auto& a : active) {
+                    if (hold_x >= a.lo - 0.05f && hold_x <= a.hi + 0.05f) {
+                        hold_free = false; break;
+                    }
+                }
+                // long hold on the other side
+                if (hold_x >= anchor + pm.lo - 0.05f && hold_x <= anchor + pm.hi + 0.05f)
+                    hold_free = false;
+
+                if (hold_free) {
+                    note_list.push_back({
+                        {"type",     1},           // long hold
+                        {"id",       id++},
+                        {"tick",     beat_tick},
+                        {"x",        hold_x},
+                        {"duration", scaled_span}
+                    });
+                    tick_counts[beat_tick]++;      // count the hold start tick
+                }
+            }
+
+            // Register as active and update spatial continuity state.
             active.push_back({anchor + pm.lo, anchor + pm.hi,
-                              beat_tick + scaled_span});
+                              beat_tick + scaled_span, pm.is_stream});
             prev_center = anchor + pat_center_offset;
             has_prev    = true;
-            next_mirror = !next_mirror;  // alternate mirror ↔ gradient
+            next_mirror = !next_mirror;
+            stream_streak = pm.is_stream ? stream_streak + 1 : 0;
             placed = true;
         }
     }
