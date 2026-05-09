@@ -42,7 +42,6 @@
     const audioBlob = new Blob([buffer], { type: "audio/mp3" });
     audio = new Audio();
     audio.src = URL.createObjectURL(audioBlob);
-    audio.play();
 
     engine.onStateChange = () => {
       score = engine!.state.score;
@@ -52,7 +51,9 @@
 
     engine.onFinish = () => onfinish(engine!.state);
 
-    setTimeout(() => engine?.start(), 100);
+    // Start audio and engine together so audio.currentTime is the shared clock.
+    await audio.play();
+    engine.start(audio);
   });
 
   onDestroy(() => {

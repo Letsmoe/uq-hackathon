@@ -1,6 +1,6 @@
 import type { RuntimeNote } from "./types";
 
-export type InputCallback = () => void;
+export type InputCallback = (x: number, y: number) => void;
 export type HoldCallback = (noteId: number, held: boolean) => void;
 
 export class InputHandler {
@@ -17,16 +17,20 @@ export class InputHandler {
   }
 
   private attach() {
-    this.canvas.addEventListener("touchstart", this.onDown, { passive: false });
-    this.canvas.addEventListener("touchend", this.onUp);
-    this.canvas.addEventListener("touchmove", this.onDown, { passive: false });
+    this.canvas.addEventListener("touchstart", this.onTouchDown, { passive: false });
+    this.canvas.addEventListener("touchend", this.onTouchUp);
+    this.canvas.addEventListener("touchmove", this.onTouchDown, { passive: false });
+    this.canvas.addEventListener("mousedown", this.onMouseDown);
+    this.canvas.addEventListener("mouseup", this.onMouseUp);
     this.canvas.style.touchAction = "none";
   }
 
   detach() {
-    this.canvas.removeEventListener("touchstart", this.onDown);
-    this.canvas.removeEventListener("touchend", this.onUp);
-    this.canvas.removeEventListener("touchmove", this.onUp);
+    this.canvas.removeEventListener("touchstart", this.onTouchDown);
+    this.canvas.removeEventListener("touchend", this.onTouchUp);
+    this.canvas.removeEventListener("touchmove", this.onTouchDown);
+    this.canvas.removeEventListener("mousedown", this.onMouseDown);
+    this.canvas.removeEventListener("mouseup", this.onMouseUp);
   }
 
   setActiveNotes(notes: RuntimeNote[], scanPixelY: number) {
@@ -34,9 +38,17 @@ export class InputHandler {
     this.scanPixelY = scanPixelY;
   }
 
-  private onDown = (e: TouchEvent) => {
-    e.preventDefault();
-    // Check if closest note is a hold — register hold start
+  private canvasCoords(clientX: number, clientY: number): { x: number; y: number } {
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
+  }
+
+  private handleDown(x: number, y: number) {
     const hold = this.activeNotes.find(
       (n) => n.type === 2 && !n.hit && !n.missed && !n.holdActive,
     );
@@ -44,14 +56,35 @@ export class InputHandler {
       this.heldNoteId = hold.id;
       this.onHold(hold.id, true);
     } else {
-      this.onInput();
+      this.onInput(x, y);
     }
-  };
+  }
 
-  private onUp = (_e: TouchEvent) => {
+  private handleUp() {
     if (this.heldNoteId !== null) {
       this.onHold(this.heldNoteId, false);
       this.heldNoteId = null;
     }
+  }
+
+  private onTouchDown = (e: TouchEvent) => {
+    e.preventDefault();
+    const t = e.touches[0] ?? e.changedTouches[0];
+    if (!t) return;
+    const { x, y } = this.canvasCoords(t.clientX, t.clientY);
+    this.handleDown(x, y);
+  };
+
+  private onTouchUp = (_e: TouchEvent) => {
+    this.handleUp();
+  };
+
+  private onMouseDown = (e: MouseEvent) => {
+    const { x, y } = this.canvasCoords(e.clientX, e.clientY);
+    this.handleDown(x, y);
+  };
+
+  private onMouseUp = (_e: MouseEvent) => {
+    this.handleUp();
   };
 }

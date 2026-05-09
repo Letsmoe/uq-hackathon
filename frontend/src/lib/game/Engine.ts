@@ -13,7 +13,9 @@ import { NoteRenderer } from "./NoteRenderer";
 import { InputHandler } from "./InputHandler";
 import { JudgmentSystem } from "./Judgment";
 
-const APPROACH_S = 0.45;
+// Must be >= NoteRenderer's APPROACH_S (1.8) so notes enter the visible list
+// early enough for their full approach animation to play.
+const APPROACH_S = 2.0;
 const HUD_H = 0; // HUD is a CSS overlay — PixiJS uses the full canvas height
 
 export class GameEngine {
@@ -27,6 +29,7 @@ export class GameEngine {
   private renderer: NoteRenderer | null = null;
   private input: InputHandler | null = null;
   private judgment: JudgmentSystem | null = null;
+  private audioEl: HTMLAudioElement | null = null;
 
   readonly state: GameState = makeInitialState();
   private chart: Chart | null = null;
@@ -80,14 +83,14 @@ export class GameEngine {
 
     this.input = new InputHandler(
       this.app.canvas as HTMLCanvasElement,
-      () => this.handleInput(),
+      (x, y) => this.handleInput(x, y),
       (id, held) => {
+        const note = this.notes.find((n) => n.id === id);
+        if (!note) return;
         if (held) {
-          const note = this.notes.find((n) => n.id === id);
-          if (note) this.judgment!.judgeHoldStart(note, this.state.elapsed);
+          this.judgment!.judgeHoldStart(note, this.state.elapsed);
         } else {
-          const note = this.notes.find((n) => n.id === id);
-          if (note) this.judgment!.judgeHoldEnd(note);
+          this.judgment!.judgeHoldEnd(note);
         }
         this.onStateChange?.();
       },
@@ -155,40 +158,48 @@ export class GameEngine {
     };
   }
 
-  private handleInput() {
+  private handleInput(touchX: number, _touchY: number) {
     if (!this.judgment) return;
     const elapsed = this.state.elapsed;
-    let bestDiff = Infinity;
+    let bestScore = -Infinity;
     let bestNote: RuntimeNote | null = null;
 
     for (const note of this.notes) {
       if (note.hit || note.missed) continue;
 
+      let noteTime: number;
+      let notePxX: number;
+
       if (note.type === 3) {
         if (!note.nodes || note.chainNodeIdx >= note.nodes.length) continue;
         const nd = note.nodes[note.chainNodeIdx];
-        const diff = Math.abs(elapsed - nd.timeSeconds);
-        if (diff < JUDGMENT_WINDOWS.bad && diff < bestDiff) {
-          bestDiff = diff;
-          bestNote = note;
-        }
+        noteTime = nd.timeSeconds;
+        notePxX = nd.pixelX;
       } else if (note.type === 2) {
         if (note.holdActive) continue;
-        const diff = Math.abs(elapsed - note.timeSeconds);
-        if (diff < JUDGMENT_WINDOWS.bad && diff < bestDiff) {
-          bestDiff = diff;
-          bestNote = note;
-        }
+        noteTime = note.timeSeconds;
+        notePxX = note.pixelX;
       } else {
-        const diff = Math.abs(elapsed - note.timeSeconds);
-        if (diff < JUDGMENT_WINDOWS.bad && diff < bestDiff) {
-          bestDiff = diff;
-          bestNote = note;
-        }
+        noteTime = note.timeSeconds;
+        notePxX = note.pixelX;
+      }
+
+      const timeDiff = Math.abs(elapsed - noteTime);
+      if (timeDiff > JUDGMENT_WINDOWS.bad) continue;
+
+      // Score combines time proximity and x-coordinate proximity
+      const xDiff = Math.abs(touchX - notePxX);
+      const coordScore = Math.max(0, 1 - xDiff / (this.W * 0.25));
+      const timeScore = 1 - timeDiff / JUDGMENT_WINDOWS.bad;
+      const score = timeScore * 0.55 + coordScore * 0.45;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestNote = note;
       }
     }
 
-    if (!bestNote) return;
+    if (!bestNote || bestScore <= 0) return;
 
     if (bestNote.type === 3) {
       this.judgment.judgeChainNode(bestNote, elapsed);
@@ -200,7 +211,8 @@ export class GameEngine {
     this.onStateChange?.();
   }
 
-  start() {
+  start(audio?: HTMLAudioElement) {
+    this.audioEl = audio ?? null;
     this.state.running = true;
     this.state.paused = false;
     this.app.ticker.add(this.tick);
@@ -221,7 +233,13 @@ export class GameEngine {
     if (!this.scanner || !this.renderer || !this.judgment || !this.chart)
       return;
 
-    this.state.elapsed += ticker.deltaMS / 1000;
+    // Use audio.currentTime as authoritative clock when available — prevents
+    // drift and eliminates the startup offset between audio and engine.
+    if (this.audioEl) {
+      this.state.elapsed = this.audioEl.currentTime;
+    } else {
+      this.state.elapsed += ticker.deltaMS / 1000;
+    }
 
     if (this.state.elapsed >= this.chart.length + 0.5) {
       this.state.finished = true;
