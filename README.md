@@ -1,10 +1,11 @@
 ## Usage
 
-- `./main audios/[FILENAME]`
-- output JSON `charts/[FILENAME]`
+- ~`./main audios/[FILENAME]`~
+- ~output JSON `charts/[FILENAME]`~
 
-- `bun install`
+- ~`bun install`~
 - `bun run dev --host`
+- Enter Network URL on tablet/ mobile devices
 
 ## ISSUES
 
@@ -36,6 +37,22 @@
 - ~https://docs.nativescript.org/setup/macos~ FUCK THIS WE DOING WEBAPP
 - [Bun](https://bun.sh/)
 - `npm install pixi.js`
+- Emscripten
+	- Clone the Emscripten SDK
+
+	```
+	git clone https://github.com/emscripten-core/emsdk.git
+	cd emsdk
+	```
+	- Install and activate the latest version
+
+	```
+	./emsdk install latest
+	./emsdk activate latest
+	```
+
+	- Set up your environment (run this in every new terminal, or add to ~/.zshrc)
+	`source ./emsdk_env.sh`
 
 ## JSON
 
@@ -167,6 +184,7 @@ Page redundent?
 - **drag/ hold/ swipe notes**
 - Scale notes according to screensize
 - Tap note at beats
+	- ref: https://github.com/TeamFlos/phira
 - progress bar (RGB)
 - restart button when paused
 - Reasonable layout of notes for gameplay

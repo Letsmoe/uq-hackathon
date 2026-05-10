@@ -14,7 +14,7 @@
 #include <emscripten/emscripten.h>
 #include "vendor/nlohmann/json.hpp"
 
-// If you vendor json.hpp locally instead, replace the above include with:
+// If vendor json.hpp locally instead, replace the above w/
 // #include "vendor/nlohmann/json.hpp"
 
 struct AudioInfo {
@@ -325,7 +325,6 @@ nlohmann::json buildNoteList(
             simultaneousPairs(pattern)
         });
     }
-}
 
     auto directionAt = [&](int tick) -> int {
         int page = tick / ticksPerPage;
@@ -344,7 +343,10 @@ nlohmann::json buildNoteList(
     const float X_GAP = 0.05f;
     const float X_MAX = 0.9f;
 
-    std::mt19937 rng(42069);
+    // Seed combines the magic base with bpm and duration so every song gets
+    // a distinct, reproducible sequence.
+    std::mt19937 rng(42069u ^ (std::hash<float>{}(bpm) * 2654435761u)
+                              ^ (std::hash<float>{}(durationSec) * 2246822519u));
     std::uniform_int_distribution<int> pick_pat(0, (int)pool.size() - 1);
 
     std::map<int, int> tickCounts;
@@ -409,7 +411,7 @@ nlohmann::json buildNoteList(
         const int MAX_TRIES = 8;
         bool placed = false;
 
-        for (int attempt = 0; attempt < max_tries && !placed; ++attempt) {
+        for (int attempt = 0; attempt < MAX_TRIES && !placed; ++attempt) {
             int          pi = pick_pat(rng);
             PatternMeta& pm = meta[pi];
 
@@ -425,13 +427,23 @@ nlohmann::json buildNoteList(
             float preferredCenter;
 
             if (!hasPrev) {
-                preferredCenter = 0.5f;
+                // First pattern: pick a random edge-biased start (left or right third)
+                std::uniform_int_distribution<int> side(0, 1);
+                preferredCenter = side(rng) == 0 ? 0.2f : 0.8f;
             } else if (nextMirror) {
+                // Hard mirror: flip to the opposite side
                 preferredCenter = 1.0f - prevCenter;
             } else {
-                std::uniform_real_distribution<float> drift(-0.15f, 0.15f);
-                preferredCenter = prevCenter + drift(rng);
+                // Drift toward whichever edge we are closest to, with a strong pull
+                float edgeTarget = (prevCenter < 0.5f) ? 0.15f : 0.85f;
+                std::uniform_real_distribution<float> drift(0.0f, 1.0f);
+                // 60% pull toward edge, 40% random nudge
+                float t = drift(rng);
+                preferredCenter = prevCenter + (edgeTarget - prevCenter) * 0.6f
+                                  + (t - 0.5f) * 0.2f;
             }
+            // Keep within playfield bounds
+            preferredCenter = std::clamp(preferredCenter, 0.15f, 0.85f);
 
             float preferredAnchor = preferredCenter - patCenterOffset;
 
@@ -440,7 +452,7 @@ nlohmann::json buildNoteList(
             for (int si = 0; si < (int)freeSegs.size(); ++si) {
                 auto [fs, fe] = freeSegs[si];
 
-                if (fe - fs >= (pm.hi - pm.lo) + 0.2f) {
+                if (fe - fs >= (pm.hi - pm.lo) + 0.2f) {  // min gap 0.2
                     candidates.push_back(si);
                 }
             }
@@ -476,7 +488,7 @@ nlohmann::json buildNoteList(
             }
 
             float anchorBase = std::clamp(preferredAnchor, anchorMin, anchorMax);
-            float jitterRange = std::min(0.1f, (anchorMax - anchorMin) * 0.5f);
+            float jitterRange = std::min(0.15f, (anchorMax - anchorMin) * 0.5f);
 
             std::uniform_real_distribution<float> jitter(-jitterRange, jitterRange);
 
@@ -527,10 +539,10 @@ nlohmann::json buildNoteList(
                 for (auto& note : pool[pi]) {
                     if (note.contains("nodes")) {
                         for (auto& node : note["nodes"]) {
-                            candidateCounts[transformTick(node.value("tick", 0))]++;
+                            candidateCounts[transform_tick(node.value("tick", 0))]++;
                         }
                     } else {
-                        candidateCounts[transformTick(note.value("tick", 0))]++;
+                        candidateCounts[transform_tick(note.value("tick", 0))]++;
                     }
                 }
 
@@ -562,7 +574,7 @@ nlohmann::json buildNoteList(
                     }
 
                     for (auto& node : nodes) {
-                        int t = transformTick(node.value("tick", 0));
+                        int t = transform_tick(node.value("tick", 0));
 
                         node["tick"] = t;
                         node["x"] = anchor + node.value("x", 0.0f);
@@ -573,7 +585,7 @@ nlohmann::json buildNoteList(
                     int origTick = note.value("tick", 0);
                     int origDuration = note.value("duration", 0);
 
-                    int t = transformTick(origTick);
+                    int t = transform_tick(origTick);
 
                     note["tick"] = t;
                     note["duration"] = origDuration * scale;
