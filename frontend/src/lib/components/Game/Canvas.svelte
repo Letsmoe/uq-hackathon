@@ -169,6 +169,17 @@
     style="background: radial-gradient(ellipse at center, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.45) 100%);"
   ></div>
 
+  <!-- Grid lines (matching main page) -->
+  <div
+    class="absolute inset-0 pointer-events-none"
+    style="
+      background-image:
+        linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 80px 80px;
+    "
+  ></div>
+
   <canvas
     bind:this={canvas}
     class="absolute inset-0 w-full h-full"
