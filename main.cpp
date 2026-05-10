@@ -94,7 +94,7 @@ float detectBPM(const std::vector<float>& mono, int sampleRate) {
 
     float bpm = 60.0f * energyRate / bestLag;
 
-    while (bpm > 200.0f) bpm /= 2.0f;
+    while (bpm > 160.0f) bpm /= 2.0f;
     while (bpm > 0.0f && bpm < 50.0f) bpm *= 2.0f;
 
     return bpm;
