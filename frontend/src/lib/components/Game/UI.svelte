@@ -27,6 +27,22 @@
 
   const DOTS_COLS = 8;
   const DOTS_ROWS = 2;
+
+  // Measure the HUD block height and set --hud-height on the parent wrapper
+  let hudBlock: HTMLElement;
+  let hudHeight = $state(210);
+
+  $effect(() => {
+    if (!hudBlock) return;
+    const ro = new ResizeObserver(() => {
+      hudHeight = hudBlock.offsetHeight;
+      // Walk up to the game wrapper and set the CSS variable
+      const wrapper = hudBlock.closest('.game-wrapper, [data-game-wrapper]') as HTMLElement | null;
+      if (wrapper) wrapper.style.setProperty('--hud-height', hudHeight + 'px');
+    });
+    ro.observe(hudBlock);
+    return () => ro.disconnect();
+  });
 </script>
 
 <svelte:head>
@@ -42,7 +58,7 @@
 <div class="absolute inset-0 pointer-events-none select-none" style="font-family: 'Rajdhani', sans-serif;">
 
   <!-- ── TOP HUD BLOCK (flex column so bar snaps below content) ────────── -->
-  <div class="absolute top-0 left-0 right-0 flex flex-col">
+  <div class="absolute top-0 left-0 right-0 flex flex-col" bind:this={hudBlock} data-hud-block>
 
     <!-- HUD row: left / centre / right -->
     <div class="relative flex items-start justify-between px-8 pt-5">
@@ -153,7 +169,7 @@
     <!-- ── PROGRESS BAR: flows naturally below the tallest HUD column ── -->
     <div class="w-full mt-6" style="height: 3px; background: rgba(255,255,255,0.08);">
       <div
-        style="height: 100%; width: {progress * 100}%; background: linear-gradient(90deg, #00f5ff, #ff00aa); box-shadow: 0 0 8px #00f5ff; transition: width 0.08s linear;"
+        style="height: 100%; width: {progress * 100}%; background: linear-gradient(90deg, #00f5ff, #cc00ff); box-shadow: 0 0 8px #00f5ff; transition: width 0.08s linear;"
       ></div>
     </div>
 

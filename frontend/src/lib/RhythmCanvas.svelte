@@ -34,14 +34,29 @@
   let resultsData = $state<ResultsSnapshot | null>(null);
   let showPause = $state(false);
 
-
-  
   // ── Layout constants (logical pixels, DPR-independent) ────────
   const PAD_X = 0.07; // fraction of width
-  const LANE_TOP = 0.24; // fraction of height — pushed below HUD overlay
-  const LANE_BOT = 0.88;
+  // PLAY_TOP_PX is now dynamic — resolved each frame from --hud-height CSS var
+  // set by UI.svelte's ResizeObserver. We keep a fallback default of 200px.
+  const PLAY_TOP_FALLBACK = 200; // px — safe default until first measure
+  // Bottom padding in px — enough to clear the logo row (bottom-6 = 24px + logo ~36px + gap)
+  const PLAY_BOT_PAD = 80;      // px from canvas bottom edge
   const NOTE_R = 64; // logical pixels
   const HOLD_W = 18;
+
+  // ── Dynamic play-area bounds ──────────────────────────────────
+  // Read the HUD height CSS variable that UI.svelte writes each frame.
+  function getPlayTop(): number {
+    if (!canvas) return PLAY_TOP_FALLBACK;
+    const wrapper = canvas.closest('[data-game-wrapper]') as HTMLElement | null;
+    if (!wrapper) return PLAY_TOP_FALLBACK;
+    const v = wrapper.style.getPropertyValue('--hud-height');
+    const px = parseFloat(v);
+    return isNaN(px) ? PLAY_TOP_FALLBACK : px + 8; // 8px breathing room
+  }
+  function getPlayBot(H: number): number {
+    return H - PLAY_BOT_PAD;
+  }
 
   // ── Timing constants ──────────────────────────────────────────
   const SCAN_BEATS = 8; // beats per half-sweep
@@ -258,8 +273,8 @@
     ): void {
       const laneLeft = PAD_X * W;
       const laneRight = W * (1 - PAD_X);
-      const laneTop = LANE_TOP * H;
-      const laneBot = LANE_BOT * H;
+      const laneTop = getPlayTop();
+      const laneBot = getPlayBot(H);
       const playH = laneBot - laneTop;
       const scanPxY = laneTop + getScannerYPosition(this.song, songTime) * playH;
 
@@ -538,8 +553,8 @@
 
     const laneLeft = PAD_X * W;
     const laneRight = W * (1 - PAD_X);
-    const laneTop = LANE_TOP * H;
-    const laneBot = LANE_BOT * H;
+    const laneTop = getPlayTop();           // dynamic — respects HUD height
+    const laneBot = getPlayBot(H);          // dynamic — respects bottom logo
     const playW = laneRight - laneLeft;
     const playH = laneBot - laneTop;
 
@@ -686,6 +701,7 @@
 
 <div
   class="game-wrapper"
+  data-game-wrapper
   onpointerdown={onPointerDown}
   onpointerup={onPointerUp}
 >
@@ -960,7 +976,7 @@
   }
   .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #00f5ff, #ff00aa);
+    background: linear-gradient(90deg, #00f5ff, #cc00ff);
     box-shadow: 0 0 8px #00f5ff;
     transition: width 0.08s linear;
   }

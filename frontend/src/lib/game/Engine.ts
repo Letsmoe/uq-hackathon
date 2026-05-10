@@ -16,13 +16,12 @@ import { JudgmentSystem } from "./Judgment";
 // Must be >= NoteRenderer's APPROACH_S (1.8) so notes enter the visible list
 // early enough for their full approach animation to play.
 const APPROACH_S = 2.0;
-const HUD_H = 0; // HUD is a CSS overlay — PixiJS uses the full canvas height
 
 export class GameEngine {
   private app: Application;
   private W = 0;
   private H = 0;
-  private PLAY_TOP = HUD_H;
+  private PLAY_TOP = 0;
   private PLAY_H = 0;
 
   private scanner: Scanner | null = null;
@@ -57,8 +56,35 @@ export class GameEngine {
     const e = new GameEngine(app);
     e.W = app.screen.width;
     e.H = app.screen.height;
-    e.PLAY_H = e.H - HUD_H;
+    e.PLAY_TOP = 0;
+    e.PLAY_H = e.H;
     return e;
+  }
+
+  /**
+   * Called by Canvas.svelte whenever the HUD height or bottom padding changes.
+   * Repositions the play area without reloading the chart.
+   */
+  setPlayArea(topPx: number, botPx: number) {
+    this.PLAY_TOP = topPx;
+    this.PLAY_H = this.H - topPx - botPx;
+    this.recomputeNotePixels();
+  }
+
+  private recomputeNotePixels() {
+    if (!this.chart) return;
+    const { bpm, time_base, page_list } = this.chart;
+    for (const note of this.notes) {
+      note.pixelY = this.PLAY_TOP + getScanLineY(note.timeSeconds, page_list, bpm, time_base) * this.PLAY_H;
+      note.endPixelY = this.PLAY_TOP + getScanLineY(note.endTimeSeconds, page_list, bpm, time_base) * this.PLAY_H;
+      note.pixelX = note.x * this.W;
+      if (note.nodes) {
+        for (const nd of note.nodes) {
+          nd.pixelY = this.PLAY_TOP + getScanLineY(nd.timeSeconds, page_list, bpm, time_base) * this.PLAY_H;
+          nd.pixelX = nd.x * this.W;
+        }
+      }
+    }
   }
 
   loadChart(chart: Chart) {

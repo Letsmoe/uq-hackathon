@@ -35,6 +35,10 @@
   let elapsed = $state(0);
   let paused = $state(false);
 
+  const BOT_PAD = 80; // px: clears bottom logos
+  let hudHeight = $state(0);
+  let hudEl: HTMLElement | undefined; // bound to the HUD block element
+
   let audio: HTMLAudioElement | null = null;
   let chartLength = $state(0); // in seconds
   let rafId = 0;
@@ -43,6 +47,27 @@
 
   onMount(async () => {
     engine = await GameEngine.create(canvas);
+
+    // ── Measure HUD and set play area BEFORE loadChart ─────────────
+    // Query the HUD block that UI.svelte renders. It's a sibling of the canvas
+    // inside [data-game-wrapper]. We use offsetHeight for the synchronous value.
+    const wrapper = canvas.closest('[data-game-wrapper]') as HTMLElement | null;
+    const hud = wrapper?.querySelector('[data-hud-block]') as HTMLElement | null;
+    const measuredTop = hud ? hud.offsetHeight : 210;
+    hudHeight = measuredTop;
+    engine.setPlayArea(measuredTop, BOT_PAD);
+
+    // Keep play area in sync if the HUD ever resizes (e.g. font load, window resize)
+    if (hud) {
+      const ro = new ResizeObserver(() => {
+        hudHeight = hud.offsetHeight;
+        engine?.setPlayArea(hudHeight, BOT_PAD);
+      });
+      ro.observe(hud);
+      // ro is cleaned up in onDestroy via the returned fn — store ref
+      ;(canvas as any).__ro = ro;
+    }
+
     if (chart) {
       engine.loadChart(chart);
     }
@@ -80,6 +105,7 @@
 
   onDestroy(() => {
     cancelAnimationFrame(rafId);
+    ;(canvas as any)?.__ro?.disconnect();
     engine?.destroy();
     engine = null;
   });
@@ -129,7 +155,7 @@
   />
 </svelte:head>
 
-<div class="relative w-full h-full">
+<div class="relative w-full h-full" data-game-wrapper>
   <!-- Cover art background -->
   <img
     src={coverSrc}
@@ -143,7 +169,10 @@
     style="background: radial-gradient(ellipse at center, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.45) 100%);"
   ></div>
 
-  <canvas bind:this={canvas} class="absolute inset-0 w-full h-full"></canvas>
+  <canvas
+    bind:this={canvas}
+    class="absolute inset-0 w-full h-full"
+  ></canvas>
 
   <GameUI
     title={songTitle}
