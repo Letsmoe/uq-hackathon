@@ -41,119 +41,123 @@
 <!-- Full overlay, pointer-events passthrough except interactive elements -->
 <div class="absolute inset-0 pointer-events-none select-none" style="font-family: 'Rajdhani', sans-serif;">
 
-  <!-- ── PROGRESS BAR (top edge) ───────────────────────────────────────── -->
-  <div class="absolute top-0 left-0 right-0 h-[3px] bg-white/10">
-    <div
-      class="h-full transition-none"
-      style="width: {progress * 100}%; background: linear-gradient(90deg, #00f5ff, #cc00ff); box-shadow: 0 0 8px #00f5ff;"
-    ></div>
-  </div>
+  <!-- ── TOP HUD BLOCK (flex column so bar snaps below content) ────────── -->
+  <div class="absolute top-0 left-0 right-0 flex flex-col">
 
-  <!-- ── TOP LEFT: pause + song info ──────────────────────────────────── -->
-  <div
-    class="absolute top-6 left-8 flex flex-row items-start gap-5 pointer-events-auto"
-  >
-    <button
-      onclick={onpause}
-      class="mt-1 flex flex-col gap-[5px] cursor-pointer bg-transparent border-none p-0 group text-white/70 hover:text-white transition-colors"
-      aria-label="Pause"
-    >
-      <Pause size="36"></Pause>
-    </button>
-    <div class="flex flex-col gap-0.5">
-      <span class="text-lg tracking-widest text-white font-light" style="font-family: 'Rajdhani', sans-serif;">{title}</span>
-      <span class="text-base tracking-widest text-white/40" style="font-family: 'Rajdhani', sans-serif; letter-spacing: 0.3em;">{artist}</span>
-    </div>
-  </div>
+    <!-- HUD row: left / centre / right -->
+    <div class="relative flex items-start justify-between px-8 pt-5">
 
-  <!-- ── TOP CENTER: dot grid + combo ─────────────────────────────────── -->
-  <div
-    class="absolute top-5 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3"
-  >
-    <div class="grid gap-[6px]" style="grid-template-columns: repeat({DOTS_COLS}, 1fr);">
-      {#each Array(DOTS_COLS * DOTS_ROWS) as _, i}
-        <div class="w-[4px] h-[4px] rounded-full bg-white/20"></div>
-      {/each}
-    </div>
-    <div class="flex flex-col items-center gap-0.5">
-      <span
-        class="leading-none"
-        style="
-          font-family: 'Orbitron', monospace;
-          font-size: 3.5rem;
-          font-weight: 900;
-          letter-spacing: 0.08em;
-          color: #ffffff;
-          text-shadow: 0 0 18px #cc00ff, 0 0 40px #aa00dd, 0 0 70px rgba(180,0,255,0.4);
-        "
-      >{combo}</span>
-      <span
-        class="uppercase"
-        style="
-          font-family: 'Rajdhani', sans-serif;
-          font-size: 0.6rem;
-          letter-spacing: 0.4em;
-          color: rgba(200,100,255,0.55);
-        "
-      >Combo</span>
-    </div>
-    <div class="grid gap-[6px]" style="grid-template-columns: repeat({DOTS_COLS}, 1fr);">
-      {#each Array(DOTS_COLS * DOTS_ROWS) as _, i}
-        <div class="w-[4px] h-[4px] rounded-full bg-white/20"></div>
-      {/each}
-    </div>
-  </div>
+      <!-- LEFT: pause + song info -->
+      <div class="flex flex-row items-start gap-5 pointer-events-auto">
+        <button
+          onclick={onpause}
+          class="mt-1 flex flex-col gap-[5px] cursor-pointer bg-transparent border-none p-0 group text-white/70 hover:text-white transition-colors"
+          aria-label="Pause"
+        >
+          <Pause size="36"></Pause>
+        </button>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-lg tracking-widest text-white font-light" style="font-family: 'Rajdhani', sans-serif;">{title}</span>
+          <span class="text-base tracking-widest text-white/40" style="font-family: 'Rajdhani', sans-serif; letter-spacing: 0.3em;">{artist}</span>
+        </div>
+      </div>
 
-  <!-- ── TOP RIGHT: score + TP ─────────────────────────────────────────── -->
-  <div class="absolute top-5 right-8 flex flex-col items-end gap-3">
-    <div class="flex flex-col items-end gap-0.5">
-      <span
-        class="uppercase"
-        style="
-          font-family: 'Rajdhani', sans-serif;
-          font-size: 0.6rem;
-          letter-spacing: 0.3em;
-          color: rgba(200,100,255,0.55);
-        "
-      >Score</span>
-      <span
-        class="leading-none tabular-nums"
-        style="
-          font-family: 'Orbitron', monospace;
-          font-size: 2.6rem;
-          font-weight: 700;
-          letter-spacing: 0.06em;
-          color: #ffffff;
-          text-shadow: 0 0 16px #cc00ff, 0 0 36px #aa00dd, 0 0 60px rgba(180,0,255,0.35);
-        "
-      >
-        {String(score).padStart(7, "0")}
-      </span>
+      <!-- CENTRE: dot grid + combo -->
+      <div class="flex flex-col items-center gap-3 absolute left-1/2 -translate-x-1/2">
+        <div class="grid gap-[6px]" style="grid-template-columns: repeat({DOTS_COLS}, 1fr);">
+          {#each Array(DOTS_COLS * DOTS_ROWS) as _, i}
+            <div class="w-[4px] h-[4px] rounded-full bg-white/20"></div>
+          {/each}
+        </div>
+        <div class="flex flex-col items-center gap-0.5">
+          <span
+            class="leading-none"
+            style="
+              font-family: 'Orbitron', monospace;
+              font-size: 3.5rem;
+              font-weight: 900;
+              letter-spacing: 0.08em;
+              color: #ffffff;
+              text-shadow: 0 0 18px #cc00ff, 0 0 40px #aa00dd, 0 0 70px rgba(180,0,255,0.4);
+            "
+          >{combo}</span>
+          <span
+            class="uppercase"
+            style="
+              font-family: 'Rajdhani', sans-serif;
+              font-size: 0.6rem;
+              letter-spacing: 0.4em;
+              color: rgba(200,100,255,0.55);
+            "
+          >Combo</span>
+        </div>
+        <div class="grid gap-[6px]" style="grid-template-columns: repeat({DOTS_COLS}, 1fr);">
+          {#each Array(DOTS_COLS * DOTS_ROWS) as _, i}
+            <div class="w-[4px] h-[4px] rounded-full bg-white/20"></div>
+          {/each}
+        </div>
+      </div>
+
+      <!-- RIGHT: score + TP -->
+      <div class="flex flex-col items-end gap-3">
+        <div class="flex flex-col items-end gap-0.5">
+          <span
+            class="uppercase"
+            style="
+              font-family: 'Rajdhani', sans-serif;
+              font-size: 0.6rem;
+              letter-spacing: 0.3em;
+              color: rgba(200,100,255,0.55);
+            "
+          >Score</span>
+          <span
+            class="leading-none tabular-nums"
+            style="
+              font-family: 'Orbitron', monospace;
+              font-size: 2.6rem;
+              font-weight: 700;
+              letter-spacing: 0.06em;
+              color: #ffffff;
+              text-shadow: 0 0 16px #cc00ff, 0 0 36px #aa00dd, 0 0 60px rgba(180,0,255,0.35);
+            "
+          >
+            {String(score).padStart(7, "0")}
+          </span>
+        </div>
+        <div class="flex flex-col items-end gap-0.5">
+          <span
+            class="uppercase"
+            style="
+              font-family: 'Rajdhani', sans-serif;
+              font-size: 0.6rem;
+              letter-spacing: 0.3em;
+              color: rgba(255,255,255,0.35);
+            "
+          >TP</span>
+          <span
+            class="leading-none"
+            style="
+              font-family: 'Orbitron', monospace;
+              font-size: 1.4rem;
+              font-weight: 400;
+              letter-spacing: 0.06em;
+              color: rgba(255,255,255,0.85);
+            "
+          >
+            {tp.toFixed(2)}%
+          </span>
+        </div>
+      </div>
     </div>
-    <div class="flex flex-col items-end gap-0.5">
-      <span
-        class="uppercase"
-        style="
-          font-family: 'Rajdhani', sans-serif;
-          font-size: 0.6rem;
-          letter-spacing: 0.3em;
-          color: rgba(255,255,255,0.35);
-        "
-      >TP</span>
-      <span
-        class="leading-none"
-        style="
-          font-family: 'Orbitron', monospace;
-          font-size: 1.4rem;
-          font-weight: 400;
-          letter-spacing: 0.06em;
-          color: rgba(255,255,255,0.85);
-        "
-      >
-        {tp.toFixed(2)}%
-      </span>
+
+    <!-- ── PROGRESS BAR: flows naturally below the tallest HUD column ── -->
+    <div class="w-full mt-6" style="height: 3px; background: rgba(255,255,255,0.08);">
+      <div
+        style="height: 100%; width: {progress * 100}%; background: linear-gradient(90deg, #00f5ff, #ff00aa); box-shadow: 0 0 8px #00f5ff; transition: width 0.08s linear;"
+      ></div>
     </div>
-  </div>
+
+  </div><!-- end top HUD block -->
 
   <!-- ── BOTTOM LEFT: logo watermark ──────────────────────────────────── -->
   <div class="absolute bottom-6 left-8 flex flex-row items-center gap-4">

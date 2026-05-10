@@ -36,7 +36,8 @@
   let paused = $state(false);
 
   let audio: HTMLAudioElement | null = null;
-  let chartLength = 0;
+  let chartLength = $state(0); // in seconds
+  let rafId = 0;
 
   const progress = $derived(chartLength > 0 ? Math.min(1, elapsed / chartLength) : 0);
 
@@ -44,27 +45,41 @@
     engine = await GameEngine.create(canvas);
     if (chart) {
       engine.loadChart(chart);
-      chartLength = chart.length ?? 0;
     }
 
     const audioBlob = new Blob([buffer], { type: "audio/mp3" });
     audio = new Audio();
     audio.src = URL.createObjectURL(audioBlob);
 
+    audio.addEventListener("loadedmetadata", () => {
+      if (audio && isFinite(audio.duration)) {
+        chartLength = audio.duration;
+      }
+    });
+
     engine.onStateChange = () => {
       score = engine!.state.score;
       combo = engine!.state.combo;
       tp = engine!.state.tp;
-      elapsed = engine!.state.elapsed;
     };
 
     engine.onFinish = () => onfinish(engine!.state);
+
+    // Drive elapsed from audio clock — reliable source of truth
+    function tick() {
+      if (audio && !audio.paused) {
+        elapsed = audio.currentTime;
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+    rafId = requestAnimationFrame(tick);
 
     await audio.play();
     engine.start(audio);
   });
 
   onDestroy(() => {
+    cancelAnimationFrame(rafId);
     engine?.destroy();
     engine = null;
   });

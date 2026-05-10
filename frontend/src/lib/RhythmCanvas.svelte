@@ -38,8 +38,8 @@
   
   // ── Layout constants (logical pixels, DPR-independent) ────────
   const PAD_X = 0.07; // fraction of width
-  const LANE_TOP = 0.08; // fraction of height
-  const LANE_BOT = 0.92;
+  const LANE_TOP = 0.24; // fraction of height — pushed below HUD overlay
+  const LANE_BOT = 0.88;
   const NOTE_R = 64; // logical pixels
   const HOLD_W = 18;
 
@@ -55,7 +55,7 @@
     lane: [0.0, 0.55, 1.0, 0.14] as RGBA,
     tapNote: [1, 1, 1, 1] as RGBA,
     holdNote: [1, 0.31, 0.61, 1] as RGBA,
-    scanner: [0, 1, 1, 1] as RGBA,
+    scanner: [0.72, 0.55, 1.0, 1] as RGBA,
   };
 
 
@@ -104,21 +104,21 @@
   // ── Scanner math ───────────────────────────────────────────────
   // Returns normalised Y in [0,1] (0=bottom, 1=top) at song time t.
   function getScannerYPosition(song: Song, time: number): number {
-  	// We need to search through all the pages and check which page we're on and then calculate the scanner position from there.
+    // We need to search through all the pages and check which page we're on and then calculate the scanner position from there.
    const tick = time / (60 / song.bpm) * song.player.time_base;
-   	// We need to search through all the pages and check which page we're on and then calculate the scanner position from there.
+    // We need to search through all the pages and check which page we're on and then calculate the scanner position from there.
     const segment = song.player.page_list.find(
       s => tick >= s.start_tick && tick < s.end_tick
     );
-  
+
     if (!segment) {
       return 0;
     }
-  
+
     const duration = segment.end_tick - segment.start_tick;
     const progress = (tick - segment.start_tick) / duration;
- 
-  
+
+
     if (segment.scan_line_direction === 1) {
       return progress;
     } else {
@@ -217,18 +217,18 @@
       }
 
       const now = performance.now();
-      
+
       for (const f of floats) {
         const elapsed = now - f.born;
         if (elapsed >= f.life) continue;
-      
+
         const t     = elapsed / f.life;           // 0 → 1
         const alpha = 1 - t * t;                  // quadratic fade-out
         const drift = t * 40;                     // floats upward 40px over lifetime
-      
+
         const label = f.text.toUpperCase();
         const { w, h } = FLOAT_TEX_SIZE[label];
-      
+
         renderer?.drawRect(
           "fx",
           { x: f.x - w / 2, y: f.y - drift - h / 2, w, h },
@@ -236,7 +236,7 @@
           `float_${label}`,
         );
       }
-      
+
       // Prune dead floats
       floats = floats.filter(f => (now - f.born) < f.life);
 
@@ -403,7 +403,7 @@
     MISS:    "#FF4455",
   };
   const FLOAT_TEX_SIZE: Record<string, { w: number; h: number }> = {};
-  
+
   // Floating judgement texts (Canvas 2D overlay, not WebGL)
   let floats: FloatingText[] = [];
 
@@ -432,7 +432,7 @@
       renderer.uploadBitmap(`float_${label}`, canvas);
       FLOAT_TEX_SIZE[label] = { w: canvas.width, h: canvas.height };
     }
-    
+
     // Wire callbacks that push data into Svelte state
     gameState.onJudge = (q, px, py) => {
       // Update HUD reactives
@@ -449,7 +449,7 @@
 
       // Floating text
       if (px > 0 || py > 0) {
-      
+
         floats.push({
           text: q.toUpperCase(),
           color:
@@ -490,7 +490,7 @@
         else if (countdownTimer < 3.5)
           countdown = 0; // shows 'GO'
         else {
-        	audio.play()
+          audio.play()
           phase = "playing";
           songTime = 0;
         }
@@ -740,8 +740,8 @@
         </div>
       {/if}
 
-      <!-- Progress bar -->
-      <div class="progress-bar">
+      <!-- Progress bar — top edge, full width, matching HTML style -->
+      <div class="progress-wrap">
         <div class="progress-fill" style="width: {progress * 100}%"></div>
       </div>
     </div>
@@ -947,22 +947,21 @@
     }
   }
 
-  /* Progress bar */
-  .progress-bar {
+  /* Progress bar — full-width top strip, below the HUD row */
+  .progress-wrap {
     position: absolute;
-    bottom: 5px;
-    left: 7%;
-    right: 7%;
+    top: 52px;
+    left: 0;
+    right: 0;
     height: 3px;
-    background: rgba(255, 255, 255, 0.12);
-    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.06);
     overflow: hidden;
+    z-index: 25;
   }
   .progress-fill {
     height: 100%;
-    background: rgba(0, 255, 255, 0.85);
-    box-shadow: 0 0 6px rgba(0, 255, 255, 0.7);
-    border-radius: 2px;
+    background: linear-gradient(90deg, #00f5ff, #ff00aa);
+    box-shadow: 0 0 8px #00f5ff;
     transition: width 0.08s linear;
   }
 
