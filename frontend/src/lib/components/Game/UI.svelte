@@ -36,16 +36,16 @@
   >
     <button
       onclick={onpause}
-      class="mt-1 flex flex-col gap-[5px] cursor-pointer bg-transparent border-none p-0 group"
+      class="mt-1 flex flex-col gap-[5px] cursor-pointer bg-transparent border-none p-0 group text-white/70 hover:text-white transition-colors"
       aria-label="Pause"
     >
       <Pause size="36"></Pause>
     </button>
     <div class="flex flex-col gap-0.5">
-      <span class="text-lg tracking-widest text-on-surface-light font-light"
+      <span class="text-lg tracking-widest text-white font-light"
         >{title}</span
       >
-      <span class="text-base tracking-widest text-on-surface-light/40"
+      <span class="text-base tracking-widest text-white/40"
         >{artist}</span
       >
     </div>
@@ -61,19 +61,19 @@
       style="grid-template-columns: repeat({DOTS_COLS}, 1fr);"
     >
       {#each Array(DOTS_COLS * DOTS_ROWS) as _, i}
-        <div class="w-[4px] h-[4px] rounded-full bg-on-surface/20"></div>
+        <div class="w-[4px] h-[4px] rounded-full bg-white/20"></div>
       {/each}
     </div>
 
     <!-- Combo -->
     <div class="flex flex-col items-center gap-0.5">
       <span
-        class="text-6xl font-extralight tracking-widest text-on-surface-light leading-none"
+        class="text-6xl font-extralight tracking-widest text-white leading-none"
       >
         {combo}
       </span>
       <span
-        class="text-[0.6rem] tracking-[0.4em] text-on-surface-light/35 uppercase"
+        class="text-[0.6rem] tracking-[0.4em] text-white/35 uppercase"
         >Combo</span
       >
     </div>
@@ -84,7 +84,7 @@
       style="grid-template-columns: repeat({DOTS_COLS}, 1fr);"
     >
       {#each Array(DOTS_COLS * DOTS_ROWS) as _, i}
-        <div class="w-[4px] h-[4px] rounded-full bg-on-surface-light/20"></div>
+        <div class="w-[4px] h-[4px] rounded-full bg-white/20"></div>
       {/each}
     </div>
   </div>
@@ -93,22 +93,22 @@
   <div class="absolute top-5 right-8 flex flex-col items-end gap-3">
     <div class="flex flex-col items-end gap-0.5">
       <span
-        class="text-[0.6rem] tracking-[0.3em] text-on-surface-light/35 uppercase"
+        class="text-[0.6rem] tracking-[0.3em] text-white/35 uppercase"
         >Score</span
       >
       <span
-        class="text-5xl font-extralight tracking-wider text-on-surface-light leading-none tabular-nums"
+        class="text-5xl font-extralight tracking-wider text-white leading-none tabular-nums"
       >
         {String(score).padStart(7, "0")}
       </span>
     </div>
     <div class="flex flex-col items-end gap-0.5">
       <span
-        class="text-[0.6rem] tracking-[0.3em] text-on-surface-light/35 uppercase"
+        class="text-[0.6rem] tracking-[0.3em] text-white/35 uppercase"
         >TP</span
       >
       <span
-        class="text-2xl font-light tracking-wider text-on-surface-light leading-none"
+        class="text-2xl font-light tracking-wider text-white leading-none"
       >
         {tp.toFixed(2)}%
       </span>
@@ -119,7 +119,7 @@
   <div class="absolute bottom-6 left-8 flex flex-row items-center gap-4">
     <!-- Snowflake / asterisk logo icon -->
     <svg
-      class="w-9 h-9 text-on-surface/30"
+      class="w-9 h-9 text-white/30"
       viewBox="0 0 40 40"
       fill="none"
       stroke="currentColor"
@@ -152,7 +152,7 @@
         class="text-4xl font-light tracking-widest text-accent-purple leading-none"
         >{difficulty}</span
       >
-      <span class="text-xs tracking-widest text-on-surface/35">Lv. {level}</span
+      <span class="text-xs tracking-widest text-white/35">Lv. {level}</span
       >
     </div>
   </div>

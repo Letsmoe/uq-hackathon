@@ -69,11 +69,18 @@
 </script>
 
 <div class="relative w-full h-full">
+  <!-- Cover art background -->
   <img
     src={coverSrc}
     alt=""
-    class="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none"
+    class="absolute inset-0 w-full h-full object-cover pointer-events-none"
+    style="opacity: 0.55; filter: blur(1px) brightness(0.65) saturate(0.8); transform: scale(1.02);"
   />
+  <!-- Subtle vignette -->
+  <div
+    class="absolute inset-0 pointer-events-none"
+    style="background: radial-gradient(ellipse at center, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.45) 100%);"
+  ></div>
 
   <canvas bind:this={canvas} class="absolute inset-0 w-full h-full"></canvas>
 

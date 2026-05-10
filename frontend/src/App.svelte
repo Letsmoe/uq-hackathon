@@ -156,7 +156,7 @@
         </div>
       {:else if page === "Game"}
         <!-- Placeholder — replace with your game component -->
-        <div class="relative w-full h-full bg-[#e8e8ec]">
+        <div class="relative w-full h-full bg-[#1a1a24]">
           <!-- HUD overlay -->
           <Canvas
             chart={songs[selected].chart}
