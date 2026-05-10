@@ -345,8 +345,18 @@ nlohmann::json buildNoteList(
 
     // Seed combines the magic base with bpm and duration so every song gets
     // a distinct, reproducible sequence.
-    std::mt19937 rng(42069u ^ (std::hash<float>{}(bpm) * 2654435761u)
-                              ^ (std::hash<float>{}(durationSec) * 2246822519u));
+    // std::mt19937 rng(42069u ^ (std::hash<float>{}(bpm) * 2654435761u)
+    //                           ^ (std::hash<float>{}(durationSec) * 2246822519u));
+
+    size_t h1 = std::hash<float>{}(bpm);
+    size_t h2 = std::hash<float>{}(durationSec);
+
+    // Mix properly before narrowing to 32-bit
+    uint32_t seed = 42069u
+        ^ (uint32_t)(h1 * 6364136223846793005ULL)   // 64-bit multiplier
+        ^ (uint32_t)(h2 * 1442695040888963407ULL);
+
+    std::mt19937 rng(seed);
     std::uniform_int_distribution<int> pick_pat(0, (int)pool.size() - 1);
 
     std::map<int, int> tickCounts;
