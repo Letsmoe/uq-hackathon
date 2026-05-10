@@ -2,13 +2,14 @@ import { Application, Container, Graphics, Text, TextStyle } from "pixi.js";
 import type { RuntimeNote, JudgmentResult } from "./types";
 
 const NOTE_R = 64;
-const APPROACH_S = 0.6;
+const CHAIN_R = 32;
+const APPROACH_S = 1;
 
 const COL = {
   tap: 0xe8e8ee,
   flick: 0xff3f80,
   hold: 0x3e9bff,
-  chain: 0x00d4e8,
+  chain: 0xffe600,
 } as const;
 
 const NOTE_COLOR: Record<0 | 1 | 2 | 3, number> = {
@@ -38,6 +39,7 @@ interface HitEffect {
   y: number;
   result: JudgmentResult;
   age: number;
+  isChain: boolean;
 }
 
 interface Popup {
@@ -110,18 +112,19 @@ export class NoteRenderer {
   private drawHitEffect(g: Graphics, fx: HitEffect) {
     const t = fx.age / HIT_DURATION;
     const col = HIT_COLOR[fx.result];
+    const r = fx.isChain ? CHAIN_R : NOTE_R;
 
     // Bright fill flash — first 20% of duration
     if (t < 0.2) {
       const ft = t / 0.2;
-      g.circle(fx.x, fx.y, NOTE_R * (1 + ft * 0.3));
+      g.circle(fx.x, fx.y, r * (1 + ft * 0.3));
       g.fill({ color: col, alpha: (1 - ft) * 0.65 });
     }
 
     // Ghost ring shrinks away — first 35%
     if (t < 0.35) {
       const rt = t / 0.35;
-      g.circle(fx.x, fx.y, NOTE_R * (1 + rt * 0.2));
+      g.circle(fx.x, fx.y, r * (1 + rt * 0.2));
       g.stroke({ width: 3.5, color: col, alpha: (1 - rt) * 0.95 });
     }
 
@@ -131,7 +134,7 @@ export class NoteRenderer {
       if (t < delay) continue;
       const rt = (t - delay) / (1 - delay);
       if (rt >= 1) continue;
-      const radius = NOTE_R * (1 + rt * 3.5);
+      const radius = r * (1 + rt * 3.5);
       g.circle(fx.x, fx.y, radius);
       g.stroke({
         width: Math.max(0.5, 2.5 * (1 - rt)),
@@ -172,7 +175,7 @@ export class NoteRenderer {
     const col = NOTE_COLOR[note.type];
 
     // Approach ring shrinks toward note
-    const ringR = NOTE_R + (1 - approach) * 380;
+    const ringR = NOTE_R + (1 - approach) * 120;
     g.circle(px, py, ringR);
     g.stroke({ width: 2, color: col, alpha: alpha * 0.55 });
 
@@ -256,14 +259,27 @@ export class NoteRenderer {
         nd.timeSeconds > elapsed - 0.1 &&
         nd.timeSeconds < elapsed + APPROACH_S + 0.4,
     );
+    // Draw dashed yellow line segment by segment
     for (let i = 0; i < visible.length - 1; i++) {
-      g.moveTo(visible[i].pixelX, visible[i].pixelY);
-      g.lineTo(visible[i + 1].pixelX, visible[i + 1].pixelY);
-      g.stroke({ width: 10, color: COL.chain, alpha: 0.3 });
+      const x1 = visible[i].pixelX,   y1 = visible[i].pixelY;
+      const x2 = visible[i+1].pixelX, y2 = visible[i+1].pixelY;
+      const dx = x2 - x1, dy = y2 - y1;
+      const len = Math.sqrt(dx*dx + dy*dy);
+      if (len < 1) continue;
+      const ux = dx/len, uy = dy/len;
+      const dash = 5, gap = 4, period = dash + gap;
+      let pos = 0;
+      while (pos < len) {
+        const dEnd = Math.min(pos + dash, len);
+        g.moveTo(x1 + ux*pos, y1 + uy*pos);
+        g.lineTo(x1 + ux*dEnd, y1 + uy*dEnd);
+        pos += period;
+      }
+      g.stroke({ width: 1.5, color: COL.chain, alpha: 0.45 });
     }
   }
 
-  private drawChainNodes(g: Graphics, note: RuntimeNote, elapsed: number) {
+  private drawChainNodes(g: Graphics, note: RuntimeNote, elapsed: number, scanPixelY = 0) {
     if (!note.nodes) return;
     for (const node of note.nodes) {
       if (node.judged) continue;
@@ -275,22 +291,33 @@ export class NoteRenderer {
       const alpha = this.alpha(node.timeSeconds, elapsed);
       if (alpha <= 0) continue;
 
-      g.circle(node.pixelX, node.pixelY, NOTE_R * 0.6);
-      g.stroke({ width: 1.5, color: COL.chain, alpha: alpha * 0.9 });
+      const { pixelX: px, pixelY: py } = node;
+      // Scanline proximity highlight: 1.0 when scanline is right on node
+      const scanDist = Math.abs(py - scanPixelY);
+      const scanlit = Math.max(0, 1 - scanDist / (CHAIN_R * 2.5));
 
-      g.circle(node.pixelX, node.pixelY, NOTE_R * 0.22);
-      g.fill({ color: COL.chain, alpha });
+      // Glow — bigger and brighter when scanline is on top
+      const glowR = CHAIN_R * (1.4 + scanlit * 0.8);
+      g.circle(px, py, glowR);
+      g.fill({ color: COL.chain, alpha: alpha * (0.18 + scanlit * 0.35) });
+
+      // Outer ring — brightens on scanlit
+      g.circle(px, py, CHAIN_R);
+      g.stroke({ width: 1.5 + scanlit, color: COL.chain, alpha: alpha * (0.9 + scanlit * 0.1) });
+
+      // Filled centre dot — turns white when hit
+      g.circle(px, py, CHAIN_R * 0.45);
+      g.fill({ color: scanlit > 0.5 ? 0xffffff : COL.chain, alpha: alpha * (1 + scanlit * 0.3) });
     }
   }
 
   // ── Hit feedback (event-driven) ────────────────────────────────────────────
 
-  triggerHit(noteId: number, result: JudgmentResult, x: number, y: number) {
-    // Replace existing effect for same note if present
+  triggerHit(noteId: number, result: JudgmentResult, x: number, y: number, isChain = false) {
     const existing = this.hitEffects.findIndex((fx) => fx.noteId === noteId);
     if (existing !== -1) this.hitEffects.splice(existing, 1);
 
-    this.hitEffects.push({ noteId, x, y, result, age: 0 });
+    this.hitEffects.push({ noteId, x, y, result, age: 0, isChain });
 
     const label =
       result === "perfect"

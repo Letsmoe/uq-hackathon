@@ -101,7 +101,7 @@ export class GameEngine {
     this.renderer = new NoteRenderer(this.app, this.app.stage, this.W, this.H);
 
     this.judgment = new JudgmentSystem(this.state, (e) => {
-      this.renderer!.triggerHit(e.noteId, e.result, e.x, e.y);
+      this.renderer!.triggerHit(e.noteId, e.result, e.x, e.y, e.noteType === 3);
       this.onJudgment?.(e);
       this.onStateChange?.();
     });
