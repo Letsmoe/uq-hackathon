@@ -68,6 +68,7 @@ export class GameEngine {
   setPlayArea(topPx: number, botPx: number) {
     this.PLAY_TOP = topPx;
     this.PLAY_H = this.H - topPx - botPx;
+    this.scanner?.setPlayArea(this.PLAY_TOP, this.PLAY_H);
     this.recomputeNotePixels();
   }
 
@@ -96,6 +97,7 @@ export class GameEngine {
 
     // Scanner added to stage first; NoteRenderer inserts below it via addChildAt(0)
     this.scanner = new Scanner(this.app);
+    this.scanner.setPlayArea(this.PLAY_TOP, this.PLAY_H);
     this.renderer = new NoteRenderer(this.app, this.app.stage, this.W, this.H);
 
     this.judgment = new JudgmentSystem(this.state, (e) => {

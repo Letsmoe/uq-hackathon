@@ -8,12 +8,20 @@ export class Scanner {
   private _dir = -1;
   W: number;
   H: number;
+  private PLAY_TOP = 0;
+  private PLAY_H: number;
 
   constructor(app: Application) {
     this.W = app.screen.width;
     this.H = app.screen.height;
+    this.PLAY_H = this.H;
     this.gfx = new Graphics();
     app.stage.addChild(this.gfx);
+  }
+
+  setPlayArea(top: number, playH: number) {
+    this.PLAY_TOP = top;
+    this.PLAY_H = playH;
   }
 
   update(
@@ -26,7 +34,7 @@ export class Scanner {
     this._scanY = getScanLineY(elapsed, pageList, bpm, timeBase);
     this._dir   = getCurrentPageDir(elapsed, pageList, bpm, timeBase);
 
-    const scanY = this._scanY * this.H;
+    const scanY = this.PLAY_TOP + this._scanY * this.PLAY_H;
     const pulse  = 0.85 + 0.15 * Math.sin(elapsed * 2.8);
     const bright = pulse * (1 + activeBoost * 0.4);
 
@@ -72,7 +80,7 @@ export class Scanner {
 
   get scanY()      { return this._scanY; }
   get scanDir()    { return this._dir; }
-  get scanPixelY() { return this._scanY * this.H; }
+  get scanPixelY() { return this.PLAY_TOP + this._scanY * this.PLAY_H; }
 
   resize(w: number, h: number) { this.W = w; this.H = h; }
   destroy() { this.gfx.destroy(); }
