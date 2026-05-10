@@ -32,12 +32,20 @@
   let score = $state(0);
   let combo = $state(0);
   let tp = $state(100);
+  let elapsed = $state(0);
+  let paused = $state(false);
 
   let audio: HTMLAudioElement | null = null;
+  let chartLength = 0;
+
+  const progress = $derived(chartLength > 0 ? Math.min(1, elapsed / chartLength) : 0);
 
   onMount(async () => {
     engine = await GameEngine.create(canvas);
-    if (chart) engine.loadChart(chart);
+    if (chart) {
+      engine.loadChart(chart);
+      chartLength = chart.length ?? 0;
+    }
 
     const audioBlob = new Blob([buffer], { type: "audio/mp3" });
     audio = new Audio();
@@ -47,11 +55,11 @@
       score = engine!.state.score;
       combo = engine!.state.combo;
       tp = engine!.state.tp;
+      elapsed = engine!.state.elapsed;
     };
 
     engine.onFinish = () => onfinish(engine!.state);
 
-    // Start audio and engine together so audio.currentTime is the shared clock.
     await audio.play();
     engine.start(audio);
   });
@@ -62,11 +70,49 @@
   });
 
   function handlePause() {
+    paused = true;
+    engine?.pause();
+    audio?.pause();
+  }
+
+  function handleResume() {
+    paused = false;
+    engine?.resume();
+    audio?.play();
+  }
+
+  function handleRestart() {
+    paused = false;
+    elapsed = 0;
+    score = 0;
+    combo = 0;
+    tp = 100;
+    if (audio) {
+      audio.currentTime = 0;
+      audio.play();
+    }
+    if (engine && chart) {
+      engine.loadChart(chart);
+      engine.start(audio!);
+    }
+  }
+
+  function handleQuit() {
+    paused = false;
     engine?.pause();
     audio?.pause();
     onpause();
   }
 </script>
+
+<svelte:head>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap"
+    rel="stylesheet"
+  />
+</svelte:head>
 
 <div class="relative w-full h-full">
   <!-- Cover art background -->
@@ -92,6 +138,100 @@
     {tp}
     {difficulty}
     {level}
+    {progress}
     onpause={handlePause}
   />
+
+  <!-- ── PAUSE OVERLAY ────────────────────────────────────────────────── -->
+  {#if paused}
+    <div class="absolute inset-0 flex flex-col items-center justify-center gap-8"
+      style="background: rgba(4,6,20,0.82); backdrop-filter: blur(6px); font-family: 'Rajdhani', sans-serif;">
+
+      <p
+        style="
+          font-family: 'Orbitron', monospace;
+          font-size: 1.5rem;
+          font-weight: 900;
+          letter-spacing: 0.6em;
+          text-transform: uppercase;
+          color: #cc00ff;
+          text-shadow: 0 0 20px #cc00ff, 0 0 50px #aa00dd, 0 0 90px rgba(180,0,255,0.4);
+        "
+      >Paused</p>
+
+      <div class="flex flex-row gap-4">
+        <button
+          onclick={handleResume}
+          class="cursor-pointer bg-transparent"
+          style="
+            font-family: 'Orbitron', monospace;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: #cc00ff;
+            border: 1px solid rgba(200,0,255,0.5);
+            padding: 0.75rem 2.5rem;
+            transition: all 0.2s;
+          "
+          onmouseenter={(e) => {
+            (e.currentTarget as HTMLElement).style.background = 'rgba(180,0,255,0.12)';
+            (e.currentTarget as HTMLElement).style.boxShadow = '0 0 20px rgba(180,0,255,0.3)';
+          }}
+          onmouseleave={(e) => {
+            (e.currentTarget as HTMLElement).style.background = 'transparent';
+            (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+          }}
+        >Resume</button>
+
+        <button
+          onclick={handleRestart}
+          class="cursor-pointer bg-transparent"
+          style="
+            font-family: 'Orbitron', monospace;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.6);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 0.75rem 2.5rem;
+            transition: all 0.2s;
+          "
+          onmouseenter={(e) => {
+            (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)';
+            (e.currentTarget as HTMLElement).style.color = '#fff';
+          }}
+          onmouseleave={(e) => {
+            (e.currentTarget as HTMLElement).style.background = 'transparent';
+            (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)';
+          }}
+        >Restart</button>
+
+        <button
+          onclick={handleQuit}
+          class="cursor-pointer bg-transparent"
+          style="
+            font-family: 'Orbitron', monospace;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.6);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 0.75rem 2.5rem;
+            transition: all 0.2s;
+          "
+          onmouseenter={(e) => {
+            (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)';
+            (e.currentTarget as HTMLElement).style.color = '#fff';
+          }}
+          onmouseleave={(e) => {
+            (e.currentTarget as HTMLElement).style.background = 'transparent';
+            (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)';
+          }}
+        >Quit</button>
+      </div>
+    </div>
+  {/if}
 </div>
