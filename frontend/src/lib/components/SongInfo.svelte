@@ -119,7 +119,7 @@
     <button
       onclick={onstart}
       disabled={generating || !canStart}
-      class="hard-press border-hard cut flex h-[clamp(52px,8vh,84px)] w-full max-w-[640px] cursor-pointer flex-row items-center justify-center gap-5 bg-accent text-2xl font-black tracking-display text-ink-fg uppercase transition-colors duration-150 disabled:cursor-not-allowed disabled:bg-hover disabled:text-fg-dim"
+      class="hard-press border-hard cut flex h-[clamp(52px,8vh,84px)] w-full max-w-[520px] cursor-pointer flex-row items-center justify-center gap-5 bg-accent text-2xl font-black tracking-display text-ink-fg uppercase transition-colors duration-150 disabled:cursor-not-allowed disabled:bg-hover disabled:text-fg-dim"
     >
       {startLabel}
       <svg class="h-7 w-7 shrink-0 fill-current" viewBox="0 0 10 10">

@@ -12,6 +12,7 @@
   import type { RecentTrack } from "./lib/components/RecentlyPlayed.svelte";
   import Logo from "./lib/components/Logo.svelte";
   import BottomPanel from "./lib/components/BottomPanel.svelte";
+  import UploadButton from "./lib/components/UploadButton.svelte";
   import MenuPanel from "./lib/components/MenuPanel.svelte";
   import MessagesPanel from "./lib/components/MessagesPanel.svelte";
   import StatsPanel from "./lib/components/StatsPanel.svelte";
@@ -209,10 +210,18 @@
             >
               <Logo />
               <NavButtons bind:active={activeTab} />
+
+              <div class="mt-auto">
+                <BottomPanel
+                  notifications={unreadCount}
+                  version={__APP_VERSION__}
+                />
+              </div>
             </div>
 
             <div class="flex min-h-0 flex-1 flex-col gap-5">
-              <div class="rise-in flex shrink-0 flex-row justify-end">
+              <div class="rise-in flex shrink-0 flex-row items-center justify-end gap-5">
+                <UploadButton onupload={addUploadedSong} />
                 <UserHeader
                   username="ink"
                   rating={12.41}
@@ -236,7 +245,7 @@
               <!-- Flexible side rails keep the song info on the column's
                    centre line however wide they get. -->
               <div
-                class="rise-in grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-6"
+                class="rise-in grid shrink-0 grid-cols-[minmax(120px,1fr)_auto_minmax(120px,1fr)] items-end gap-6"
                 style="animation-delay: {BOTTOM_ENTRY_DELAY_MS}ms;"
               >
                 <RecentlyPlayed
@@ -256,11 +265,7 @@
                   onshuffle={pickRandomSong}
                 />
 
-                <BottomPanel
-                  notifications={unreadCount}
-                  version={__APP_VERSION__}
-                  onupload={addUploadedSong}
-                />
+                <div aria-hidden="true"></div>
               </div>
             </div>
           </div>
