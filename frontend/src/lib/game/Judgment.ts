@@ -32,31 +32,48 @@ export class JudgmentSystem {
     return true;
   }
 
+  /**
+   * Grabbing a hold scores nothing on its own: the head grade is banked and
+   * only awarded once the tail has been held all the way out.
+   */
   judgeHoldStart(note: RuntimeNote, elapsed: number) {
     if (note.hit || note.missed || note.holdActive) return;
     const result = this.resultFromOffset(Math.abs(elapsed - note.timeSeconds));
     if (result === 'miss') return;
     note.holdActive = true;
     note.holdProgress = 0;
-    this.applyResult(result, note.pixelX, note.pixelY, note);
+    note.holdHeadResult = result;
   }
 
   updateHold(note: RuntimeNote, elapsed: number): boolean {
     if (!note.holdActive) return false;
-    const dur = note.endTimeSeconds - note.timeSeconds;
-    note.holdProgress = Math.min(1, (elapsed - note.timeSeconds) / dur);
-    if (note.holdProgress >= 1) {
-      note.holdActive = false;
-      note.hit = true;
-      return true;
-    }
-    return false;
+    note.holdProgress = this.holdProgressAt(note, elapsed);
+    if (note.holdProgress < 1) return false;
+
+    note.holdActive = false;
+    note.hit = true;
+    this.applyResult(this.bankedHoldResult(note), note.pixelX, note.pixelY, note);
+    return true;
   }
 
+  /** Letting go before the tail runs out drops the whole note. */
   judgeHoldEnd(note: RuntimeNote) {
     if (!note.holdActive) return;
     note.holdActive = false;
-    note.hit = true;
+    note.missed = true;
+    note.holdHeadResult = null;
+    this.applyResult('miss', note.pixelX, note.pixelY, note);
+  }
+
+  private holdProgressAt(note: RuntimeNote, elapsed: number): number {
+    const duration = note.endTimeSeconds - note.timeSeconds;
+    if (duration <= 0) return 1;
+    return Math.min(1, (elapsed - note.timeSeconds) / duration);
+  }
+
+  private bankedHoldResult(note: RuntimeNote): JudgmentResult {
+    if (note.holdHeadResult === null) return 'good';
+    return note.holdHeadResult;
   }
 
   checkMisses(notes: RuntimeNote[], elapsed: number) {

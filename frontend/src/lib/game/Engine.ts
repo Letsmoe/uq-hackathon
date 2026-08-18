@@ -192,6 +192,7 @@ export class GameEngine {
       missed: false,
       holdActive: false,
       holdProgress: 0,
+      holdHeadResult: null,
       chainNodeIdx: 0,
     };
   }
@@ -248,6 +249,14 @@ export class GameEngine {
       this.judgment.judgeNote(bestNote, elapsed);
     }
     this.onStateChange?.();
+  }
+
+  private updateActiveHolds() {
+    for (const note of this.notes) {
+      if (note.type !== 2 || !note.holdActive) continue;
+      const completed = this.judgment!.updateHold(note, this.state.elapsed);
+      if (completed) this.onStateChange?.();
+    }
   }
 
   private addShake(magnitude: number) {
@@ -362,6 +371,10 @@ export class GameEngine {
     );
     this.state.scanY = this.scanner.scanY;
 
+    // Advanced before the visibility pass so the tail is drawn at the fill
+    // level it actually has this frame, not the previous one's.
+    this.updateActiveHolds();
+
     // Note types
     // 0 = tap, 1 = flick, 2 = hold, 3 = chain
     // Visible notes: within approach window (and not fully done)
@@ -387,15 +400,6 @@ export class GameEngine {
     });
 
     this.renderer.update(visible, this.state.elapsed, ticker.deltaMS);
-
-    // Hold updates
-    for (const note of this.notes) {
-      if (note.type === 2 && note.holdActive) {
-        if (this.judgment.updateHold(note, this.state.elapsed)) {
-          this.onStateChange?.();
-        }
-      }
-    }
 
     this.judgeChainNodesUnderPointers(this.state.elapsed);
     this.judgment.checkMisses(this.notes, this.state.elapsed);

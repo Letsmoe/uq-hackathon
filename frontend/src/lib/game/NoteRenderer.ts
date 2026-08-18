@@ -23,6 +23,15 @@ const FADE_IN_S = 0.45;
 /** Fade for a note that is past its hit time but not yet judged. */
 const FADE_OUT_S = 0.15;
 
+/** Size of a note at the far end of its approach, as a fraction of full size. */
+const MIN_BODY_SCALE = 0.3;
+/** >1 holds the note small early, so nearly all the growth happens late. */
+const GROWTH_EXPONENT = 2.2;
+/** Extra swell over the last moments before the hit time. */
+const HIT_OVERSHOOT = 0.22;
+/** How far outside the note the approach ring starts, in body-scale units. */
+const RING_SPREAD = 2.4;
+
 /**
  * Seconds before its hit time over which a note charges up. Driven by time
  * rather than by distance to the scanline: the beam crosses a note's row on
@@ -183,7 +192,7 @@ export class NoteRenderer {
       return;
     }
 
-    const alpha = this.approachAlpha(note.timeSeconds, elapsed);
+    const alpha = this.noteAlpha(note, elapsed);
     if (alpha <= 0) return;
 
     this.placeVisual({
@@ -196,6 +205,11 @@ export class NoteRenderer {
       approach: this.approachProgress(note.timeSeconds, elapsed),
       charge: this.chargeLevel(note.timeSeconds, elapsed),
     });
+  }
+
+  private noteAlpha(note: RuntimeNote, elapsed: number): number {
+    if (note.type === 2) return this.holdAlpha(note, elapsed);
+    return this.approachAlpha(note.timeSeconds, elapsed);
   }
 
   private updateChainVisuals(note: RuntimeNote, elapsed: number) {
@@ -240,8 +254,7 @@ export class NoteRenderer {
     // Uncharged notes sit back so the one that is actually due stands out.
     visual.root.alpha = options.alpha * (0.6 + charge * 0.4);
 
-    // Body: settles to full size as it approaches, so notes "arrive".
-    const bodyScale = 0.86 + options.approach * 0.14 + charge * 0.06;
+    const bodyScale = this.bodyScale(options.approach, charge);
     visual.body.texture = this.textures[options.texture];
     visual.body.scale.set(bodyScale);
 
@@ -249,14 +262,29 @@ export class NoteRenderer {
     const coreColor = mixColor(PALETTE.coreApproach, PALETTE.coreActive, charge);
     visual.core.tint = mixColor(coreColor, PALETTE.coreHot, charge * charge);
     visual.core.alpha = 0.32 + charge * 0.68;
-    visual.core.scale.set((options.radius * (0.85 + charge * 1.7)) / 128);
+    visual.core.scale.set(
+      (options.radius * bodyScale * (0.85 + charge * 1.7)) / 128,
+    );
 
     // Outer halo only really blooms on the note that is due.
     visual.halo.tint = coreColor;
     visual.halo.alpha = 0.05 + charge * 0.6;
-    visual.halo.scale.set((options.radius * (2.2 + charge * 1.9)) / 128);
+    visual.halo.scale.set(
+      (options.radius * bodyScale * (2.2 + charge * 1.9)) / 128,
+    );
 
-    this.placeApproachRing(visual, options.texture, options.approach);
+    this.placeApproachRing(visual, options.texture, options.approach, bodyScale);
+  }
+
+  /**
+   * Size is the primary read on when a note is due: it comes in as a small
+   * seed and swells late, so the note that must be played next is the biggest
+   * thing on screen by a wide margin.
+   */
+  private bodyScale(approach: number, charge: number): number {
+    const swell = Math.pow(approach, GROWTH_EXPONENT);
+    const growth = MIN_BODY_SCALE + (1 - MIN_BODY_SCALE) * swell;
+    return growth + charge * HIT_OVERSHOOT;
   }
 
   /** Ring collapses onto the note over the approach window. */
@@ -264,13 +292,16 @@ export class NoteRenderer {
     visual: NoteVisual,
     texture: "body" | "chainBody",
     approach: number,
+    bodyScale: number,
   ) {
     const showRing = texture === "body" && approach < 1;
     visual.ring.visible = showRing;
     if (!showRing) return;
 
-    visual.ring.alpha = (1 - approach) * 0.65;
-    visual.ring.scale.set(1 + (1 - approach) * 2.2);
+    // Tracks the body so the closing gap between ring and note reads as the
+    // countdown, rather than the ring sliding past a note of fixed size.
+    visual.ring.alpha = 0.25 + (1 - approach) * 0.55;
+    visual.ring.scale.set(bodyScale + (1 - approach) * RING_SPREAD);
   }
 
   private acquireVisual(key: number): NoteVisual {
@@ -340,7 +371,7 @@ export class NoteRenderer {
   private drawHoldTail(note: RuntimeNote, elapsed: number) {
     if (note.hit && !note.holdActive) return;
 
-    const alpha = this.approachAlpha(note.timeSeconds, elapsed);
+    const alpha = this.holdAlpha(note, elapsed);
     if (alpha <= 0) return;
 
     const top = Math.min(note.pixelY, note.endPixelY);
@@ -356,6 +387,16 @@ export class NoteRenderer {
     const current = this.holdCurrent(note, elapsed);
     this.drawHoldArcs(note.pixelX, top, bottom, alpha, current, elapsed);
     this.drawHoldFill(note, alpha, elapsed);
+  }
+
+  /**
+   * A hold that is being held stays fully lit for its whole tail. The normal
+   * post-hit fade would black the channel out a fraction of a second after the
+   * head, taking the arcs with it.
+   */
+  private holdAlpha(note: RuntimeNote, elapsed: number): number {
+    if (note.holdActive) return 1;
+    return this.approachAlpha(note.timeSeconds, elapsed);
   }
 
   /** Spools up on grab, then builds the rest of the way as the hold fills. */

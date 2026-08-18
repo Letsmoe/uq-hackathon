@@ -25,6 +25,8 @@ export interface RuntimeNote {
   missed: boolean;
   holdActive: boolean;
   holdProgress: number;
+  /** Timing grade of the hold's head press, banked until the tail completes. */
+  holdHeadResult: JudgmentResult | null;
   chainNodeIdx: number; // next unjudged chain node index
 }
 
