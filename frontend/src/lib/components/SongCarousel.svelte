@@ -1,6 +1,5 @@
 <script lang="ts">
   import { Spring } from "svelte/motion";
-  import { carouselMotion } from "../carouselMotion";
   import {
     OPACITY_STOPS,
     DIM_STOPS,
@@ -61,12 +60,6 @@
       return;
     }
     position.target = selected;
-  });
-
-  // The background shader leans with the swipe, so it needs the same position
-  // the cards are placed from.
-  $effect(() => {
-    carouselMotion.position = position.current;
   });
 
   function measureStage() {

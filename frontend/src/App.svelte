@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
-  import ShaderGrid from "./lib/ShaderGrid.svelte";
 
   import UserHeader from "./lib/components/UserHeader.svelte";
   import NavButtons from "./lib/components/NavButtons.svelte";
@@ -200,42 +199,31 @@
           class="absolute inset-0"
           transition:fade={{ duration: PAGE_FADE_MS, easing: cubicOut }}
         >
-          <!-- Background -->
-          <ShaderGrid />
-          <img
-            src="/ellasy.png"
-            class="pointer-events-none absolute -right-20 bottom-0 h-full object-cover opacity-15 [mask-image:linear-gradient(to_left,black,transparent_85%)]"
-            alt=""
-          />
-
-          <!-- The carousel takes the slack in the column; every other band
-               is sized by its own content. -->
-          <div class="relative flex h-full w-full flex-col gap-5 p-6">
+          <!-- Two columns. The left rail runs the full height, so the
+               carousel and the song info below it share one centre line
+               instead of each centring in a different width. -->
+          <div class="relative flex h-full w-full flex-row gap-6 p-6">
             <div
-              class="rise-in flex shrink-0 flex-row items-center justify-between gap-6"
+              class="rise-in flex shrink-0 flex-col gap-6"
+              style="animation-delay: {NAV_ENTRY_DELAY_MS}ms;"
             >
               <Logo />
-              <UserHeader
-                username="ink"
-                rating={12.41}
-                ratingCurrent={2430}
-                ratingMax={8000}
-                avatarSrc="/ellasy.png"
-                {unreadCount}
-                onmessages={() => (openPanel = "messages")}
-                onstats={() => (openPanel = "stats")}
-                onsettings={() => (openPanel = "settings")}
-              />
+              <NavButtons bind:active={activeTab} />
             </div>
 
-            <!-- Modes sit in the rail the wide layout leaves free, rather
-                 than competing with the logo across the top. -->
-            <div class="flex min-h-0 flex-1 flex-row gap-6">
-              <div
-                class="rise-in flex shrink-0 items-start"
-                style="animation-delay: {NAV_ENTRY_DELAY_MS}ms;"
-              >
-                <NavButtons bind:active={activeTab} />
+            <div class="flex min-h-0 flex-1 flex-col gap-5">
+              <div class="rise-in flex shrink-0 flex-row justify-end">
+                <UserHeader
+                  username="ink"
+                  rating={12.41}
+                  ratingCurrent={2430}
+                  ratingMax={8000}
+                  avatarSrc="/ellasy.png"
+                  {unreadCount}
+                  onmessages={() => (openPanel = "messages")}
+                  onstats={() => (openPanel = "stats")}
+                  onsettings={() => (openPanel = "settings")}
+                />
               </div>
 
               <div
@@ -244,36 +232,36 @@
               >
                 <SongCarousel {songs} bind:selected />
               </div>
-            </div>
 
-            <!-- Flexible side rails keep the song info on the centre line
-                 however wide they get. -->
-            <div
-              class="rise-in grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-6"
-              style="animation-delay: {BOTTOM_ENTRY_DELAY_MS}ms;"
-            >
-              <RecentlyPlayed
-                tracks={recentTracks}
-                onselect={(songIndex) => (selected = songIndex)}
-              />
+              <!-- Flexible side rails keep the song info on the column's
+                   centre line however wide they get. -->
+              <div
+                class="rise-in grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-6"
+                style="animation-delay: {BOTTOM_ENTRY_DELAY_MS}ms;"
+              >
+                <RecentlyPlayed
+                  tracks={recentTracks}
+                  onselect={(songIndex) => (selected = songIndex)}
+                />
 
-              <SongInfo
-                description={selectedSong.description ?? ""}
-                difficulty={selectedSong.difficulty}
-                bestScore={selectedSong.bestScore ?? 0}
-                badge={selectedSong.badge}
-                {generating}
-                canStart={Boolean(selectedChart)}
-                ondifficultychange={changeDifficulty}
-                onstart={startSong}
-                onshuffle={pickRandomSong}
-              />
+                <SongInfo
+                  description={selectedSong.description ?? ""}
+                  difficulty={selectedSong.difficulty}
+                  bestScore={selectedSong.bestScore ?? 0}
+                  badge={selectedSong.badge}
+                  {generating}
+                  canStart={Boolean(selectedChart)}
+                  ondifficultychange={changeDifficulty}
+                  onstart={startSong}
+                  onshuffle={pickRandomSong}
+                />
 
-              <BottomPanel
-                notifications={unreadCount}
-                version={__APP_VERSION__}
-                onupload={addUploadedSong}
-              />
+                <BottomPanel
+                  notifications={unreadCount}
+                  version={__APP_VERSION__}
+                  onupload={addUploadedSong}
+                />
+              </div>
             </div>
           </div>
 
