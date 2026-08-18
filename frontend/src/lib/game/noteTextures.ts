@@ -38,6 +38,35 @@ const RULE_SHARE = 0.11;
 const SHADOW_SHARE = 0.16;
 const BEVEL_SHARE = 0.28;
 
+/** Note half-size against each screen axis, and the bounds it may not leave.
+ *  Bounding it by width as well as height keeps two notes from overlapping on
+ *  a narrow screen, where the chart's horizontal spacing is fixed but a
+ *  height-derived note would grow past it. */
+const NOTE_HEIGHT_SHARE = 0.065;
+const NOTE_WIDTH_SHARE = 0.075;
+const MIN_NOTE_HALF = 34;
+const MAX_NOTE_HALF = 82;
+
+/** Drag nodes stay smaller so a chain reads as one gesture. */
+export const CHAIN_HALF_RATIO = 0.62;
+
+export function noteHalfFor(width: number, height: number): number {
+  const fromScreen = Math.min(height * NOTE_HEIGHT_SHARE, width * NOTE_WIDTH_SHARE);
+
+  return Math.round(Math.min(Math.max(fromScreen, MIN_NOTE_HALF), MAX_NOTE_HALF));
+}
+
+/**
+ * How much room a note needs beyond the edge of the play band. A note is drawn
+ * centred on its scan position, so without this the first row of every page
+ * would push up through the progress bar and the last row off the bottom.
+ */
+export function noteClearance(width: number, height: number): number {
+  const half = noteHalfFor(width, height);
+
+  return half + shadowOffset(half);
+}
+
 export function ruleWidth(half: number): number {
   return Math.max(2, half * RULE_SHARE);
 }

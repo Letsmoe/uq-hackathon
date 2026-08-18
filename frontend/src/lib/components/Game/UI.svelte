@@ -115,7 +115,7 @@
     <!-- ── PROGRESS BAR ──────────────────────────────────────────────────── -->
     <!-- Scaled rather than resized: this advances every frame of the song, and
          a width animation would relayout the bar on each one. -->
-    <div class="border-t-hard border-b-hard mt-4 h-2.5 w-full overflow-hidden bg-raised">
+    <div class="border-t-hard border-b-hard mt-1 h-2.5 w-full overflow-hidden bg-raised">
       <div
         class="progress-fill h-full w-full origin-left"
         style="transform: scaleX({progress});"
@@ -159,17 +159,6 @@
         Rhythm Protocol
       </span>
     </div>
-  </div>
-
-  <!-- ── BOTTOM RIGHT: difficulty badge ─────────────────────────────────── -->
-  <div class="absolute right-8 bottom-6 flex flex-row items-end gap-3">
-    <div class="h-9 w-1.5 bg-accent"></div>
-    <span
-      class="border-hard cut-sm bg-accent px-3 py-1.5 text-[clamp(1.1rem,2.4vh,1.6rem)] leading-none font-bold text-ink-fg"
-      style="font-family: var(--font-numeral); letter-spacing: 0.12em;"
-    >
-      {difficulty}
-    </span>
   </div>
 </div>
 

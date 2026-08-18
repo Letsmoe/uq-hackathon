@@ -10,25 +10,17 @@ import {
 import type { RuntimeNote, JudgmentResult } from "./types";
 import {
   createNoteTextures,
+  noteHalfFor,
   ruleWidth,
   shadowOffset,
   traceBevelSquare,
+  CHAIN_HALF_RATIO,
   PALETTE,
   SKIN_COLOR,
   type NoteSkin,
   type NoteTextureSet,
 } from "./noteTextures";
 
-/** Note half-size as a share of playfield height, and the bounds it may not
- *  leave. A fixed pixel size was authored against one design resolution and
- *  grew or shrank against the screen as soon as the playfield stopped being a
- *  scaled copy of it. */
-const NOTE_R_SHARE = 0.065;
-const MIN_NOTE_R = 34;
-const MAX_NOTE_R = 82;
-// Drag nodes stay a little smaller than taps so a chain still reads as one
-// gesture rather than a row of separate notes.
-const CHAIN_R_RATIO = 0.62;
 const HIT_DURATION = 380;
 
 /** Seconds a note is on screen ahead of its hit time. */
@@ -138,10 +130,8 @@ export class NoteRenderer {
     private W: number,
     private H: number,
   ) {
-    this.noteHalf = Math.round(
-      Math.min(Math.max(H * NOTE_R_SHARE, MIN_NOTE_R), MAX_NOTE_R),
-    );
-    this.chainHalf = Math.round(this.noteHalf * CHAIN_R_RATIO);
+    this.noteHalf = noteHalfFor(W, H);
+    this.chainHalf = Math.round(this.noteHalf * CHAIN_HALF_RATIO);
 
     this.textures = createNoteTextures(
       app.renderer as Renderer,

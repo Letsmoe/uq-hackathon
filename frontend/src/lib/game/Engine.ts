@@ -10,6 +10,7 @@ import type {
 import { makeInitialState, JUDGMENT_WINDOWS } from "./types";
 import { Scanner } from "./Scanner";
 import { NoteRenderer } from "./NoteRenderer";
+import { noteClearance } from "./noteTextures";
 import { InputHandler } from "./InputHandler";
 import { JudgmentSystem } from "./Judgment";
 import { AudioPlayer } from "./AudioPlayer";
@@ -79,10 +80,16 @@ export class GameEngine {
   /**
    * Called by Canvas.svelte whenever the HUD height or bottom padding changes.
    * Repositions the play area without reloading the chart.
+   *
+   * The band is inset by a note's own reach at both ends, since a note is drawn
+   * centred on its scan position: without the inset the first row of a page
+   * would ride up over the progress bar.
    */
   setPlayArea(topPx: number, botPx: number) {
-    this.PLAY_TOP = topPx;
-    this.PLAY_H = this.H - topPx - botPx;
+    const clearance = noteClearance(this.W, this.H);
+
+    this.PLAY_TOP = topPx + clearance;
+    this.PLAY_H = this.H - this.PLAY_TOP - botPx - clearance;
     this.scanner?.setPlayArea(this.PLAY_TOP, this.PLAY_H);
     this.recomputeNotePixels();
   }
