@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Pause } from "svelte-radix";
+  import PauseIcon from "phosphor-svelte/lib/PauseIcon";
 
   type Props = {
     title?: string;
@@ -8,7 +8,6 @@
     combo?: number;
     tp?: number;
     difficulty?: string;
-    level?: number;
     progress?: number; // 0–1
     onpause?: () => void;
   };
@@ -20,7 +19,6 @@
     combo = $bindable(125),
     tp = $bindable(98.42),
     difficulty = "EX",
-    level = 10,
     progress = 0,
     onpause = () => {},
   }: Props = $props();
@@ -81,7 +79,7 @@
           style="color: rgba(46,40,64,0.7);"
           aria-label="Pause"
         >
-          <Pause size="36"></Pause>
+          <PauseIcon size={32} weight="fill" />
         </button>
         <div class="flex flex-col gap-0.5">
           <span
@@ -265,11 +263,6 @@
           letter-spacing: 0.12em;
           color: #7d67d2;
         ">{difficulty}</span
-      >
-      <span
-        class="tracking-widest"
-        style="font-size: 0.75rem; color: rgba(46,40,64,0.45);"
-        >Lv. {level}</span
       >
     </div>
   </div>

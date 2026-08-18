@@ -1,125 +1,84 @@
 @import "tailwindcss";
 
 @import url("https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
 /* ============================================================
    SYNAPSE RHYTHM PROTOCOL — DESIGN SYSTEM
    Tailwind v4 theme tokens
+
+   The menu is dark: light chrome and cover art sit on a deep
+   canvas. Names are semantic — components never reach for a
+   raw hex, and the whole look retunes from this block.
    ============================================================ */
 
 @theme {
   /* ----------------------------------------------------------
-     COLORS
+     SURFACES — each step is one shade above what it sits on
   ---------------------------------------------------------- */
+  --color-canvas: #0d0e13; /* page background, behind the grid    */
+  --color-raised: #16171e; /* cards, controls, quiet panels       */
+  --color-overlay: #1c1e27; /* panels floating above the menu      */
+  --color-hover: #23252f; /* hover state for raised surfaces     */
 
-  /* Backgrounds */
-  --color-surface-base: #eceae4; /* main page bg — warm off-white grid */
-  --color-surface-raised: #f4f2ed; /* slightly lighter lifted panels     */
-  --color-surface-dark: rgba(
-    16,
-    17,
-    28,
-    1
-  ); /* full-dark panels (event sidebar)   */
-  --color-surface-dark-muted: #161622; /* secondary dark panel bg            */
+  /* Inverted chrome — light blocks punched into the dark canvas.
+     This is the primary action colour: START, the active tab.  */
+  --color-ink: #f0f0f4;
+  --color-ink-fg: #0d0e13;
 
-  /* Brand accents */
-  --color-accent-blue: #3e9bff; /* rating, selected item, progress fill  */
-  --color-accent-pink: #ff3f80; /* music library / secondary nav accent  */
-  --color-accent-cyan: #00d4e8; /* options / tertiary nav accent         */
-  --color-accent-purple: rgba(
-    125,
-    103,
-    210,
-    1
-  ); /* event art / rare highlight            */
+  /* ----------------------------------------------------------
+     LINES
+  ---------------------------------------------------------- */
+  --color-line: rgba(255, 255, 255, 0.08); /* dividers, card edges     */
+  --color-line-strong: rgba(255, 255, 255, 0.18); /* focused, selected */
 
-  /* Text */
-  --color-text-primary: #1a1a22; /* main body text on light bg            */
-  --color-text-secondary: #6b6b7a; /* subtitles, captions, muted labels     */
-  --color-text-inverse: #e8e8ee; /* text on dark panels                   */
-  --color-text-muted: #9a9aa8; /* placeholders, disabled states         */
+  /* ----------------------------------------------------------
+     FOREGROUND
+  ---------------------------------------------------------- */
+  --color-fg: #f0f0f4; /* headings, values, anything that must read */
+  --color-fg-muted: #9a9aa8; /* labels, secondary copy             */
+  --color-fg-dim: #61616e; /* disabled, decorative captions        */
 
-  /* On Surface / Text */
-  --color-on-surface-dark: rgba(211, 212, 219, 1);
-  --color-on-surface-light: rgba(26, 26, 34, 1);
+  /* ----------------------------------------------------------
+     ACCENTS
+     Accent marks selection. Signal marks something live.
+  ---------------------------------------------------------- */
+  --color-accent: #7c6bf5;
+  --color-accent-soft: rgba(124, 107, 245, 0.16);
+  --color-signal: #35e0f0;
+  --color-signal-soft: rgba(53, 224, 240, 0.14);
 
-  /* Semantic */
-  --color-success: #00c97a;
-  --color-warning: #f5a623;
-  --color-danger: #ff3f5a;
-
-  /* Borders */
-  --color-border-subtle: rgba(26, 26, 34, 0.1); /* grid lines, dividers  */
-  --color-border-default: rgba(26, 26, 34, 0.2); /* standard component    */
-  --color-border-strong: rgba(26, 26, 34, 0.4); /* focused / active      */
+  /* Status — never decoration */
+  --color-success: #3fd68a;
+  --color-warning: #ffc24d;
+  --color-danger: #ff5c6e;
 
   /* ----------------------------------------------------------
      TYPOGRAPHY
   ---------------------------------------------------------- */
 
-  /* UI uses a geometric sans-serif; Rajdhani mirrors the game's
-     condensed-but-spaced look. Inter is the safe fallback.    */
+  /* Rajdhani carries the game's condensed-but-spaced look. */
   --font-ui: "Rajdhani", "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
 
-  /* Scale — game UI is mostly caps + tight hierarchy */
-  --text-2xs: 0.625rem; /* 10px — index labels // 01            */
-  --text-xs: 0.6875rem; /* 11px — BPM, timestamps               */
-  --text-sm: 0.75rem; /* 12px — subtitles like "DISCOVER NEW MUSIC" */
-  --text-base: 0.9375rem; /* 15px — standard body / menu items    */
-  --text-lg: 1.125rem; /* 18px — section headings              */
-  --text-xl: 1.5rem; /* 24px — PLAY, primary nav items       */
-  --text-2xl: 2rem; /* 32px — event title "ECHOES"          */
-  --text-3xl: 3rem; /* 48px — hero numbers (fragments)      */
+  /* Scale — the UI is mostly caps with a tight hierarchy */
+  --text-2xs: 0.625rem; /* 10px — captions, index labels        */
+  --text-xs: 0.6875rem; /* 11px — sub-labels                    */
+  --text-sm: 0.75rem; /* 12px — section labels                  */
+  --text-base: 0.9375rem; /* 15px — body, menu items            */
+  --text-lg: 1.125rem; /* 18px — headings, nav items            */
+  --text-xl: 1.5rem; /* 24px — start button, song title        */
+  --text-2xl: 2rem; /* 32px — display headings                 */
+  --text-3xl: 3rem; /* 48px — hero numbers (level)             */
 
   /* Letter-spacing — everything reads spaced-out */
-  --tracking-ui: 0.15em; /* standard menu items                */
-  --tracking-loose: 0.25em; /* section labels, index numbers      */
-  --tracking-tight: 0.05em; /* large display numbers              */
-
-  /* ----------------------------------------------------------
-     SPACING
-  ---------------------------------------------------------- */
-
-  /* Base unit = 4px. Scale stays in multiples. */
-  --spacing-1: 0.25rem; /*  4px */
-  --spacing-2: 0.5rem; /*  8px */
-  --spacing-3: 0.75rem; /* 12px */
-  --spacing-4: 1rem; /* 16px */
-  --spacing-5: 1.25rem; /* 20px */
-  --spacing-6: 1.5rem; /* 24px */
-  --spacing-8: 2rem; /* 32px */
-  --spacing-10: 2.5rem; /* 40px */
-  --spacing-12: 3rem; /* 48px */
-  --spacing-16: 4rem; /* 64px */
-
-  /* Common component gaps */
-  --gap-nav-item: var(--spacing-1); /* between stacked menu rows  */
-  --gap-section: var(--spacing-8); /* between major layout zones */
-  --gap-card: var(--spacing-4); /* internal card padding      */
-
-  /* ----------------------------------------------------------
-     BORDER RADIUS
-  ---------------------------------------------------------- */
-
-  --radius-none: 0;
-  --radius-sm: 2px; /* progress bars, thin chips */
-  --radius-md: 4px; /* buttons, tags             */
-  --radius-lg: 8px; /* panels, cards             */
-  --radius-xl: 12px; /* modals, sidebars          */
-
-  /* ----------------------------------------------------------
-     SHADOWS / ELEVATION
-     (kept minimal — the design uses flat dark surfaces)
-  ---------------------------------------------------------- */
-
-  --shadow-panel: 0 0 0 1px var(--color-border-default);
-  --shadow-active: inset 3px 0 0 0 var(--color-accent-blue);
+  --tracking-ui: 0.15em; /* menu items                          */
+  --tracking-loose: 0.25em; /* section labels, captions         */
+  --tracking-display: 0.5em; /* song title, START               */
+  --tracking-num: 0.05em; /* large display numbers              */
 
   /* ----------------------------------------------------------
      MOTION
   ---------------------------------------------------------- */
-
   --duration-fast: 80ms;
   --duration-base: 150ms;
   --duration-slow: 300ms;
@@ -127,84 +86,66 @@
 }
 
 /* ============================================================
-   UTILITY ALIASES
-   Concrete classes that capture common UI patterns from the
-   screenshot — use these on elements directly.
+   BASE
+   Touch defaults plus a press state every control inherits, so
+   taps read as acknowledged without per-component styling.
    ============================================================ */
 
-/* Index label  "// 01" */
-.label-index {
-  font-family: var(--font-ui);
+@layer base {
+  body {
+    font-family: var(--font-ui);
+    background-color: var(--color-canvas);
+    color: var(--color-fg);
+  }
+
+  button,
+  label,
+  [role="button"] {
+    /* Suppresses the WebView's 300ms double-tap-zoom wait and its grey
+       tap flash, both of which make presses feel unresponsive. */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:not(:disabled):active,
+  label:active,
+  [role="button"]:active {
+    transform: scale(0.96);
+    filter: brightness(1.12);
+  }
+}
+
+/* ============================================================
+   CHROME
+   The one shape language Tailwind has no utility for: hard
+   panels with a cut leading or trailing edge.
+   ============================================================ */
+
+/* Caps label sitting above a value: "DIFFICULTY", "BEST SCORE" */
+.label-caps {
   font-size: var(--text-2xs);
   letter-spacing: var(--tracking-loose);
-  color: var(--color-text-secondary);
   text-transform: uppercase;
+  color: var(--color-fg-muted);
 }
 
-/* Primary nav item  "P L A Y" */
-.nav-item {
-  font-family: var(--font-ui);
-  font-size: var(--text-xl);
-  font-weight: 700;
-  letter-spacing: var(--tracking-ui);
-  text-transform: uppercase;
-  color: var(--color-text-primary);
+.clip-slant-right {
+  clip-path: polygon(0 0, 100% 0, calc(100% - 24px) 100%, 0 100%);
+}
+.clip-slant-left {
+  clip-path: polygon(24px 0, 100% 0, 100% 100%, 0 100%);
+}
+.clip-slant-both {
+  clip-path: polygon(24px 0, 100% 0, calc(100% - 24px) 100%, 0 100%);
 }
 
-/* Nav subtitle  "START A PLAY SESSION" */
-.nav-subtitle {
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  letter-spacing: var(--tracking-loose);
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-}
-
-/* Section heading on dark panel */
-.heading-dark {
-  font-family: var(--font-ui);
-  font-size: var(--text-2xl);
-  font-weight: 700;
-  letter-spacing: var(--tracking-ui);
-  text-transform: uppercase;
-  color: var(--color-text-inverse);
-}
-
-/* Stat number  "8,756" */
-.stat-number {
-  font-family: var(--font-ui);
-  font-size: var(--text-3xl);
-  font-weight: 700;
-  letter-spacing: var(--tracking-tight);
-  color: var(--color-text-primary);
-}
-
-/* Active nav row — left accent stripe */
-.nav-row-active {
-  background: rgba(62, 155, 255, 0.08);
-  border-left: 3px solid var(--color-accent-blue);
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
-}
-
-/* Dark sidebar / event panel */
-.panel-dark {
-  background: var(--color-surface-dark);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-6);
-  color: var(--color-text-inverse);
-}
-
-/* Progress bar track */
-.progress-track {
-  height: 3px;
-  border-radius: var(--radius-sm);
-  background: var(--color-border-subtle);
-}
-
-/* Progress bar fill */
-.progress-fill {
-  height: 100%;
-  border-radius: var(--radius-sm);
-  background: var(--color-accent-blue);
-  transition: width var(--duration-slow) var(--ease-ui);
+/* Arrowhead trailing edge — the START button */
+.clip-arrow-right {
+  clip-path: polygon(
+    0 0,
+    calc(100% - 40px) 0,
+    100% 50%,
+    calc(100% - 40px) 100%,
+    0 100%
+  );
 }

@@ -1,6 +1,7 @@
 import { decodeTrack, getAudioContext } from "../audioDecoding";
 
 const CALIBRATION_STORAGE_KEY = "synapse.calibrationSeconds";
+const VOLUME_STORAGE_KEY = "synapse.volume";
 
 /**
  * Sample-accurate playback clock for the rhythm engine.
@@ -27,6 +28,7 @@ export class AudioPlayer {
   constructor() {
     this.context = getAudioContext();
     this.gainNode = this.context.createGain();
+    this.gainNode.gain.value = AudioPlayer.volume;
     this.gainNode.connect(this.context.destination);
   }
 
@@ -129,6 +131,23 @@ export class AudioPlayer {
 
   static set calibrationSeconds(seconds: number) {
     localStorage.setItem(CALIBRATION_STORAGE_KEY, String(seconds));
+  }
+
+  /** Master output level, 0 to 1. Read once per player, at construction. */
+  static get volume(): number {
+    const stored = localStorage.getItem(VOLUME_STORAGE_KEY);
+    if (stored === null) {
+      return 1;
+    }
+    const parsed = Number.parseFloat(stored);
+    if (Number.isNaN(parsed)) {
+      return 1;
+    }
+    return parsed;
+  }
+
+  static set volume(level: number) {
+    localStorage.setItem(VOLUME_STORAGE_KEY, String(level));
   }
 
   /** The AudioContext is shared and outlives the player, so it is not closed. */

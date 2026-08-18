@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +11,7 @@
     "android:sync": "CAPACITOR_BUILD=1 vite build && cap sync android",
     "android:run": "CAPACITOR_BUILD=1 vite build && cap sync android && cap run android",
     "android:apk": "CAPACITOR_BUILD=1 vite build && cap sync android && cd android && ./gradlew assembleDebug",
+    "android:bundle": "CAP_BUNDLE=1 bun run android:run",
     "android:open": "cap open android"
   },
   "devDependencies": {
@@ -21,7 +22,6 @@
     "@vite-pwa/assets-generator": "^1.0.2",
     "svelte": "^5.39.9",
     "svelte-check": "^4.3.2",
-    "svelte-radix": "^3.0.2",
     "typescript": "~5.9.3",
     "vite": "^7.1.9",
     "vite-plugin-pwa": "^1.1.0",
@@ -35,6 +35,7 @@
     "@capacitor/android": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@tailwindcss/vite": "^4.2.4",
+    "phosphor-svelte": "^3.1.0",
     "pixi.js": "^8.18.1",
     "tailwindcss": "^4.2.4"
   }

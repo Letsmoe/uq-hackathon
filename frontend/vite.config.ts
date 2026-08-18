@@ -3,8 +3,20 @@ import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 
+import packageJson from "./package.json" with { type: "json" };
+
 // https://vitejs.dev/config/
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(packageJson.version),
+  },
+  server: {
+    // The native shell resolves this exact host:port, so a silent fallback to
+    // 5174 would leave the device pointing at nothing.
+    host: true,
+    port: 5173,
+    strictPort: true,
+  },
   plugins: [
     tailwindcss(),
     svelte(),
@@ -59,8 +71,10 @@ export default defineConfig({
         clientsClaim: true,
       },
 
+      // A dev service worker intercepts the WebView's requests and replays a
+      // cached bundle, so edits never reach the device over live reload.
       devOptions: {
-        enabled: true,
+        enabled: false,
       },
     }),
   ],

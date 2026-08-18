@@ -1,194 +1,143 @@
-<script lang="ts">
-  type NavId = "solo" | "course" | "event" | "random";
+<script module lang="ts">
+  export type NavId = "solo" | "course" | "event" | "random";
+</script>
 
-  interface NavButton {
+<script lang="ts">
+  import DiamondIcon from "phosphor-svelte/lib/DiamondIcon";
+  import LockSimpleIcon from "phosphor-svelte/lib/LockSimpleIcon";
+  import ShuffleIcon from "phosphor-svelte/lib/ShuffleIcon";
+  import SparkleIcon from "phosphor-svelte/lib/SparkleIcon";
+  import StackSimpleIcon from "phosphor-svelte/lib/StackSimpleIcon";
+  import type { Component } from "svelte";
+
+  interface Props {
+    active?: NavId;
+    onrandom?: () => void;
+  }
+
+  let { active = $bindable("solo"), onrandom = () => {} }: Props = $props();
+
+  type NavButton = {
     id: NavId;
     label: string;
     sub: string;
-    shape: string;
-  }
+    icon: Component;
+    clip: string;
+    locked: boolean;
+  };
 
-  export let active: NavId = "solo";
-
-  // Widened to NavId so the entries still typecheck against `active` while the
-  // non-solo modes are commented out.
   const buttons: NavButton[] = [
     {
       id: "solo",
-      label: "SOLO",
-      sub: "PLAY",
-      shape: "slanted-right",
+      label: "Solo",
+      sub: "Play",
+      icon: DiamondIcon,
+      clip: "clip-slant-right",
+      locked: false,
     },
-    // {
-    //   id: "course",
-    //   label: "COURSE",
-    //   sub: "CHALLENGE",
-    //   shape: "slanted-left-right",
-    // },
-    // {
-    //   id: "event",
-    //   label: "EVENT",
-    //   sub: "LIMITED",
-    //   shape: "slanted-left-right",
-    // },
-    // {
-    //   id: "random",
-    //   label: "RANDOM",
-    //   sub: "SURPRISE",
-    //   shape: "slanted-left",
-    // },
-  ] as const;
+    {
+      id: "course",
+      label: "Course",
+      sub: "Challenge",
+      icon: StackSimpleIcon,
+      clip: "clip-slant-both",
+      locked: true,
+    },
+    {
+      id: "event",
+      label: "Event",
+      sub: "Limited",
+      icon: SparkleIcon,
+      clip: "clip-slant-both",
+      locked: true,
+    },
+    {
+      id: "random",
+      label: "Random",
+      sub: "Surprise",
+      icon: ShuffleIcon,
+      clip: "clip-slant-left",
+      locked: false,
+    },
+  ];
+
+  // RANDOM is an action rather than a destination: it rerolls the selection and
+  // leaves the player on the tab they were already on.
+  function select(button: NavButton) {
+    if (button.locked) {
+      return;
+    }
+    if (button.id === "random") {
+      onrandom();
+      return;
+    }
+    active = button.id;
+  }
+
+  function iconWeight(id: NavId) {
+    if (active === id) {
+      return "fill";
+    }
+    return "regular";
+  }
 </script>
 
-<div class="flex flex-row items-stretch">
-  {#each buttons as btn, i}
+<nav class="flex flex-row items-stretch">
+  {#each buttons as button (button.id)}
     <button
-      class="nav-btn {btn.shape} {active === btn.id ? 'active' : ''}"
-      onclick={() => (active = btn.id)}
+      onclick={() => select(button)}
+      disabled={button.locked}
+      aria-current={active === button.id}
+      class="nav-tab {button.clip} {active === button.id ? 'is-active' : ''}"
     >
-      <!-- Icon -->
-      <span class="icon">
-        {#if btn.id === "solo"}
-          <!-- Diamond -->
-          <svg
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path d="M12 2L22 12L12 22L2 12Z" />
-          </svg>
-        {:else if btn.id === "course"}
-          <!-- Stacked layers -->
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.75"
-            stroke-linejoin="round"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path d="M2 12L12 17L22 12" />
-            <path d="M2 7L12 12L22 7L12 2L2 7Z" />
-            <path d="M2 17L12 22L22 17" />
-          </svg>
-        {:else if btn.id === "event"}
-          <!-- Asterisk / burst -->
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.75"
-            stroke-linecap="round"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <line x1="12" y1="2" x2="12" y2="22" />
-            <line x1="2" y1="12" x2="22" y2="12" />
-            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-            <line x1="19.07" y1="4.93" x2="4.93" y2="19.07" />
-          </svg>
-        {:else}
-          <!-- Shuffle -->
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.75"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <polyline points="16 3 21 3 21 8" />
-            <line x1="4" y1="20" x2="21" y2="3" />
-            <polyline points="21 16 21 21 16 21" />
-            <line x1="15" y1="15" x2="21" y2="21" />
-            <line x1="4" y1="4" x2="9" y2="9" />
-          </svg>
-        {/if}
+      <span class="icon-slot flex h-6 w-6 shrink-0 items-center justify-center">
+        <button.icon size={22} weight={iconWeight(button.id)} />
       </span>
 
-      <!-- Labels -->
-      <span class="labels">
-        <span class="label-main">{btn.label}</span>
-        <span class="label-sub">{btn.sub}</span>
+      <span class="flex flex-col items-start gap-1.5">
+        <span class="text-lg leading-none font-semibold tracking-ui uppercase">
+          {button.label}
+        </span>
+        <span class="sub-label">
+          {#if button.locked}
+            <LockSimpleIcon size={10} weight="fill" />
+          {/if}
+          {button.sub}
+        </span>
       </span>
     </button>
-
-    <!-- Divider between inactive buttons -->
-    {#if i < buttons.length - 1 && !(active === btn.id || active === buttons[i + 1].id)}
-      <div class="self-stretch w-px bg-on-surface/10 my-3"></div>
-    {:else if i < buttons.length - 1}
-      <div class="self-stretch w-px bg-transparent my-3"></div>
-    {/if}
   {/each}
-</div>
+</nav>
 
 <style>
   @reference "tailwindcss";
   @reference "../../style/global.css";
 
-  .nav-btn {
-    @apply flex flex-row items-center gap-4 px-14 py-5 bg-transparent transition-colors duration-200 border-none cursor-pointer -mr-[26px];
+  /* The slanted clips overlap by the width of the cut, so the four tabs read as
+     one continuous strip rather than as separate pills. */
+  .nav-tab {
+    @apply -mr-[24px] flex cursor-pointer flex-row items-center gap-4 border-none bg-raised py-4 pr-12 pl-14 text-fg-muted transition-colors duration-150;
   }
 
-  /* Active: dark pill */
-  .nav-btn.active {
-    @apply bg-surface-dark;
+  .nav-tab:not(:disabled):hover {
+    @apply bg-hover text-fg;
   }
 
-  /* Clip shapes */
-  .slanted-right {
-    clip-path: polygon(0 0, 100% 0, calc(100% - 24px) 100%, 0% 100%);
-  }
-  .slanted-left {
-    clip-path: polygon(24px 0, 100% 0, 100% 100%, 0% 100%);
-  }
-  .slanted-left-right {
-    clip-path: polygon(24px 0, 100% 0, calc(100% - 24px) 100%, 0% 100%);
+  .nav-tab:disabled {
+    @apply cursor-not-allowed text-fg-dim;
   }
 
-  /* Icon sizing & color */
-  .icon {
-    @apply w-6 h-6 shrink-0 flex items-center justify-center;
+  /* Later tabs paint over the slanted edge of earlier ones, so the active tab
+     has to be lifted for its cut to stay visible. */
+  .nav-tab.is-active {
+    @apply relative z-10 bg-ink text-ink-fg;
   }
 
-  .icon svg {
-    @apply w-full h-full;
+  .nav-tab.is-active .icon-slot {
+    @apply text-accent;
   }
 
-  /* Default (inactive) icon + text */
-  .nav-btn:not(.active) .icon {
-    @apply text-on-surface-light/30;
-  }
-  .nav-btn:not(.active) .label-main {
-    @apply text-on-surface-light/40;
-  }
-  .nav-btn:not(.active) .label-sub {
-    @apply text-on-surface-light/25;
-  }
-  .nav-btn:not(.active):hover .icon,
-  .nav-btn:not(.active):hover .label-main {
-    @apply text-on-surface-light/60;
-  }
-
-  /* Active icon + text */
-  .nav-btn.active .icon {
-    @apply text-accent-purple;
-  }
-  .nav-btn.active .label-main {
-    @apply text-on-surface-dark font-semibold;
-  }
-  .nav-btn.active .label-sub {
-    @apply text-on-surface-dark/50;
-  }
-
-  /* Label stack */
-  .labels {
-    @apply flex flex-col items-start;
-  }
-  .label-main {
-    @apply text-lg tracking-widest leading-none;
-  }
-  .label-sub {
-    @apply text-xs tracking-widest uppercase mt-1 leading-none;
+  .sub-label {
+    @apply flex flex-row items-center gap-1.5 text-2xs leading-none tracking-loose uppercase opacity-70;
   }
 </style>

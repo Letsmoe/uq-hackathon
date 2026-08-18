@@ -86,21 +86,27 @@ them.
 cd frontend
 bun run android:apk     # build + sync + assembleDebug
 bun run android:run     # build + sync + install on a connected device
+bun run android:bundle  # same, but self-contained (no dev server)
 bun run android:open    # open in Android Studio
 ```
 
 The APK lands in `frontend/android/app/build/outputs/apk/debug/`.
 
-For live reload against the dev server, point the shell at your machine's LAN
-address:
+The shell loads `http://<your-lan-ip>:5173` by default, so the installed app
+picks up edits from a running dev server without a reinstall — start the server
+alongside it:
 
 ```sh
-bun run dev --host
-CAP_SERVER_URL=http://<your-lan-ip>:5173 bunx cap sync android
+bun run dev
 ```
 
-Unset `CAP_SERVER_URL` and re-sync before building anything you intend to ship;
-it enables cleartext HTTP.
+Two environment variables override the default:
+
+- `CAP_SERVER_URL=http://host:port` — pin a specific host instead of the
+  auto-detected LAN address.
+- `CAP_BUNDLE=1` — serve the bundled `dist/` build. **Required for anything you
+  intend to ship**: the default enables cleartext HTTP and depends on a dev
+  server that is not on the user's network.
 
 ## Chart format
 

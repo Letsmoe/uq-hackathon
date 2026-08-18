@@ -1,9 +1,18 @@
 <script lang="ts">
-  import { ChevronLeft, ChevronRight } from "svelte-radix";
-
   const SWIPE_THRESHOLD_PX = 40;
+  // Fraction of the finger travel the stage mirrors before the step commits.
+  const DRAG_FOLLOW_RATIO = 0.4;
 
-  let { songs, selected = $bindable(1) } = $props();
+  // Card sizes and the gap between neighbours, in design pixels. The stage is
+  // taller than the centre card so no card can bleed into the title below it.
+  const CENTER_SIZE = 320;
+  const ADJACENT_SIZE = 230;
+  const FAR_SIZE = 150;
+  const STAGE_HEIGHT = CENTER_SIZE + 20;
+  const STEP_TO_ADJACENT = CENTER_SIZE / 2 + ADJACENT_SIZE / 2 + 30;
+  const STEP_TO_FAR = ADJACENT_SIZE / 2 + FAR_SIZE / 2 + 24;
+
+  let { songs, selected = $bindable(0) } = $props();
 
   function prev() {
     if (selected > 0) selected--;
@@ -13,28 +22,47 @@
   }
 
   let dragStartX = 0;
-  let dragging = false;
   let didDrag = false;
+  let dragging = $state(false);
+  let dragOffsetX = $state(0);
+  let pressedIndex = $state(-1);
+
+  const stageOffsetX = $derived(dragOffsetX * DRAG_FOLLOW_RATIO);
+
+  // Following the finger has to be untransitioned or it lags behind it; the
+  // snap back once the finger lifts does want easing.
+  const stageTransitionMs = $derived.by(() => {
+    if (dragging) {
+      return 0;
+    }
+    return 200;
+  });
 
   function handlePointerDown(event: PointerEvent) {
     dragStartX = event.clientX;
+    dragOffsetX = 0;
     dragging = true;
     didDrag = false;
   }
 
-  function handlePointerUp(event: PointerEvent) {
+  function handlePointerMove(event: PointerEvent) {
     if (!dragging) {
       return;
     }
-    dragging = false;
 
     const dx = event.clientX - dragStartX;
     if (Math.abs(dx) < SWIPE_THRESHOLD_PX) {
+      dragOffsetX = dx;
       return;
     }
 
-    // Suppresses the card's click, which fires straight after pointerup.
+    // Stepping here rather than on pointerup is what removes the perceived
+    // lag: the carousel moves the moment the swipe is unambiguous. Resetting
+    // the origin lets one long drag walk several songs.
     didDrag = true;
+    dragStartX = event.clientX;
+    dragOffsetX = 0;
+    pressedIndex = -1;
     if (dx < 0) {
       next();
     } else {
@@ -42,8 +70,10 @@
     }
   }
 
-  function handlePointerCancel() {
+  function endDrag() {
     dragging = false;
+    dragOffsetX = 0;
+    pressedIndex = -1;
   }
 
   function handleCardClick(offset: number) {
@@ -57,168 +87,189 @@
     }
   }
 
-  function getCardProps(i: number) {
-    const offset = i - selected;
-    const abs = Math.abs(offset);
-    const sign = Math.sign(offset);
+  function pressScale(index: number) {
+    if (pressedIndex === index) {
+      return 0.96;
+    }
+    return 1;
+  }
 
-    const size = abs === 0 ? 420 : abs === 1 ? 300 : 190;
-    const zIndex = 30 - abs * 5;
-    const opacity = abs === 0 ? 1 : abs === 1 ? 0.85 : 0.5;
+  function cardSize(distance: number) {
+    if (distance === 0) {
+      return CENTER_SIZE;
+    }
+    if (distance === 1) {
+      return ADJACENT_SIZE;
+    }
+    return FAR_SIZE;
+  }
 
-    const stepToAdj = 210 + 150 + 32; // half-center + half-adj + gap
-    const stepToFar = 150 + 95 + 24; // half-adj   + half-far + gap
+  function cardOpacity(distance: number) {
+    if (distance === 0) {
+      return 1;
+    }
+    if (distance === 1) {
+      return 0.85;
+    }
+    return 0.45;
+  }
 
-    let tx = 0;
-    if (abs === 1) tx = sign * stepToAdj;
-    if (abs === 2) tx = sign * (stepToAdj + stepToFar);
-    if (abs > 2) tx = sign * (stepToAdj + stepToFar + (abs - 2) * 250);
+  function cardShift(offset: number) {
+    const distance = Math.abs(offset);
+    const direction = Math.sign(offset);
+    if (distance === 0) {
+      return 0;
+    }
+    if (distance === 1) {
+      return direction * STEP_TO_ADJACENT;
+    }
+    return (
+      direction * (STEP_TO_ADJACENT + STEP_TO_FAR + (distance - 2) * FAR_SIZE)
+    );
+  }
 
-    return { size, zIndex, opacity, tx, offset, abs };
+  function getCardProps(index: number) {
+    const offset = index - selected;
+    const distance = Math.abs(offset);
+
+    return {
+      offset,
+      distance,
+      size: cardSize(distance),
+      opacity: cardOpacity(distance),
+      shift: cardShift(offset),
+      zIndex: 30 - distance * 5,
+    };
   }
 </script>
 
 <svelte:window
-  onkeydown={(e) => {
-    if (e.key === "ArrowLeft") prev();
-    if (e.key === "ArrowRight") next();
+  onkeydown={(event) => {
+    if (event.key === "ArrowLeft") prev();
+    if (event.key === "ArrowRight") next();
   }}
 />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="relative flex flex-col items-center justify-center w-full h-full select-none overflow-hidden touch-none"
+  class="flex h-full w-full touch-none flex-col items-center justify-center select-none"
   onpointerdown={handlePointerDown}
-  onpointerup={handlePointerUp}
-  onpointercancel={handlePointerCancel}
+  onpointermove={handlePointerMove}
+  onpointerup={endDrag}
+  onpointercancel={endDrag}
+  onpointerleave={endDrag}
 >
-  <!-- Cards stage -->
+  <!-- Cards stage. shrink-0 keeps the fixed height from collapsing under the
+       flex column, which would let the absolute cards spill over the title. -->
   <div
-    class="relative w-full flex items-center justify-center"
-    style="height: 440px;"
+    class="relative flex w-full shrink-0 items-center justify-center overflow-hidden will-change-transform"
+    style="
+      height: {STAGE_HEIGHT}px;
+      transform: translateX({stageOffsetX}px);
+      transition: transform {stageTransitionMs}ms var(--ease-ui);
+    "
   >
-    {#each songs as song, i}
-      {@const p = getCardProps(i)}
+    {#each songs as song, index}
+      {@const card = getCardProps(index)}
 
       <button
-        onclick={() => handleCardClick(p.offset)}
+        onclick={() => handleCardClick(card.offset)}
+        onpointerdown={() => (pressedIndex = index)}
         aria-label={song.title}
-        class="absolute top-1/2 left-1/2 overflow-hidden border-none p-0 cursor-pointer transition-all duration-500 ease-out {p.abs ===
+        class="absolute top-1/2 left-1/2 cursor-pointer overflow-hidden p-0 transition-all duration-300 ease-out {card.distance ===
         0
-          ? 'border-2 border-accent-blue shadow-[0_0_56px_rgba(91,141,246,0.3)]'
-          : p.abs === 1
-            ? 'border border-white/10'
-            : 'border border-white/5'}"
+          ? 'border-2 border-accent shadow-[0_0_64px_rgba(124,107,245,0.35)]'
+          : 'border border-line'}"
         style="
-          width: {p.size}px;
-          height: {p.size}px;
-          z-index: {p.zIndex};
-          opacity: {p.opacity};
-          transform: translate(calc(-50% + {p.tx}px), -50%);
-          pointer-events: {p.abs > 2 ? 'none' : 'auto'};
+          width: {card.size}px;
+          height: {card.size}px;
+          z-index: {card.zIndex};
+          opacity: {card.opacity};
+          transform: translate(calc(-50% + {card.shift}px), -50%) scale({pressScale(
+          index,
+        )});
+          pointer-events: {card.distance > 2 ? 'none' : 'auto'};
         "
       >
-        <!-- Cover -->
         <img
           src={song.cover}
           alt={song.title}
-          class="absolute inset-0 w-full h-full object-cover transition-all duration-500 {p.abs >
+          class="absolute inset-0 h-full w-full object-cover transition-all duration-300 {card.distance >
           0
-            ? 'grayscale-[50%] brightness-[0.7]'
+            ? 'brightness-[0.55] grayscale-[45%]'
             : ''}"
         />
 
-        <!-- Gradient -->
         <div
-          class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"
+          class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent"
         ></div>
 
-        <!-- Index number -->
         <span
-          class="absolute top-3 left-3 text-xs tracking-widest font-light {p.abs ===
+          class="absolute top-3 left-3 text-xs tracking-loose {card.distance ===
           0
-            ? 'text-accent-blue'
+            ? 'text-accent'
             : 'text-white/50'}"
         >
-          {String(i).padStart(2, "0")}
+          {String(index).padStart(2, "0")}
         </span>
 
-        <!-- Title + artist on non-center cards -->
-        {#if p.abs > 0}
-          <div class="absolute bottom-4 left-4 flex flex-col items-start">
+        {#if card.distance > 0}
+          <div class="absolute bottom-4 left-4 flex flex-col items-start gap-1">
             <p
-              class="text-white/90 font-semibold tracking-widest leading-none {p.abs ===
+              class="leading-none font-semibold tracking-ui text-white {card.distance ===
               1
                 ? 'text-sm'
-                : 'text-xs'}"
+                : 'text-2xs'}"
             >
               {song.title}
             </p>
             <p
-              class="text-white/40 tracking-widest mt-1 {p.abs === 1
-                ? 'text-xs'
-                : 'text-[10px]'}"
+              class="text-2xs leading-none tracking-loose text-white/50 uppercase"
             >
               {song.artist}
             </p>
           </div>
         {/if}
 
-        <!-- Badge letter -->
         <span
-          class="absolute bottom-3 right-4 font-bold text-white/20 leading-none {p.abs ===
+          class="absolute right-4 bottom-3 leading-none font-bold text-white/25 {card.distance ===
           0
-            ? 'text-6xl'
-            : p.abs === 1
-              ? 'text-4xl'
-              : 'text-2xl'}">{song.badge}</span
+            ? 'text-3xl'
+            : 'text-2xl'}"
         >
+          {song.badge}
+        </span>
       </button>
     {/each}
 
-    <!-- Arrows -->
-    <button
-      onclick={prev}
-      disabled={selected === 0}
-      class="absolute left-6 z-50 text-on-surface/40 hover:text-on-surface/80 disabled:opacity-0 disabled:pointer-events-none transition-all duration-200 cursor-pointer bg-transparent border-none p-2"
-    >
-      <ChevronLeft size="36" />
-    </button>
-
-    <button
-      onclick={next}
-      disabled={selected === songs.length - 1}
-      class="absolute right-6 z-50 text-on-surface/40 hover:text-on-surface/80 disabled:opacity-0 disabled:pointer-events-none transition-all duration-200 cursor-pointer bg-transparent border-none p-2"
-    >
-      <ChevronRight size="36" />
-    </button>
   </div>
 
-  <!-- Song title -->
-  <div class="mt-8 flex flex-col items-center gap-1.5">
+  <!-- Title -->
+  <div class="mt-6 flex shrink-0 flex-col items-center gap-2">
     <h2
-      class="text-2xl tracking-[0.6em] text-on-surface font-light text-center"
+      class="text-center text-xl leading-none font-semibold tracking-display text-fg uppercase"
     >
       {songs[selected].title}
     </h2>
-    <span class="text-sm tracking-[0.3em] text-on-surface/40 uppercase"
-      >{songs[selected].artist}</span
-    >
+    <span class="text-sm tracking-loose text-fg-muted uppercase">
+      {songs[selected].artist}
+    </span>
   </div>
 
-  <!-- Dot indicators -->
-  <div class="flex flex-row gap-2 mt-5">
-    {#each songs as _, i}
+  <!-- Dots. The mark is small, the target around it is not. -->
+  <div class="mt-2 flex shrink-0 flex-row">
+    {#each songs as song, index}
       <button
-        onclick={() => {
-          selected = i;
-        }}
-        class="rounded-full transition-all duration-300 cursor-pointer border-none p-0 {i ===
-        selected
-          ? 'w-4 h-1.5 bg-accent-purple'
-          : 'w-1.5 h-1.5 bg-on-surface/20 hover:bg-on-surface/40'}"
-        aria-label="Go to {songs[i].title}"
-      ></button>
+        onclick={() => (selected = index)}
+        aria-label="Go to {song.title}"
+        class="flex h-9 w-9 cursor-pointer items-center justify-center border-none bg-transparent p-0"
+      >
+        <span
+          class="h-1.5 transition-all duration-300 {index === selected
+            ? 'w-6 bg-accent'
+            : 'w-2 bg-line-strong'}"
+        ></span>
+      </button>
     {/each}
   </div>
 </div>

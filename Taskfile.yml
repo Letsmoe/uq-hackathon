@@ -83,12 +83,13 @@ tasks:
   # ── Android ──────────────────────────────────────────────────────────────
 
   android:sync:
-    desc: Build the web app and copy it into the native Android project
+    desc: Sync the native project (points at your dev server unless CAP_BUNDLE=1)
     deps: [install]
     dir: "{{.FRONTEND}}"
     cmds:
       # CAPACITOR_BUILD disables the service worker, which otherwise serves a
-      # stale precached bundle inside the WebView after every rebuild.
+      # stale precached bundle inside the WebView after every rebuild. The
+      # build itself is only the offline fallback when CAP_BUNDLE=1 is set.
       - CAPACITOR_BUILD=1 bun run build
       - bunx cap sync android
 
@@ -113,10 +114,15 @@ tasks:
       - adb install -r "{{.APK}}"
 
   android:run:
-    desc: Build, install and launch on the connected device
+    desc: Build, install and launch on the device (run `task dev` alongside)
     deps: [android:install]
     cmds:
       - adb shell am start -n {{.ACTIVITY}}
+
+  android:bundle:
+    desc: Same as android:run but self-contained — no dev server needed
+    cmds:
+      - CAP_BUNDLE=1 task android:run
 
   android:log:
     desc: Follow device logs (JS console, crashes, Capacitor)
@@ -133,20 +139,6 @@ tasks:
     desc: Remove the app from the connected device
     cmds:
       - adb uninstall {{.PACKAGE_ID}}
-
-  android:livereload:
-    desc: Point the installed app at your dev server (run `task dev` alongside)
-    vars:
-      LAN_IP:
-        sh: ip route get 1.1.1.1 | awk '{print $7; exit}'
-    dir: "{{.FRONTEND}}"
-    cmds:
-      - 'echo "Pointing app at http://{{.LAN_IP}}:5173"'
-      - CAP_SERVER_URL=http://{{.LAN_IP}}:5173 bunx cap sync android
-      - cd android && ./gradlew assembleDebug
-      - adb install -r "app/build/outputs/apk/debug/app-debug.apk"
-      - adb shell am start -n {{.ACTIVITY}}
-      - 'echo "Re-run `task android:run` to go back to the bundled build."'
 
   # ── Housekeeping ─────────────────────────────────────────────────────────
 

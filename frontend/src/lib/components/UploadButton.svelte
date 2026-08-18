@@ -12,7 +12,7 @@
 </script>
 
 <script lang="ts">
-  import { Upload } from "svelte-radix";
+  import UploadSimpleIcon from "phosphor-svelte/lib/UploadSimpleIcon";
   import { generateChart } from "../chartGeneration";
 
   interface Props {
@@ -67,8 +67,8 @@
 </script>
 
 <label
-  class="ml-1 h-full aspect-square flex items-center justify-center border border-on-surface-light/20 hover:bg-on-surface-light/[0.07] bg-on-surface-light/[0.03] text-on-surface-light/40 hover:text-on-surface-light/80 hover:border-on-surface-light/40 transition-all duration-200 cursor-pointer text-lg leading-none"
-  title="Upload"
+  class="flex aspect-square shrink-0 cursor-pointer items-center justify-center self-stretch border border-line bg-raised text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg"
+  title="Upload a track"
 >
   <input
     type="file"
@@ -76,5 +76,5 @@
     class="sr-only"
     onchange={handleFileSelect}
   />
-  <Upload size="24" />
+  <UploadSimpleIcon size={28} />
 </label>

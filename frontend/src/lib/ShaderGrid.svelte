@@ -99,12 +99,12 @@ void main() {
   p += dir * influence * 0.025;
   p += sin(vec2(p.y, p.x) * 28.0 + u_time * 0.8) * influence * 0.002;
 
-  // Colors
-  vec3 bg         = vec3(236, 234, 228) / 255.0;
-  vec3 dotColor   = vec3(0.38, 0.37, 0.35);
-  vec3 lineColor  = vec3(0.50, 0.49, 0.47);
-  vec3 crossColor = vec3(0.13, 0.13, 0.20);
-  vec3 accent     = vec3(125.0, 103.0, 210.0) / 255.0;
+  // Colors — mirrors the --color-canvas / --color-accent tokens
+  vec3 bg         = vec3(13.0, 14.0, 19.0) / 255.0;
+  vec3 dotColor   = vec3(0.62, 0.62, 0.70);
+  vec3 lineColor  = vec3(0.50, 0.50, 0.60);
+  vec3 crossColor = vec3(0.88, 0.88, 0.94);
+  vec3 accent     = vec3(124.0, 107.0, 245.0) / 255.0;
 
   // -----------------------------
   // Minor dot grid (small dots inside)
@@ -142,15 +142,17 @@ void main() {
   vec3 color = bg;
 
   // Draw order: background -> minor dots -> dotted lines -> crosses
-  color = mix(color, dotColor,   dots * 0.35);
-  color = mix(color, lineColor,  gridLines * 0.42);
-  color = mix(color, crossColor, crosses * 0.25);
+  color = mix(color, dotColor,   dots * 0.16);
+  color = mix(color, lineColor,  gridLines * 0.20);
+  color = mix(color, crossColor, crosses * 0.22);
 
-  color += accent * cursorGlow * 0.12;
-  color = mix(color, accent, cursorRing * 0.25);
+  color += accent * cursorGlow * 0.22;
+  color = mix(color, accent, cursorRing * 0.45);
 
+  // Darkening the edges on a light canvas reads as depth; on a dark one it
+  // crushes to black, so the vignette lifts the centre instead.
   float vignette = smoothstep(1.0, 0.18, length((uv - 0.5) * vec2(1.25, 1.0)));
-  color *= 0.94 + vignette * 0.08;
+  color += vignette * 0.025;
 
   float noise = fract(sin(dot(frag + u_time, vec2(12.9898, 78.233))) * 43758.5453);
   color += (noise - 0.5) * 0.018;
@@ -339,7 +341,7 @@ void main() {
     width: 100%;
     height: 100%;
     display: block;
-    background: #ebe8df;
+    background: var(--color-canvas);
     cursor: crosshair;
     /* Without this the WebView claims a drag as a scroll gesture and fires
        pointercancel, so the cursor effect only responds to taps. */

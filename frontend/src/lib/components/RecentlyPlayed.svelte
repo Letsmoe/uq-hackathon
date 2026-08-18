@@ -1,71 +1,45 @@
-<script lang="ts">
-  type Track = {
-    id: number;
+<script module lang="ts">
+  export type RecentTrack = {
+    songIndex: number;
     title: string;
     artist: string;
     cover: string;
   };
-
-  export let tracks: Track[] = [
-    { id: 1, title: "Stardust", artist: "Nhato", cover: "/cover/cover-3.png" },
-    { id: 2, title: "Abyss Gate", artist: "xi", cover: "/cover/cover-2.png" },
-    {
-      id: 3,
-      title: "Skycastle",
-      artist: "Camellia",
-      cover: "/cover/cover-1.png",
-    },
-    { id: 4, title: "Cloudbreak", artist: "HiTech", cover: "/cover-image.png" },
-  ];
-
-  let selected = 0;
 </script>
 
-<div class="flex flex-col gap-4 p-6 w-full">
-  <!-- Section header -->
-  <div class="flex flex-row items-center gap-4">
-    <div class="w-0.5 h-5 bg-surface-dark shrink-0"></div>
-    <span class="text-xs tracking-[0.25em] text-on-surface/40 uppercase"
-      >Recently Played</span
-    >
-  </div>
-  <hr class="h-[0.5px] w-full bg-surface-dark/15 -my-2" />
+<script lang="ts">
+  interface Props {
+    tracks?: RecentTrack[];
+    onselect?: (songIndex: number) => void;
+  }
 
-  <!-- Cards row -->
-  <div class="flex flex-row gap-4 items-end">
-    {#each tracks as track, i}
-      <button
-        class="flex flex-col items-center gap-2 group cursor-pointer bg-transparent border-none p-0"
-        onclick={() => (selected = i)}
-      >
-        <!-- Cover art -->
-        <div
-          class="relative overflow-hidden transition-all duration-300 {selected ===
-          i
-            ? 'border-2 border-accent-purple w-28 h-28 shadow-[0_0_24px_rgba(139,92,246,0.35)]'
-            : 'border border-white/10 w-24 h-24 opacity-70 group-hover:opacity-100 group-hover:border-white/25'}"
+  let { tracks = [], onselect = () => {} }: Props = $props();
+</script>
+
+<div class="flex w-full flex-col gap-3">
+  <div class="flex flex-row items-center gap-3">
+    <div class="h-4 w-0.5 shrink-0 bg-accent"></div>
+    <span class="label-caps">Recently Played</span>
+  </div>
+  <div class="h-px w-full bg-line"></div>
+
+  <div class="flex h-[88px] flex-row items-center gap-3">
+    {#if tracks.length === 0}
+      <p class="text-2xs tracking-loose text-fg-dim uppercase">No plays yet</p>
+    {:else}
+      {#each tracks as track (track.songIndex)}
+        <button
+          onclick={() => onselect(track.songIndex)}
+          title="{track.title} — {track.artist}"
+          class="group h-[88px] w-[88px] shrink-0 cursor-pointer overflow-hidden border border-line p-0 transition-colors duration-150 hover:border-line-strong"
         >
           <img
             src={track.cover}
             alt={track.title}
-            class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            class="h-full w-full object-cover brightness-75 transition-all duration-300 group-hover:brightness-100"
           />
-          <!-- Subtle dark overlay on unselected -->
-          {#if selected !== i}
-            <div
-              class="absolute inset-0 bg-black/30 transition-opacity duration-300 group-hover:bg-black/10"
-            ></div>
-          {/if}
-        </div>
-
-        <!-- Dot indicator -->
-        <div
-          class="w-1.5 h-1.5 rounded-full transition-all duration-300 {selected ===
-          i
-            ? 'bg-accent-purple'
-            : 'bg-on-surface/20 group-hover:bg-on-surface/40'}"
-        ></div>
-      </button>
-    {/each}
+        </button>
+      {/each}
+    {/if}
   </div>
 </div>

@@ -11,7 +11,6 @@
     songTitle = "",
     artist = "",
     difficulty = "EX",
-    level = 10,
     coverSrc = "/ellasy.png",
     onpause = () => {},
     onfinish = (_stats: unknown) => {},
@@ -21,7 +20,6 @@
     songTitle?: string;
     artist?: string;
     difficulty?: string;
-    level?: number;
     coverSrc?: string;
     onpause?: () => void;
     onfinish?: (stats: unknown) => void;
@@ -248,7 +246,6 @@
     {combo}
     {tp}
     {difficulty}
-    {level}
     {progress}
     onpause={handlePause}
   />

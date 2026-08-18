@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { Plus, Upload } from "svelte-radix";
   import type { MouseEventHandler } from "svelte/elements";
   import UploadButton from "./UploadButton.svelte";
   import type { UploadHandler } from "./UploadButton.svelte";
@@ -12,66 +11,58 @@
   }
 
   let {
-    notifications = 2,
-    version = "1.2.0",
+    notifications = 0,
+    version = "0.0.0",
     onquickplay = () => {},
     onupload = () => {},
   }: Props = $props();
+
+  const waveformBars = [0.4, 0.7, 1, 0.6, 0.9, 0.5, 1, 0.75, 0.55, 0.85];
 </script>
 
-<div class="flex flex-col justify-end gap-3 w-full h-full pb-4 pr-4">
-  <div class="flex flex-row items-center justify-end gap-3">
-    <!-- Upload / add button -->
-    <UploadButton {onupload}></UploadButton>
-    <!-- Quick play card -->
+<div class="flex h-full w-full flex-col items-end justify-end gap-4">
+  <div class="flex flex-row items-stretch gap-3">
+    <UploadButton {onupload} />
+
     <button
       onclick={onquickplay}
-      class="flex flex-row items-center gap-5 border border-on-surface-light/10 bg-on-surface-light/[0.03] hover:bg-on-surface-light/[0.07] transition-colors duration-200 px-5 py-4 cursor-pointer w-fit self-end"
+      class="flex h-20 cursor-pointer flex-row items-center gap-5 border border-line bg-raised px-6 transition-colors duration-150 hover:bg-hover"
     >
-      <!-- Waveform icon -->
-      <div class="flex flex-row items-end gap-[3px] h-8">
-        {#each [0.4, 0.7, 1, 0.6, 0.9, 0.5, 1, 0.75, 0.55, 0.85, 0.45, 0.65] as h}
-          <div
-            class="w-[3px] bg-on-surface-light/50 rounded-sm"
-            style="height: {h * 100}%"
-          ></div>
+      <div class="flex h-9 flex-row items-end gap-[3px]">
+        {#each waveformBars as height, index (index)}
+          <div class="w-[3px] bg-accent" style="height: {height * 100}%"></div>
         {/each}
       </div>
 
-      <!-- Labels -->
-      <div class="flex flex-col items-start gap-1">
+      <div class="flex flex-col items-start gap-1.5">
         <span
-          class="text-sm tracking-[0.3em] text-on-surface-light font-light uppercase"
-          >Quick Play</span
+          class="text-sm leading-none font-semibold tracking-display text-fg uppercase"
         >
-        <span
-          class="text-[0.6rem] tracking-[0.2em] text-on-surface-light/50 uppercase"
-          >Random Song</span
-        >
+          Quick Play
+        </span>
+        <span class="text-2xs leading-none tracking-loose text-fg-muted uppercase">
+          Random Song
+        </span>
       </div>
     </button>
   </div>
 
-  <!-- Bottom info bar -->
-  <div class="flex flex-row items-center justify-end gap-4">
-    <!-- Notifications -->
-    <!-- <div class="flex flex-row items-center gap-2"> -->
-    <!--   <span class="text-[0.6rem] tracking-[0.2em] text-on-surface/35 uppercase" -->
-    <!--     >Notifications</span -->
-    <!--   > -->
-    <!--   <span -->
-    <!--     class="text-[0.6rem] font-semibold bg-accent-purple text-white px-1.5 py-0.5 leading-none" -->
-    <!--   > -->
-    <!--     {notifications} -->
-    <!--   </span> -->
-    <!-- </div> -->
+  <!-- Status line, sitting on the frame's bottom-right corner -->
+  <div class="flex flex-row items-center gap-4">
+    <div class="flex flex-row items-center gap-2">
+      <span class="label-caps">Notifications</span>
+      <span
+        class="min-w-4 px-1 py-0.5 text-center text-2xs leading-none font-semibold {notifications >
+        0
+          ? 'bg-accent text-fg'
+          : 'bg-raised text-fg-dim'}"
+      >
+        {notifications}
+      </span>
+    </div>
 
-    <!-- Divider -->
-    <div class="w-px h-3 bg-on-surface-light/15"></div>
+    <div class="h-3 w-px bg-line"></div>
 
-    <!-- Version -->
-    <span class="text-[0.6rem] tracking-[0.2em] text-on-surface/35 uppercase"
-      >Version {version}</span
-    >
+    <span class="label-caps">Version {version}</span>
   </div>
 </div>
