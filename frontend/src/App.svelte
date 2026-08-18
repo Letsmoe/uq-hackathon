@@ -228,17 +228,17 @@
           />
 
           <!-- Rows are fixed height so no zone can grow into the one below it;
-               only the carousel takes up the slack. -->
+               only the carousel takes up the slack. Navigation shares the
+               header row, which is what buys the carousel its height. -->
           <div class="relative flex h-full w-full flex-col px-10 pt-6 pb-6">
-            <div class="flex h-20 shrink-0 flex-row items-center justify-between">
+            <div class="flex h-16 shrink-0 flex-row items-center justify-between gap-8">
               <Logo />
+              <NavButtons bind:active={activeTab} />
               <UserHeader
                 username="ink"
                 rating={12.41}
                 ratingCurrent={2430}
                 ratingMax={8000}
-                fragments={8756}
-                memories={315}
                 avatarSrc="/ellasy.png"
                 {unreadCount}
                 onmessages={() => (openPanel = "messages")}
@@ -247,18 +247,18 @@
               />
             </div>
 
-            <div class="flex h-[76px] shrink-0 items-center justify-center">
-              <NavButtons bind:active={activeTab} onrandom={pickRandomSong} />
-            </div>
-
             <div class="min-h-0 flex-1">
-              <SongCarousel {songs} bind:selected />
+              <SongCarousel
+                {songs}
+                bind:selected
+                onshuffle={pickRandomSong}
+              />
             </div>
 
             <!-- Fixed side columns keep the song info on the frame's centre
                  line however wide the rails get. -->
             <div
-              class="grid h-[240px] shrink-0 grid-cols-[minmax(0,1fr)_640px_minmax(0,1fr)] items-end gap-6"
+              class="grid h-[212px] shrink-0 grid-cols-[minmax(0,1fr)_640px_minmax(0,1fr)] items-end gap-6"
             >
               <RecentlyPlayed
                 tracks={recentTracks}
@@ -279,7 +279,6 @@
               <BottomPanel
                 notifications={unreadCount}
                 version={__APP_VERSION__}
-                onquickplay={pickRandomSong}
                 onupload={addUploadedSong}
               />
             </div>

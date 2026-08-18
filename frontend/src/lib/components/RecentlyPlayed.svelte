@@ -23,7 +23,7 @@
   </div>
   <div class="h-px w-full bg-line"></div>
 
-  <div class="flex h-[88px] flex-row items-center gap-3">
+  <div class="flex h-[68px] flex-row items-center gap-3">
     {#if tracks.length === 0}
       <p class="text-2xs tracking-loose text-fg-dim uppercase">No plays yet</p>
     {:else}
@@ -31,13 +31,18 @@
         <button
           onclick={() => onselect(track.songIndex)}
           title="{track.title} — {track.artist}"
-          class="group h-[88px] w-[88px] shrink-0 cursor-pointer overflow-hidden border border-line p-0 transition-colors duration-150 hover:border-line-strong"
+          class="group relative h-[68px] w-[68px] shrink-0 cursor-pointer overflow-hidden border border-line p-0 transition-colors duration-150 hover:border-line-strong"
         >
           <img
             src={track.cover}
             alt={track.title}
-            class="h-full w-full object-cover brightness-75 transition-all duration-300 group-hover:brightness-100"
+            class="h-full w-full object-cover"
           />
+          <!-- Dimmed by an overlay rather than a filter, so the hover
+               composites instead of re-rasterising the cover. -->
+          <div
+            class="absolute inset-0 bg-black/30 transition-opacity duration-200 group-hover:opacity-0"
+          ></div>
         </button>
       {/each}
     {/if}

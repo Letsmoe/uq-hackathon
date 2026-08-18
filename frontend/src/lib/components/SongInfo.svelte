@@ -42,7 +42,7 @@
   });
 </script>
 
-<div class="flex h-full w-full flex-col items-center justify-end gap-4">
+<div class="flex h-full w-full flex-col items-center justify-end gap-3">
   <p
     class="h-4 text-center text-2xs leading-none tracking-loose text-fg-muted uppercase"
   >
@@ -55,7 +55,7 @@
       <button
         onclick={() => ondifficultychange(option)}
         disabled={generating}
-        class="flex h-14 flex-1 cursor-pointer items-center justify-center border text-sm font-semibold tracking-ui uppercase transition-colors duration-150 disabled:cursor-not-allowed {option ===
+        class="flex h-12 flex-1 cursor-pointer items-center justify-center border text-sm font-semibold tracking-ui uppercase transition-colors duration-150 disabled:cursor-not-allowed {option ===
         difficulty
           ? `border-line-strong bg-raised ${difficultyColor[option]}`
           : 'border-line bg-canvas/40 text-fg-dim hover:bg-raised hover:text-fg-muted'}"
@@ -78,7 +78,7 @@
   <button
     onclick={onstart}
     disabled={generating || !canStart}
-    class="clip-arrow-right flex h-[92px] w-[520px] cursor-pointer flex-row items-center justify-center gap-4 border-none bg-ink pr-10 text-2xl tracking-display text-ink-fg uppercase transition-opacity duration-150 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-25"
+    class="clip-arrow-right flex h-[76px] w-[560px] cursor-pointer flex-row items-center justify-center gap-4 border-none bg-ink pr-10 text-2xl tracking-display text-ink-fg uppercase transition-opacity duration-150 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-25"
   >
     {startLabel}
     <svg class="h-4 w-4 shrink-0 fill-ink-fg/50" viewBox="0 0 10 10">

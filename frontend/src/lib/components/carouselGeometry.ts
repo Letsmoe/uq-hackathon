@@ -5,13 +5,13 @@
 // of it is a function of one continuous position in song indexes, which is
 // what lets a drag pass through the same states the spring settles into.
 
-export const CENTER_SIZE = 320;
-export const ADJACENT_SIZE = 230;
-export const FAR_SIZE = 150;
+export const CENTER_SIZE = 380;
+export const ADJACENT_SIZE = 270;
+export const FAR_SIZE = 180;
 
-export const STAGE_HEIGHT = CENTER_SIZE + 20;
-export const STEP_TO_ADJACENT = CENTER_SIZE / 2 + ADJACENT_SIZE / 2 + 30;
-export const STEP_TO_FAR = ADJACENT_SIZE / 2 + FAR_SIZE / 2 + 24;
+export const STAGE_HEIGHT = CENTER_SIZE + 24;
+export const STEP_TO_ADJACENT = CENTER_SIZE / 2 + ADJACENT_SIZE / 2 + 34;
+export const STEP_TO_FAR = ADJACENT_SIZE / 2 + FAR_SIZE / 2 + 28;
 
 export const SCALE_STOPS = [
   1,

@@ -1,17 +1,13 @@
 <script lang="ts">
   import ChartBarIcon from "phosphor-svelte/lib/ChartBarIcon";
-  import DiamondIcon from "phosphor-svelte/lib/DiamondIcon";
   import EnvelopeIcon from "phosphor-svelte/lib/EnvelopeIcon";
   import GearIcon from "phosphor-svelte/lib/GearIcon";
-  import StarIcon from "phosphor-svelte/lib/StarIcon";
 
   interface Props {
     username?: string;
     rating?: number;
     ratingCurrent?: number;
     ratingMax?: number;
-    fragments?: number;
-    memories?: number;
     avatarSrc?: string;
     unreadCount?: number;
     onmessages?: () => void;
@@ -24,8 +20,6 @@
     rating = 12.41,
     ratingCurrent = 2430,
     ratingMax = 8000,
-    fragments = 8756,
-    memories = 315,
     avatarSrc = "/ellasy.png",
     unreadCount = 0,
     onmessages = () => {},
@@ -36,10 +30,10 @@
   const ratingProgress = $derived((ratingCurrent / ratingMax) * 100);
 
   const iconButtonClass =
-    "relative flex h-14 w-14 items-center justify-center border border-line bg-raised text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg cursor-pointer";
+    "relative flex h-12 w-12 items-center justify-center border border-line bg-raised text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg cursor-pointer";
 </script>
 
-<header class="flex flex-row items-center gap-7">
+<header class="flex flex-row items-center gap-5">
   <!-- Identity -->
   <div class="flex shrink-0 flex-row items-center gap-3">
     <div class="h-12 w-12 shrink-0 overflow-hidden border border-line">
@@ -75,32 +69,9 @@
 
   <div class="h-10 w-px shrink-0 bg-line"></div>
 
-  <!-- Currencies -->
-  <div class="flex flex-row items-center gap-8">
-    <div class="flex flex-col gap-1.5">
-      <span class="label-caps">Fragments</span>
-      <div class="flex flex-row items-center gap-2">
-        <DiamondIcon size={14} weight="fill" class="shrink-0 text-fg-muted" />
-        <span class="text-xl leading-none font-semibold text-fg">
-          {fragments.toLocaleString()}
-        </span>
-      </div>
-    </div>
+  <!-- Panels. Fragments and memories used to sit here; the stats panel is
+       where a player goes to read numbers. -->
 
-    <div class="flex flex-col gap-1.5">
-      <span class="label-caps">Memories</span>
-      <div class="flex flex-row items-center gap-2">
-        <StarIcon size={14} weight="fill" class="shrink-0 text-accent" />
-        <span class="text-xl leading-none font-semibold text-fg">
-          {memories.toLocaleString()}
-        </span>
-      </div>
-    </div>
-  </div>
-
-  <div class="h-10 w-px shrink-0 bg-line"></div>
-
-  <!-- Panels -->
   <div class="flex flex-row items-center gap-2">
     <button
       onclick={onmessages}

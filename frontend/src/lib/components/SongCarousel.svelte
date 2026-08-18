@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Spring } from "svelte/motion";
+  import ShuffleIcon from "phosphor-svelte/lib/ShuffleIcon";
   import {
     CENTER_SIZE,
     STAGE_HEIGHT,
@@ -19,7 +20,25 @@
   const DRAG_INTENT_PX = 12;
   const EDGE_RESISTANCE = 0.35;
 
-  let { songs, selected = $bindable(0) } = $props();
+  /** Only the fields the carousel puts on a card. */
+  type CarouselSong = {
+    title: string;
+    artist: string;
+    badge: string;
+    cover: string;
+  };
+
+  interface Props {
+    songs: CarouselSong[];
+    selected?: number;
+    onshuffle?: () => void;
+  }
+
+  let {
+    songs,
+    selected = $bindable(0),
+    onshuffle = () => {},
+  }: Props = $props();
 
   // Continuous carousel position in song indexes. Everything on screen is a
   // function of this one number, so a drag moves the cards through the same
@@ -243,21 +262,35 @@
     </span>
   </div>
 
-  <!-- Dots. The mark is small, the target around it is not. -->
-  <div class="mt-2 flex shrink-0 flex-row">
-    {#each songs as song, index}
+  <!-- Dots, and the reroll that used to live on the far side of the screen.
+       The mark is small, the target around it is not. -->
+  <div class="mt-2 flex shrink-0 flex-row items-center gap-2">
+    <div class="flex flex-row">
+      {#each songs as song, index}
+        <button
+          onclick={() => (selected = index)}
+          aria-label="Go to {song.title}"
+          class="flex h-9 w-9 cursor-pointer items-center justify-center border-none bg-transparent p-0"
+        >
+          <span
+            class="h-1.5 transition-all duration-300 {index === selected
+              ? 'w-6 bg-accent'
+              : 'w-2 bg-line-strong'}"
+          ></span>
+        </button>
+      {/each}
+    </div>
+
+    {#if songs.length > 1}
       <button
-        onclick={() => (selected = index)}
-        aria-label="Go to {song.title}"
-        class="flex h-9 w-9 cursor-pointer items-center justify-center border-none bg-transparent p-0"
+        onclick={onshuffle}
+        title="Random song"
+        aria-label="Random song"
+        class="flex h-9 w-9 cursor-pointer items-center justify-center border border-line bg-raised text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg"
       >
-        <span
-          class="h-1.5 transition-all duration-300 {index === selected
-            ? 'w-6 bg-accent'
-            : 'w-2 bg-line-strong'}"
-        ></span>
+        <ShuffleIcon size={14} />
       </button>
-    {/each}
+    {/if}
   </div>
 </div>
 
