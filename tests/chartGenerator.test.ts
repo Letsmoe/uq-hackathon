@@ -97,6 +97,19 @@ describe("chart building", () => {
     }
   });
 
+  test.each(DIFFICULTIES)("%s never draws two notes on top of each other", (difficulty) => {
+    const chart = buildChart(analysis, difficulty);
+
+    expectNoOverlap(chart);
+  });
+
+  test.each(DIFFICULTIES)("%s leaves room to release a hold", (difficulty) => {
+    const chart = buildChart(analysis, difficulty);
+    const spec = specForDifficulty(difficulty);
+
+    expectHoldsRelease(chart, spec.minNoteIntervalSec);
+  });
+
   test("pages tile the track without gaps", () => {
     const pages = buildChart(analysis, "hard").page_list;
 
@@ -151,12 +164,14 @@ describe("musical structure", () => {
       repeated.endBeat,
     );
 
-    // A repeat that runs shorter than its source is clipped at its own end, so
-    // the replay is asserted as a prefix rather than as an exact copy.
+    // The replay is clipped at its own end and loses any opening note that
+    // collides with what the previous section left on screen, so it is asserted
+    // as a subsequence of the source rather than as an exact copy.
     const shifted = inSource.map((tick) => tick + shiftTicks);
 
     expect(inRepeat.length).toBeGreaterThan(0);
-    expect(shifted.slice(0, inRepeat.length)).toEqual(inRepeat);
+    expect(inRepeat.length).toBeGreaterThan(inSource.length * 0.8);
+    expectSubsequence(inRepeat, shifted);
   });
 
   test("the busier half of a track carries more notes", () => {
@@ -231,6 +246,103 @@ function expectMinimumInterval(chart: Chart, minIntervalSec: number): void {
   for (let index = 1; index < distinct.length; index++) {
     expect(distinct[index] - distinct[index - 1]).toBeGreaterThan(minIntervalSec * 0.95);
   }
+}
+
+// A note body spans about this much of the playfield horizontally and about
+// this long vertically, time being the vertical axis. Two note bodies overlap
+// when they are inside the ellipse those two extents describe.
+const MIN_VISUAL_GAP_X = 0.18;
+const OVERLAP_WINDOW_SEC = 0.24;
+
+function requiredGapAt(timeGapSec: number): number {
+  const closeness = 1 - (timeGapSec / OVERLAP_WINDOW_SEC) ** 2;
+
+  return MIN_VISUAL_GAP_X * Math.sqrt(Math.max(0, closeness));
+}
+
+interface DrawnNote {
+  startSec: number;
+  endSec: number;
+  x: number;
+}
+
+function drawnNotes(chart: Chart): DrawnNote[] {
+  const toSeconds = (tick: number) => tickToSeconds(tick, chart.bpm, chart.time_base);
+
+  return chart.note_list.flatMap((note) => {
+    if (note.nodes) {
+      return note.nodes.map((node) => ({
+        startSec: toSeconds(node.tick),
+        endSec: toSeconds(node.tick),
+        x: node.x,
+      }));
+    }
+
+    return [
+      {
+        startSec: toSeconds(note.tick!),
+        endSec: toSeconds(note.tick! + note.duration!),
+        x: note.x!,
+      },
+    ];
+  });
+}
+
+function expectNoOverlap(chart: Chart): void {
+  const drawn = drawnNotes(chart).sort((first, second) => first.startSec - second.startSec);
+
+  for (let index = 1; index < drawn.length; index++) {
+    expectClearOfEarlier(drawn, index);
+  }
+}
+
+function expectClearOfEarlier(drawn: DrawnNote[], index: number): void {
+  const note = drawn[index];
+
+  for (let earlier = index - 1; earlier >= 0; earlier--) {
+    const timeGap = Math.max(0, note.startSec - drawn[earlier].endSec);
+
+    if (timeGap > OVERLAP_WINDOW_SEC) break;
+
+    expect(Math.abs(note.x - drawn[earlier].x)).toBeGreaterThanOrEqual(
+      requiredGapAt(timeGap) - 1e-6,
+    );
+  }
+}
+
+function expectSubsequence(candidate: number[], within: number[]): void {
+  let cursor = 0;
+
+  for (const value of candidate) {
+    cursor = within.indexOf(value, cursor);
+
+    expect(cursor).toBeGreaterThanOrEqual(0);
+    cursor++;
+  }
+}
+
+function expectHoldsRelease(chart: Chart, minIntervalSec: number): void {
+  const drawn = drawnNotes(chart).sort((first, second) => first.startSec - second.startSec);
+
+  for (let index = 0; index < drawn.length; index++) {
+    expectTailClearsNext(drawn, index, minIntervalSec);
+  }
+}
+
+function expectTailClearsNext(drawn: DrawnNote[], index: number, minIntervalSec: number): void {
+  const hold = drawn[index];
+
+  if (hold.endSec === hold.startSec) {
+    return;
+  }
+
+  const next = drawn.find((other) => other.startSec > hold.startSec + 1e-6);
+
+  if (!next) {
+    return;
+  }
+
+  expect(next.startSec - hold.endSec).toBeGreaterThanOrEqual(minIntervalSec * 0.95);
 }
 
 function expectChordWidth(chart: Chart, maxNotesPerTick: number): void {

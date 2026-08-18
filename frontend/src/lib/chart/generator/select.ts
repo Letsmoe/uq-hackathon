@@ -20,9 +20,13 @@ const SUBDIVISION_PRIORITY: Record<number, number> = {
   4: 0.8,
 };
 
-const MIN_HOLD_BEATS = 0.75;
+export const MIN_HOLD_BEATS = 0.75;
 const MAX_HOLD_BEATS = 4;
-const HOLD_TAIL_CLEARANCE_BEATS = 0.25;
+
+// A hold ties up a hand until it releases, and releasing then tapping again
+// takes longer than tapping twice, so this floor applies at every difficulty.
+// Without it back to back holds are unplayable at the faster settings.
+export const HOLD_RELEASE_SEC = 0.18;
 const MAX_DRAG_SPACING_SLOTS = SLOTS_PER_BEAT / 2;
 const QUIET_SECTION_FLOOR = 0.2;
 
@@ -69,7 +73,7 @@ function selectSectionEvents(
   const noteBudget = budgetFor(section, spec, grid);
   const chosen = chooseSlots(rankByPriority(candidates), spec, grid, noteBudget);
 
-  return buildEvents(chosen, spec);
+  return buildEvents(chosen, spec, grid);
 }
 
 // ── Candidate filtering and ranking ─────────────────────────────────────────
@@ -187,11 +191,11 @@ function hasNeighbourWithin(chosen: SlotMap, slot: number, minimumGapSlots: numb
 
 // ── Note kinds ──────────────────────────────────────────────────────────────
 
-function buildEvents(chosen: SlotMap, spec: DifficultySpec): NoteEvent[] {
+function buildEvents(chosen: SlotMap, spec: DifficultySpec, grid: BeatGrid): NoteEvent[] {
   const slots = [...chosen.keys()].sort((first, second) => first - second);
   const dragRuns = findDragRuns(slots, chosen, spec);
 
-  return assembleEvents(slots, chosen, dragRuns, spec);
+  return assembleEvents(slots, chosen, dragRuns, spec, grid);
 }
 
 function assembleEvents(
@@ -199,6 +203,7 @@ function assembleEvents(
   chosen: SlotMap,
   dragRuns: Map<number, number[]>,
   spec: DifficultySpec,
+  grid: BeatGrid,
 ): NoteEvent[] {
   const consumed = collectConsumedSlots(dragRuns);
   const events: NoteEvent[] = [];
@@ -208,7 +213,7 @@ function assembleEvents(
 
     if (consumed.has(slot)) continue;
 
-    events.push(buildEventAt(slot, index, slots, chosen, dragRuns, spec));
+    events.push(buildEventAt(slot, index, slots, chosen, dragRuns, spec, grid));
   }
 
   return events;
@@ -231,6 +236,7 @@ function buildEventAt(
   chosen: SlotMap,
   dragRuns: Map<number, number[]>,
   spec: DifficultySpec,
+  grid: BeatGrid,
 ): NoteEvent {
   const run = dragRuns.get(slot);
 
@@ -238,7 +244,7 @@ function buildEventAt(
     return buildDragEvent(slot, run, chosen);
   }
 
-  return buildTapOrHold(slot, slotAfter(slots, index), chosen, spec);
+  return buildTapOrHold(slot, slotAfter(slots, index), chosen, spec, grid);
 }
 
 function slotAfter(slots: number[], index: number): number {
@@ -256,11 +262,12 @@ function buildTapOrHold(
   nextSlot: number,
   chosen: SlotMap,
   spec: DifficultySpec,
+  grid: BeatGrid,
 ): NoteEvent {
   const onsets = chosen.get(slot)!;
   const leader = strongestOf(onsets);
   const base = baseEvent(slot, leader, chordSizeFor(onsets, spec));
-  const durationSlots = holdLengthFor(leader, slot, nextSlot, spec);
+  const durationSlots = holdLengthFor(leader, slot, nextSlot, spec, grid);
 
   if (durationSlots <= 0) {
     return base;
@@ -311,16 +318,16 @@ function holdLengthFor(
   slot: number,
   nextSlot: number,
   spec: DifficultySpec,
+  grid: BeatGrid,
 ): number {
   if (!spec.allowHolds || leader.sustainBeats < MIN_HOLD_BEATS) {
     return 0;
   }
 
-  const clearanceSlots = HOLD_TAIL_CLEARANCE_BEATS * SLOTS_PER_BEAT;
   const room = Math.min(
     leader.sustainBeats * SLOTS_PER_BEAT,
     MAX_HOLD_BEATS * SLOTS_PER_BEAT,
-    nextSlot - slot - clearanceSlots,
+    nextSlot - slot - holdClearanceSlots(spec, grid),
   );
 
   if (room < MIN_HOLD_BEATS * SLOTS_PER_BEAT) {
@@ -328,6 +335,12 @@ function holdLengthFor(
   }
 
   return Math.round(room);
+}
+
+export function holdClearanceSlots(spec: DifficultySpec, grid: BeatGrid): number {
+  const releaseSec = Math.max(HOLD_RELEASE_SEC, spec.minNoteIntervalSec);
+
+  return (releaseSec / grid.beatPeriodSec) * SLOTS_PER_BEAT;
 }
 
 // ── Drags ───────────────────────────────────────────────────────────────────

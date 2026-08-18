@@ -3,8 +3,21 @@ import type { Section } from "../dsp/structure";
 import type { BeatGrid } from "../dsp/tempo";
 import type { AudioAnalysis } from "../analyze";
 import { specForDifficulty, type Difficulty, type DifficultySpec } from "./difficulty";
-import { newLayoutState, placeEvents, type LayoutState, type PlacedNote } from "./layout";
-import { selectEvents, SLOTS_PER_BEAT, type SectionEvents } from "./select";
+import {
+  newLayoutState,
+  placedFits,
+  placeEvents,
+  rememberPlaced,
+  type LayoutState,
+  type PlacedNote,
+} from "./layout";
+import {
+  holdClearanceSlots,
+  selectEvents,
+  MIN_HOLD_BEATS,
+  SLOTS_PER_BEAT,
+  type SectionEvents,
+} from "./select";
 
 export const TIME_BASE = 480;
 export const BEATS_PER_PAGE = 4;
@@ -18,7 +31,8 @@ export function buildChart(analysis: AudioAnalysis, difficulty: Difficulty): Cha
     return emptyChart(analysis.durationSec);
   }
 
-  const placed = placeAllSections(analysis, difficulty);
+  const spec = specForDifficulty(difficulty);
+  const placed = clampHoldTails(placeAllSections(analysis, difficulty), spec, analysis.grid);
 
   return {
     bpm: analysis.grid.bpm,
@@ -88,7 +102,7 @@ function notesForSection(
   const source = perSection[sourceIndex];
 
   if (source && source.length > 0) {
-    return replaySection(source, sectionEvents[sourceIndex].section, entry.section, state);
+    return replaySection(source, sectionEvents[sourceIndex].section, entry.section, grid, state);
   }
 
   return placeEvents(entry.events, spec, grid, state);
@@ -98,17 +112,34 @@ function replaySection(
   source: PlacedNote[],
   sourceSection: Section,
   section: Section,
+  grid: BeatGrid,
   state: LayoutState,
 ): PlacedNote[] {
   const shiftBeats = section.startBeat - sourceSection.startBeat;
   const endSlot = section.endBeat * SLOTS_PER_BEAT;
-  const replayed = source
+  const shifted = source
     .map((note) => shiftNote(note, shiftBeats * SLOTS_PER_BEAT))
     .filter((note) => lastSlotOf(note) < endSlot);
 
-  rememberLast(replayed, state);
+  return keepFitting(shifted, grid, state);
+}
 
-  return replayed;
+/**
+ * The replay is verbatim, so its opening can land on top of whatever the
+ * previous section ended with. Those few notes are dropped rather than moved,
+ * which would break the very repetition the replay exists for.
+ */
+function keepFitting(notes: PlacedNote[], grid: BeatGrid, state: LayoutState): PlacedNote[] {
+  const kept: PlacedNote[] = [];
+
+  for (const note of notes) {
+    if (!placedFits(note, grid, state)) continue;
+
+    rememberPlaced(note, grid, state);
+    kept.push(note);
+  }
+
+  return kept;
 }
 
 function lastSlotOf(note: PlacedNote): number {
@@ -129,15 +160,35 @@ function shiftNote(note: PlacedNote, shift: number): PlacedNote {
   };
 }
 
-function rememberLast(notes: PlacedNote[], state: LayoutState): void {
-  const last = notes[notes.length - 1];
+/**
+ * Note selection runs per section, so a hold at the end of one section cannot
+ * see the first note of the next and a replayed section can land in front of a
+ * different note than its source did. Tails are therefore trimmed once at the
+ * end, where the whole chart is visible.
+ */
+function clampHoldTails(
+  placed: PlacedNote[],
+  spec: DifficultySpec,
+  grid: BeatGrid,
+): PlacedNote[] {
+  const sorted = [...placed].sort((first, second) => first.slot - second.slot);
+  const clearance = holdClearanceSlots(spec, grid);
 
-  if (!last) {
-    return;
+  return sorted.map((note, index) => clampHold(note, sorted[index + 1], clearance));
+}
+
+function clampHold(note: PlacedNote, next: PlacedNote | undefined, clearance: number): PlacedNote {
+  if (note.kind !== "hold" || !next) {
+    return note;
   }
 
-  state.previousX = last.x;
-  state.previousSlot = last.slot;
+  const room = next.slot - note.slot - clearance;
+
+  if (room < MIN_HOLD_BEATS * SLOTS_PER_BEAT) {
+    return { ...note, kind: "tap", durationSlots: 0 };
+  }
+
+  return { ...note, durationSlots: Math.min(note.durationSlots, Math.floor(room)) };
 }
 
 // ── Chart assembly ──────────────────────────────────────────────────────────
@@ -176,29 +227,28 @@ function toChartNotes(note: PlacedNote, offsetTicks: number): ChartNote[] {
     return [dragNote(note, tick, offsetTicks)];
   }
 
-  return [tapOrHoldNote(note, tick), ...chordNotes(note, tick)];
+  return note.xs.map((x, member) => memberNote(note, tick, x, member));
 }
 
-function tapOrHoldNote(note: PlacedNote, tick: number): ChartNote {
+/**
+ * Only the first member of a chord carries the hold; the rest are taps, since a
+ * chord of holds would need one finger per member held at once.
+ */
+function memberNote(note: PlacedNote, tick: number, x: number, member: number): ChartNote {
+  if (member > 0) {
+    return { type: NOTE_TYPE.tap, tick, x, duration: 0 };
+  }
+
   return {
     type: NOTE_TYPE[note.kind],
     tick,
-    x: note.x,
+    x,
     duration: note.durationSlots * TICKS_PER_SLOT,
   };
 }
 
-function chordNotes(note: PlacedNote, tick: number): ChartNote[] {
-  return note.chordX.map((x) => ({
-    type: NOTE_TYPE.tap,
-    tick,
-    x,
-    duration: 0,
-  }));
-}
-
 function dragNote(note: PlacedNote, tick: number, offsetTicks: number): ChartNote {
-  const head = { tick, x: note.x, duration: 0 };
+  const head = { tick, x: note.xs[0], duration: 0 };
   const tail = note.dragNodes.map((node) => ({
     tick: offsetTicks + node.slot * TICKS_PER_SLOT,
     x: node.x,

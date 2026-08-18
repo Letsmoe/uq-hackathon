@@ -82,7 +82,7 @@ const SPECS: Record<Difficulty, DifficultySpec> = {
     allowedSubdivisions: [1, 2, 3, 4],
     targetNotesPerSecond: 6.5,
     minNoteIntervalSec: 0.075,
-    maxNotesPerTick: 4,
+    maxNotesPerTick: 3,
     allowHolds: true,
     allowDrags: true,
     minDragNotes: 4,
