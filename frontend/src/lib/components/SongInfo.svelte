@@ -1,32 +1,71 @@
 <script lang="ts">
   import { ChevronLeft, ChevronRight } from "svelte-radix";
 
-  type Difficulty = "easy" | "normal" | "hard" | "expert";
+  import type { MouseEventHandler } from "svelte/elements";
+  import { DIFFICULTIES } from "../chartGeneration";
+  import type { Difficulty } from "../chartGeneration";
+
+  interface Props {
+    title?: string;
+    artist?: string;
+    description?: string;
+    difficulty?: Difficulty;
+    level?: number;
+    maxLevel?: number;
+    bestScore?: number;
+    badge?: string;
+    /** True while the chart for the picked difficulty is still being generated. */
+    generating?: boolean;
+    canStart?: boolean;
+    ondifficultychange?: (difficulty: Difficulty) => void;
+    onstart?: MouseEventHandler<HTMLButtonElement>;
+  }
 
   let {
     title = "STARDUST",
     artist = "Nhato",
     description = "Drift beyond the silence,\nwhere light becomes fragment.",
-    difficulty = "hard" as Difficulty,
+    difficulty = "hard",
     level = $bindable(8),
     maxLevel = 15,
     bestScore = 0,
     badge = "S",
+    generating = false,
+    canStart = true,
+    ondifficultychange = () => {},
     onstart = () => {},
-  } = $props();
+  }: Props = $props();
 
   const difficultyColor: Record<Difficulty, string> = {
     easy: "text-green-400",
     normal: "text-accent-blue",
     hard: "text-accent-purple",
-    expert: "text-red-400",
+    expert: "text-orange-400",
+    chaos: "text-red-500",
   };
+
+  const difficultyIndex = $derived(DIFFICULTIES.indexOf(difficulty));
 
   function decreaseLevel() {
     if (level > 1) level--;
   }
   function increaseLevel() {
     if (level < maxLevel) level++;
+  }
+
+  function easierDifficulty() {
+    if (difficultyIndex <= 0) return;
+    ondifficultychange(DIFFICULTIES[difficultyIndex - 1]);
+  }
+
+  function harderDifficulty() {
+    if (difficultyIndex >= DIFFICULTIES.length - 1) return;
+    ondifficultychange(DIFFICULTIES[difficultyIndex + 1]);
+  }
+
+  function startLabel(isGenerating: boolean) {
+    if (isGenerating) return "GENERATING";
+    return "START";
   }
 </script>
 
@@ -40,16 +79,35 @@
 
   <!-- Stats row -->
   <div class="flex flex-row items-center justify-center gap-16 w-full mt-2">
-    <!-- Difficulty -->
-    <div class="flex flex-col items-start gap-1">
+    <!-- Difficulty picker -->
+    <div class="flex flex-col items-center gap-1">
       <span class="text-[0.6rem] tracking-[0.2em] text-on-surface/35 uppercase"
         >Difficulty</span
       >
-      <span
-        class="text-base font-semibold tracking-widest uppercase {difficultyColor[
-          difficulty
-        ]}">{difficulty}</span
-      >
+      <div class="flex flex-row items-center gap-3">
+        <button
+          onclick={easierDifficulty}
+          disabled={generating || difficultyIndex <= 0}
+          class="text-on-surface/30 hover:text-on-surface/70 disabled:opacity-20 transition-colors cursor-pointer bg-transparent border-none p-0"
+        >
+          <ChevronLeft size="20" />
+        </button>
+
+        <span
+          class="w-28 text-center text-base font-semibold tracking-widest uppercase transition-opacity duration-200 {difficultyColor[
+            difficulty
+          ]}"
+          class:opacity-40={generating}>{difficulty}</span
+        >
+
+        <button
+          onclick={harderDifficulty}
+          disabled={generating || difficultyIndex >= DIFFICULTIES.length - 1}
+          class="text-on-surface/30 hover:text-on-surface/70 disabled:opacity-20 transition-colors cursor-pointer bg-transparent border-none p-0"
+        >
+          <ChevronRight size="20" />
+        </button>
+      </div>
     </div>
 
     <!-- Level picker -->
@@ -105,10 +163,11 @@
   <!-- Start button -->
   <button
     onclick={onstart}
-    class="relative mt-4 flex flex-row items-center justify-center gap-6 bg-surface-dark text-on-surface-dark px-32 py-7 text-2xl tracking-[0.75em] uppercase border-l-4 border-l-accent-purple shadow-xl cursor-pointer border-none transition-opacity duration-200 hover:opacity-90 active:opacity-75"
+    disabled={generating || !canStart}
+    class="relative mt-4 flex flex-row items-center justify-center gap-6 bg-surface-dark text-on-surface-dark px-32 py-7 text-2xl tracking-[0.75em] uppercase border-l-4 border-l-accent-purple shadow-xl cursor-pointer border-none transition-opacity duration-200 hover:opacity-90 active:opacity-75 disabled:opacity-40 disabled:cursor-not-allowed"
     style="clip-path: polygon(0 0, calc(100% - 40px) 0, 100% 50%, calc(100% - 40px) 100%, 0 100%);"
   >
-    START
+    {startLabel(generating)}
     <!-- Arrow triangle -->
     <svg
       class="w-3 h-3 fill-on-surface-dark/50 shrink-0 ml-2"

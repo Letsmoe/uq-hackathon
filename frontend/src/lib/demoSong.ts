@@ -1,6 +1,5 @@
-import { analyzeAudioFile } from "./cpp/audioChartWasm";
-import type { Difficulty } from "./cpp/audioChartWasm";
-import patterns from "../assets/patterns.json";
+import { generateChart } from "./chartGeneration";
+import type { Difficulty } from "./chartGeneration";
 import type { Chart } from "./game/chart";
 
 const DEMO_AUDIO_URL = "/demo.mp3";
@@ -26,13 +25,7 @@ export async function loadDemoSong(
   }
 
   const buffer = await response.arrayBuffer();
-  // analyzeAudioFile detaches whatever it decodes, so it is handed a copy and
-  // the original is kept for playback.
-  const chart = await analyzeAudioFile(buffer.slice(0), patterns, {
-    timeBase: 480,
-    beatsPerPage: 4,
-    difficulty,
-  });
+  const chart = await generateChart(buffer, difficulty);
 
   return { chart, buffer };
 }

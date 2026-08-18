@@ -1,19 +1,19 @@
 <script module lang="ts">
   import type { Chart } from "../game/chart";
+  import type { Difficulty } from "../chartGeneration";
 
   export type UploadHandler = (
     chart: Chart,
     buffer: ArrayBuffer,
     file: File,
     coverUrl: string | null,
+    difficulty: Difficulty,
   ) => void;
 </script>
 
 <script lang="ts">
   import { Upload } from "svelte-radix";
-  import { analyzeAudioFile } from "../cpp/audioChartWasm.js";
-  import type { Difficulty } from "../cpp/audioChartWasm.js";
-  import patterns from "../../assets/patterns.json";
+  import { generateChart } from "../chartGeneration";
 
   interface Props {
     onupload?: UploadHandler;
@@ -59,14 +59,9 @@
     const file = input.files?.[0];
     if (!file) return;
     const arrayBuffer = await file.arrayBuffer();
-    const copy = arrayBuffer.slice(0);
     const coverUrl = extractCover(arrayBuffer);
-    const chart = await analyzeAudioFile(arrayBuffer, patterns, {
-      timeBase: 480,
-      beatsPerPage: 4,
-      difficulty,
-    });
-    onupload(chart, copy, file, coverUrl);
+    const chart = await generateChart(arrayBuffer, difficulty);
+    onupload(chart, arrayBuffer, file, coverUrl, difficulty);
     input.value = "";
   }
 </script>

@@ -10,6 +10,10 @@
   import Logo from "./lib/components/Logo.svelte";
   import BottomPanel from "./lib/components/BottomPanel.svelte";
   import Canvas from "./lib/components/Game/Canvas.svelte";
+  import type { Chart } from "./lib/game/chart";
+  import { loadDemoSong } from "./lib/demoSong";
+  import { generateChart } from "./lib/chartGeneration";
+  import type { Difficulty } from "./lib/chartGeneration";
 
   // ── Types ──────────────────────────────────────────────────────────────────
   type Song = {
@@ -18,9 +22,23 @@
     badge: string;
     cover: string;
     description?: string;
-    difficulty?: "easy" | "normal" | "hard" | "expert";
+    difficulty: Difficulty;
     level?: number;
     bestScore?: number;
+    // Charts are generated per difficulty on demand and kept so that switching
+    // back to one already played does not pay for a second decode.
+    charts: Partial<Record<Difficulty, Chart>>;
+    // Present only on user-uploaded songs, which is every playable song.
+    buffer?: ArrayBuffer;
+  };
+
+  // The in-game HUD badge only has room for a couple of characters.
+  const difficultyBadge: Record<Difficulty, string> = {
+    easy: "EZ",
+    normal: "NM",
+    hard: "HD",
+    expert: "EX",
+    chaos: "CH",
   };
 
   // ── Data ───────────────────────────────────────────────────────────────────
@@ -34,6 +52,7 @@
       difficulty: "normal",
       level: 0,
       bestScore: 0,
+      charts: {},
     },
   ]);
 
@@ -41,11 +60,42 @@
   let selected = $state(0);
   let level = $state(songs[selected].level ?? 8);
   let page = $state<"Menu" | "Game">("Menu");
+  let generating = $state(false);
+
+  const selectedSong = $derived(songs[selected]);
+  const selectedChart = $derived(selectedSong.charts[selectedSong.difficulty]);
 
   // Keep level in sync when selected changes
   $effect(() => {
     level = songs[selected].level ?? 8;
   });
+
+  // ── Difficulty ─────────────────────────────────────────────────────────────
+  async function changeDifficulty(difficulty: Difficulty) {
+    const song = songs[selected];
+    song.difficulty = difficulty;
+
+    if (song.charts[difficulty] || !song.buffer) {
+      return;
+    }
+
+    await buildChart(song, song.buffer, difficulty);
+  }
+
+  async function buildChart(
+    song: Song,
+    buffer: ArrayBuffer,
+    difficulty: Difficulty,
+  ) {
+    generating = true;
+    try {
+      song.charts[difficulty] = await generateChart(buffer, difficulty);
+    } catch (error) {
+      console.error("Chart generation failed", error);
+    } finally {
+      generating = false;
+    }
+  }
 
   // ── Scaling ────────────────────────────────────────────────────────────────
   let content: HTMLDivElement;
@@ -56,11 +106,36 @@
     content.style.transform = `scale(${frame.clientWidth / 1920})`;
   }
 
-  onMount(resizeGame);
+  // Generating the chart for the demo track goes through the same decode →
+  // wasm → chart path as an upload, so this exercises the real pipeline.
+  async function addDemoSong() {
+    try {
+      const demo = await loadDemoSong();
+      if (!demo) {
+        return;
+      }
+      songs.push({
+        title: "We Are The Energy",
+        artist: "Metrik",
+        badge: "A",
+        cover: "/cover/cover-1.png",
+        description: "Bundled demo track.",
+        difficulty: "normal",
+        level: 9,
+        bestScore: 0,
+        charts: { normal: demo.chart },
+        buffer: demo.buffer,
+      });
+      selected = songs.length - 1;
+    } catch (error) {
+      console.error("Demo song failed to load", error);
+    }
+  }
 
-  let score: number = $state(0);
-  let combo: number = $state(0);
-  let tp: number = $state(0);
+  onMount(() => {
+    resizeGame();
+    void addDemoSong();
+  });
 </script>
 
 <svelte:window onresize={resizeGame} onorientationchange={resizeGame} />
@@ -111,19 +186,22 @@
             <div class="grid grid-cols-[1fr_2fr_1fr] items-end pb-4">
               <!-- Recently played -->
               <div class="flex items-end">
-                <!-- <RecentlyPlayed /> -->
+                <RecentlyPlayed />
               </div>
 
               <!-- Song info + start button -->
               <div class="flex flex-col items-center gap-4">
                 <SongInfo
-                  title={songs[selected].title}
-                  artist={songs[selected].artist}
-                  description={songs[selected].description ?? ""}
-                  difficulty={songs[selected].difficulty ?? "normal"}
+                  title={selectedSong.title}
+                  artist={selectedSong.artist}
+                  description={selectedSong.description ?? ""}
+                  difficulty={selectedSong.difficulty}
                   bind:level
-                  bestScore={songs[selected].bestScore ?? 0}
-                  badge={songs[selected].badge}
+                  bestScore={selectedSong.bestScore ?? 0}
+                  badge={selectedSong.badge}
+                  {generating}
+                  canStart={Boolean(selectedChart)}
+                  ondifficultychange={changeDifficulty}
                   onstart={() => (page = "Game")}
                 />
               </div>
@@ -135,17 +213,23 @@
                 onquickplay={() => {
                   selected = Math.floor(Math.random() * songs.length);
                 }}
-                onupload={(chart, buffer, file: File, coverUrl: string | null) => {
+                onupload={(
+                  chart,
+                  buffer,
+                  file: File,
+                  coverUrl: string | null,
+                  difficulty: Difficulty,
+                ) => {
                   songs.push({
                     title: file.name.replace(/\.[^.]+$/, ""),
                     artist: "UNKNOWN",
                     badge: "C",
                     cover: coverUrl ?? "/cover/placeholder.png",
                     description: "A newly uploaded song.",
-                    difficulty: "normal",
+                    difficulty,
                     level: 7,
                     bestScore: 0,
-                    chart,
+                    charts: { [difficulty]: chart },
                     buffer,
                   });
                   selected = songs.length - 1;
@@ -156,16 +240,16 @@
         </div>
       {:else if page === "Game"}
         <!-- Placeholder — replace with your game component -->
-        <div class="relative w-full h-full bg-[#1a1a24]">
+        <div class="relative w-full h-full bg-[#eceae4]">
           <!-- HUD overlay -->
           <Canvas
-            chart={songs[selected].chart}
-            buffer={songs[selected].buffer}
-            songTitle={songs[selected].title}
-            artist={songs[selected].artist}
-            difficulty={songs[selected].badge}
-            level={songs[selected].level ?? 8}
-            coverSrc={songs[selected].cover}
+            chart={selectedChart}
+            buffer={selectedSong.buffer}
+            songTitle={selectedSong.title}
+            artist={selectedSong.artist}
+            difficulty={difficultyBadge[selectedSong.difficulty]}
+            level={selectedSong.level ?? 8}
+            coverSrc={selectedSong.cover}
             onpause={() => (page = "Menu")}
             onfinish={(stats) => console.log("Final stats:", stats)}
           ></Canvas>
@@ -185,6 +269,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    /* The frame is fixed-size with nothing to scroll. Releasing touch
+       gestures to the browser only costs pointer events to pointercancel. */
+    touch-action: none;
+    overscroll-behavior: none;
   }
 
   #content-frame {
@@ -206,28 +294,5 @@
     background-color: #fff;
   }
 
-  .install-btn {
-    position: fixed;
-    bottom: 1.5rem;
-    right: 1.5rem;
-    z-index: 9999;
-    padding: 0.6rem 1.2rem;
-    background: rgba(16, 17, 28, 0.92);
-    border: 1px solid rgba(62, 155, 255, 0.4);
-    color: #e8e8ee;
-    font-family: "Rajdhani", system-ui, sans-serif;
-    font-size: 0.85rem;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    border-radius: 4px;
-    cursor: pointer;
-    backdrop-filter: blur(8px);
-    transition:
-      border-color 150ms,
-      background 150ms;
-  }
-  .install-btn:hover {
-    background: rgba(62, 155, 255, 0.12);
-    border-color: rgba(62, 155, 255, 0.7);
-  }
 </style>
+
