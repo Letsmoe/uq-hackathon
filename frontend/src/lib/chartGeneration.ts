@@ -1,6 +1,7 @@
 import { DIFFICULTIES, type Difficulty } from "./chart";
 import type { Chart } from "./game/chart";
 import type { WorkerRequest, WorkerResponse } from "./chart/workerProtocol";
+import { decodeTrack } from "./audioDecoding";
 
 export { DIFFICULTIES };
 export type { Difficulty };
@@ -71,7 +72,7 @@ function idFor(audio: ArrayBuffer): number {
 }
 
 async function analyze(audio: ArrayBuffer, audioId: number): Promise<void> {
-  const decoded = await decodeToMono(audio.slice(0));
+  const decoded = await decodeToMono(audio);
 
   await send(
     {
@@ -130,21 +131,12 @@ interface DecodedAudio {
 }
 
 /**
- * Downmixes to mono for analysis. decodeAudioData detaches the buffer it is
- * handed, so callers that still need the encoded bytes must pass a copy.
+ * Downmixes to mono for analysis. The decoded buffer is shared with playback,
+ * so it must be read from, never written to.
  */
 async function decodeToMono(file: ArrayBuffer): Promise<DecodedAudio> {
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-
-  if (!AudioContextClass) {
-    throw new Error("Web Audio is not supported in this browser");
-  }
-
-  const audioContext = new AudioContextClass();
-  const audioBuffer = await audioContext.decodeAudioData(file);
+  const audioBuffer = await decodeTrack(file);
   const mono = downmix(audioBuffer);
-
-  await audioContext.close();
 
   return { mono, sampleRate: audioBuffer.sampleRate };
 }

@@ -1,3 +1,5 @@
+import { decodeTrack, getAudioContext } from "../audioDecoding";
+
 const CALIBRATION_STORAGE_KEY = "synapse.calibrationSeconds";
 
 /**
@@ -23,11 +25,7 @@ export class AudioPlayer {
   private playing = false;
 
   constructor() {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) {
-      throw new Error("Web Audio is not supported in this browser");
-    }
-    this.context = new AudioContextClass();
+    this.context = getAudioContext();
     this.gainNode = this.context.createGain();
     this.gainNode.connect(this.context.destination);
   }
@@ -43,11 +41,11 @@ export class AudioPlayer {
   }
 
   /**
-   * `data` is copied before decoding because decodeAudioData detaches the
-   * ArrayBuffer it is given, which would make the song unplayable on replay.
+   * Reuses the decode the chart analyzer already paid for when the same track
+   * was charted, which is the normal path into a song.
    */
   async load(data: ArrayBuffer): Promise<void> {
-    this.buffer = await this.context.decodeAudioData(data.slice(0));
+    this.buffer = await decodeTrack(data);
   }
 
   play(fromSeconds = 0): void {
@@ -133,10 +131,11 @@ export class AudioPlayer {
     localStorage.setItem(CALIBRATION_STORAGE_KEY, String(seconds));
   }
 
+  /** The AudioContext is shared and outlives the player, so it is not closed. */
   destroy(): void {
     this.stopSourceNode();
+    this.gainNode.disconnect();
     this.buffer = null;
-    void this.context.close();
   }
 
   /** True position within the buffer, ignoring latency and calibration. */
@@ -168,11 +167,5 @@ export class AudioPlayer {
     this.sourceNode.stop();
     this.sourceNode.disconnect();
     this.sourceNode = null;
-  }
-}
-
-declare global {
-  interface Window {
-    webkitAudioContext?: typeof AudioContext;
   }
 }

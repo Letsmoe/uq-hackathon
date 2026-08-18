@@ -46,6 +46,14 @@
   let ready = $state(false);
   let started = $state(false);
   let loadError = $state<string | null>(null);
+  let loadingPhase = $state<"renderer" | "audio">("renderer");
+
+  const loadingLabel = $derived.by(() => {
+    if (loadingPhase === "renderer") {
+      return "Starting renderer…";
+    }
+    return "Decoding audio…";
+  });
 
   const progress = $derived.by(() => {
     if (chartLength <= 0) {
@@ -99,6 +107,7 @@
       engine.loadChart(chart);
     }
 
+    loadingPhase = "audio";
     try {
       audioPlayer = new AudioPlayer();
       await audioPlayer.load(buffer);
@@ -279,7 +288,7 @@
             text-transform: uppercase;
             color: rgba(60,52,90,0.45);
           "
-        >Decoding audio…</p>
+        >{loadingLabel}</p>
       {:else}
         <p
           style="
