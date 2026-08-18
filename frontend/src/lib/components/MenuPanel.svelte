@@ -1,6 +1,12 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { fade, fly } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
   import XIcon from "phosphor-svelte/lib/XIcon";
+
+  const PANEL_WIDTH = 420;
+  const SCRIM_MS = 180;
+  const PANEL_MS = 280;
 
   interface Props {
     title: string;
@@ -23,11 +29,14 @@
 <div
   class="absolute inset-0 z-50 flex justify-end bg-canvas/75"
   onclick={onclose}
+  transition:fade={{ duration: SCRIM_MS }}
 >
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <section
-    class="flex h-full w-[420px] flex-col border-l border-line-strong bg-overlay"
+    class="flex h-full flex-col border-l border-line-strong bg-overlay"
+    style="width: {PANEL_WIDTH}px;"
     onclick={(event) => event.stopPropagation()}
+    transition:fly={{ x: PANEL_WIDTH, duration: PANEL_MS, easing: cubicOut }}
   >
     <header
       class="flex shrink-0 items-start justify-between border-b border-line px-7 py-6"

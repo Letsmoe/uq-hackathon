@@ -105,6 +105,15 @@
        tap flash, both of which make presses feel unresponsive. */
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+    /* Only the release is eased. Going down is instant, which is what makes
+       a press read as registered. */
+    transition: transform var(--duration-base) var(--ease-ui);
+  }
+
+  button:not(:disabled):active,
+  label:active,
+  [role="button"]:active {
+    transition-duration: 0ms;
   }
 
   button:not(:disabled):active,

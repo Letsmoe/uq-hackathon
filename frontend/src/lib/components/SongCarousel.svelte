@@ -1,46 +1,57 @@
 <script lang="ts">
-  const SWIPE_THRESHOLD_PX = 40;
-  // Fraction of the finger travel the stage mirrors before the step commits.
-  const DRAG_FOLLOW_RATIO = 0.4;
+  import { Spring } from "svelte/motion";
+  import {
+    CENTER_SIZE,
+    STAGE_HEIGHT,
+    STEP_TO_ADJACENT,
+    SCALE_STOPS,
+    OPACITY_STOPS,
+    DIM_STOPS,
+    interpolateStops,
+    cardShift,
+    withEdgeResistance,
+    clamp,
+  } from "./carouselGeometry";
 
-  // Card sizes and the gap between neighbours, in design pixels. The stage is
-  // taller than the centre card so no card can bleed into the title below it.
-  const CENTER_SIZE = 320;
-  const ADJACENT_SIZE = 230;
-  const FAR_SIZE = 150;
-  const STAGE_HEIGHT = CENTER_SIZE + 20;
-  const STEP_TO_ADJACENT = CENTER_SIZE / 2 + ADJACENT_SIZE / 2 + 30;
-  const STEP_TO_FAR = ADJACENT_SIZE / 2 + FAR_SIZE / 2 + 24;
+  // Finger travel that moves the stage by one card. Matching the on-screen
+  // step means the cards stay locked to the finger for the whole drag.
+  const DRAG_PIXELS_PER_STEP = STEP_TO_ADJACENT;
+  const DRAG_INTENT_PX = 12;
+  const EDGE_RESISTANCE = 0.35;
 
   let { songs, selected = $bindable(0) } = $props();
+
+  // Continuous carousel position in song indexes. Everything on screen is a
+  // function of this one number, so a drag moves the cards through the same
+  // states the spring settles into.
+  const position = new Spring(selected, { stiffness: 0.16, damping: 0.72 });
+
+  let dragging = $state(false);
+  let didDrag = false;
+  let dragStartX = 0;
+  let dragStartIndex = 0;
+  let pressedIndex = $state(-1);
+
+  const lastIndex = $derived(songs.length - 1);
+
+  $effect(() => {
+    if (dragging) {
+      return;
+    }
+    position.target = selected;
+  });
 
   function prev() {
     if (selected > 0) selected--;
   }
+
   function next() {
     if (selected < songs.length - 1) selected++;
   }
 
-  let dragStartX = 0;
-  let didDrag = false;
-  let dragging = $state(false);
-  let dragOffsetX = $state(0);
-  let pressedIndex = $state(-1);
-
-  const stageOffsetX = $derived(dragOffsetX * DRAG_FOLLOW_RATIO);
-
-  // Following the finger has to be untransitioned or it lags behind it; the
-  // snap back once the finger lifts does want easing.
-  const stageTransitionMs = $derived.by(() => {
-    if (dragging) {
-      return 0;
-    }
-    return 200;
-  });
-
   function handlePointerDown(event: PointerEvent) {
     dragStartX = event.clientX;
-    dragOffsetX = 0;
+    dragStartIndex = selected;
     dragging = true;
     didDrag = false;
   }
@@ -50,29 +61,21 @@
       return;
     }
 
-    const dx = event.clientX - dragStartX;
-    if (Math.abs(dx) < SWIPE_THRESHOLD_PX) {
-      dragOffsetX = dx;
-      return;
+    const travelled = dragStartX - event.clientX;
+    if (Math.abs(travelled) > DRAG_INTENT_PX) {
+      didDrag = true;
+      pressedIndex = -1;
     }
 
-    // Stepping here rather than on pointerup is what removes the perceived
-    // lag: the carousel moves the moment the swipe is unambiguous. Resetting
-    // the origin lets one long drag walk several songs.
-    didDrag = true;
-    dragStartX = event.clientX;
-    dragOffsetX = 0;
-    pressedIndex = -1;
-    if (dx < 0) {
-      next();
-    } else {
-      prev();
-    }
+    const raw = dragStartIndex + travelled / DRAG_PIXELS_PER_STEP;
+    position.set(withEdgeResistance(raw, lastIndex, EDGE_RESISTANCE), {
+      instant: true,
+    });
+    selected = clamp(Math.round(raw), 0, lastIndex);
   }
 
   function endDrag() {
     dragging = false;
-    dragOffsetX = 0;
     pressedIndex = -1;
   }
 
@@ -94,51 +97,37 @@
     return 1;
   }
 
-  function cardSize(distance: number) {
-    if (distance === 0) {
-      return CENTER_SIZE;
-    }
-    if (distance === 1) {
-      return ADJACENT_SIZE;
-    }
-    return FAR_SIZE;
+  function ramp(value: number) {
+    return clamp(value, 0, 1);
   }
 
-  function cardOpacity(distance: number) {
-    if (distance === 0) {
-      return 1;
+  /// Cards far enough off-centre to be decoration should not swallow taps
+  /// meant for the ones behind them.
+  function pointerEvents(distance: number) {
+    if (distance < 2.6) {
+      return "auto";
     }
-    if (distance === 1) {
-      return 0.85;
-    }
-    return 0.45;
-  }
-
-  function cardShift(offset: number) {
-    const distance = Math.abs(offset);
-    const direction = Math.sign(offset);
-    if (distance === 0) {
-      return 0;
-    }
-    if (distance === 1) {
-      return direction * STEP_TO_ADJACENT;
-    }
-    return (
-      direction * (STEP_TO_ADJACENT + STEP_TO_FAR + (distance - 2) * FAR_SIZE)
-    );
+    return "none";
   }
 
   function getCardProps(index: number) {
-    const offset = index - selected;
+    const offset = index - position.current;
     const distance = Math.abs(offset);
 
     return {
-      offset,
+      offset: index - selected,
       distance,
-      size: cardSize(distance),
-      opacity: cardOpacity(distance),
+      scale: interpolateStops(distance, SCALE_STOPS),
+      opacity: interpolateStops(distance, OPACITY_STOPS),
+      dim: interpolateStops(distance, DIM_STOPS),
       shift: cardShift(offset),
-      zIndex: 30 - distance * 5,
+      // Accent ring and glow belong to whichever card holds the centre.
+      focus: ramp(1 - distance * 2),
+      // The centre card's name is spelled out below the stage, so its label
+      // only fades in as it leaves.
+      label: ramp((distance - 0.3) * 2.5),
+      zIndex: 30 - Math.round(distance) * 5,
+      pointerEvents: pointerEvents(distance),
     };
   }
 </script>
@@ -162,12 +151,8 @@
   <!-- Cards stage. shrink-0 keeps the fixed height from collapsing under the
        flex column, which would let the absolute cards spill over the title. -->
   <div
-    class="relative flex w-full shrink-0 items-center justify-center overflow-hidden will-change-transform"
-    style="
-      height: {STAGE_HEIGHT}px;
-      transform: translateX({stageOffsetX}px);
-      transition: transform {stageTransitionMs}ms var(--ease-ui);
-    "
+    class="relative flex w-full shrink-0 items-center justify-center overflow-hidden"
+    style="height: {STAGE_HEIGHT}px;"
   >
     {#each songs as song, index}
       {@const card = getCardProps(index)}
@@ -176,72 +161,74 @@
         onclick={() => handleCardClick(card.offset)}
         onpointerdown={() => (pressedIndex = index)}
         aria-label={song.title}
-        class="absolute top-1/2 left-1/2 cursor-pointer overflow-hidden p-0 transition-all duration-300 ease-out {card.distance ===
-        0
-          ? 'border-2 border-accent shadow-[0_0_64px_rgba(124,107,245,0.35)]'
-          : 'border border-line'}"
+        class="card absolute top-1/2 left-1/2 cursor-pointer p-0"
         style="
-          width: {card.size}px;
-          height: {card.size}px;
+          width: {CENTER_SIZE}px;
+          height: {CENTER_SIZE}px;
           z-index: {card.zIndex};
           opacity: {card.opacity};
-          transform: translate(calc(-50% + {card.shift}px), -50%) scale({pressScale(
-          index,
-        )});
-          pointer-events: {card.distance > 2 ? 'none' : 'auto'};
+          transform: translate(-50%, -50%) translateX({card.shift}px) scale({card.scale});
+          pointer-events: {card.pointerEvents};
         "
       >
-        <img
-          src={song.cover}
-          alt={song.title}
-          class="absolute inset-0 h-full w-full object-cover transition-all duration-300 {card.distance >
-          0
-            ? 'brightness-[0.55] grayscale-[45%]'
-            : ''}"
-        />
-
         <div
-          class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent"
-        ></div>
-
-        <span
-          class="absolute top-3 left-3 text-xs tracking-loose {card.distance ===
-          0
-            ? 'text-accent'
-            : 'text-white/50'}"
+          class="card-body relative h-full w-full overflow-hidden border border-line"
+          style="transform: scale({pressScale(index)});"
         >
-          {String(index).padStart(2, "0")}
-        </span>
+          <img
+            src={song.cover}
+            alt={song.title}
+            class="absolute inset-0 h-full w-full object-cover"
+          />
 
-        {#if card.distance > 0}
-          <div class="absolute bottom-4 left-4 flex flex-col items-start gap-1">
-            <p
-              class="leading-none font-semibold tracking-ui text-white {card.distance ===
-              1
-                ? 'text-sm'
-                : 'text-2xs'}"
-            >
+          <div
+            class="absolute inset-0 bg-black"
+            style="opacity: {card.dim};"
+          ></div>
+
+          <div
+            class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent"
+          ></div>
+
+          <!-- Selection chrome. Fading a ready-made ring keeps the border and
+               shadow off the animated properties. -->
+          <div
+            class="pointer-events-none absolute inset-0 border-2 border-accent shadow-[0_0_64px_rgba(124,107,245,0.35)]"
+            style="opacity: {card.focus};"
+          ></div>
+
+          <!-- Cross-faded rather than recoloured: two opacities composite,
+               a changing colour repaints the glyph. -->
+          <span class="absolute top-3 left-3 text-base tracking-loose text-white/50">
+            {String(index).padStart(2, "0")}
+          </span>
+          <span
+            class="absolute top-3 left-3 text-base tracking-loose text-accent"
+            style="opacity: {card.focus};"
+          >
+            {String(index).padStart(2, "0")}
+          </span>
+
+          <div
+            class="absolute bottom-4 left-4 flex flex-col items-start gap-1"
+            style="opacity: {card.label};"
+          >
+            <p class="leading-none font-semibold tracking-ui text-white text-lg">
               {song.title}
             </p>
-            <p
-              class="text-2xs leading-none tracking-loose text-white/50 uppercase"
-            >
+            <p class="text-sm leading-none tracking-loose text-white/50 uppercase">
               {song.artist}
             </p>
           </div>
-        {/if}
 
-        <span
-          class="absolute right-4 bottom-3 leading-none font-bold text-white/25 {card.distance ===
-          0
-            ? 'text-3xl'
-            : 'text-2xl'}"
-        >
-          {song.badge}
-        </span>
+          <span
+            class="absolute right-4 bottom-3 text-3xl leading-none font-bold text-white/25"
+          >
+            {song.badge}
+          </span>
+        </div>
       </button>
     {/each}
-
   </div>
 
   <!-- Title -->
@@ -273,3 +260,20 @@
     {/each}
   </div>
 </div>
+
+<style>
+  .card {
+    will-change: transform, opacity;
+    background: none;
+    border: none;
+    /* The spring writes this transform every frame; a CSS transition on top
+       of it would chase its own output. */
+    transition: none;
+  }
+
+  /* The press dip is discrete, so it is the one thing on the card that wants
+     a CSS transition rather than the spring. */
+  .card-body {
+    transition: transform var(--duration-fast) var(--ease-ui);
+  }
+</style>

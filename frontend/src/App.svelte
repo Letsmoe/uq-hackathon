@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { fade } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
   import ShaderGrid from "./lib/ShaderGrid.svelte";
 
   import UserHeader from "./lib/components/UserHeader.svelte";
@@ -72,6 +74,7 @@
   let playCount = $state(0);
 
   const RECENT_LIMIT = 4;
+  const PAGE_FADE_MS = 220;
 
   const selectedSong = $derived(songs[selected]);
   const selectedChart = $derived(selectedSong.charts[selectedSong.difficulty]);
@@ -210,106 +213,116 @@
       style="width: {DESIGN_WIDTH}px; height: {DESIGN_HEIGHT}px;"
     >
       {#if page === "Menu"}
-        <!-- Background -->
-        <ShaderGrid />
-        <img
-          src="/ellasy.png"
-          class="pointer-events-none absolute -right-20 bottom-0 h-full object-cover opacity-15 [mask-image:linear-gradient(to_left,black,transparent_85%)]"
-          alt=""
-        />
+        <!-- Menu and game overlap for the length of the crossfade, so both
+             sides are taken out of flow. -->
+        <div
+          class="absolute inset-0"
+          transition:fade={{ duration: PAGE_FADE_MS, easing: cubicOut }}
+        >
+          <!-- Background -->
+          <ShaderGrid />
+          <img
+            src="/ellasy.png"
+            class="pointer-events-none absolute -right-20 bottom-0 h-full object-cover opacity-15 [mask-image:linear-gradient(to_left,black,transparent_85%)]"
+            alt=""
+          />
 
-        <!-- Rows are fixed height so no zone can grow into the one below it;
-             only the carousel takes up the slack. -->
-        <div class="relative flex h-full w-full flex-col px-10 pt-6 pb-6">
-          <div class="flex h-20 shrink-0 flex-row items-center justify-between">
-            <Logo />
-            <UserHeader
-              username="ink"
-              rating={12.41}
-              ratingCurrent={2430}
-              ratingMax={8000}
-              fragments={8756}
-              memories={315}
-              avatarSrc="/ellasy.png"
-              {unreadCount}
-              onmessages={() => (openPanel = "messages")}
-              onstats={() => (openPanel = "stats")}
-              onsettings={() => (openPanel = "settings")}
-            />
+          <!-- Rows are fixed height so no zone can grow into the one below it;
+               only the carousel takes up the slack. -->
+          <div class="relative flex h-full w-full flex-col px-10 pt-6 pb-6">
+            <div class="flex h-20 shrink-0 flex-row items-center justify-between">
+              <Logo />
+              <UserHeader
+                username="ink"
+                rating={12.41}
+                ratingCurrent={2430}
+                ratingMax={8000}
+                fragments={8756}
+                memories={315}
+                avatarSrc="/ellasy.png"
+                {unreadCount}
+                onmessages={() => (openPanel = "messages")}
+                onstats={() => (openPanel = "stats")}
+                onsettings={() => (openPanel = "settings")}
+              />
+            </div>
+
+            <div class="flex h-[76px] shrink-0 items-center justify-center">
+              <NavButtons bind:active={activeTab} onrandom={pickRandomSong} />
+            </div>
+
+            <div class="min-h-0 flex-1">
+              <SongCarousel {songs} bind:selected />
+            </div>
+
+            <!-- Fixed side columns keep the song info on the frame's centre
+                 line however wide the rails get. -->
+            <div
+              class="grid h-[240px] shrink-0 grid-cols-[minmax(0,1fr)_640px_minmax(0,1fr)] items-end gap-6"
+            >
+              <RecentlyPlayed
+                tracks={recentTracks}
+                onselect={(songIndex) => (selected = songIndex)}
+              />
+
+              <SongInfo
+                description={selectedSong.description ?? ""}
+                difficulty={selectedSong.difficulty}
+                bestScore={selectedSong.bestScore ?? 0}
+                badge={selectedSong.badge}
+                {generating}
+                canStart={Boolean(selectedChart)}
+                ondifficultychange={changeDifficulty}
+                onstart={startSong}
+              />
+
+              <BottomPanel
+                notifications={unreadCount}
+                version={__APP_VERSION__}
+                onquickplay={pickRandomSong}
+                onupload={addUploadedSong}
+              />
+            </div>
           </div>
 
-          <div class="flex h-[76px] shrink-0 items-center justify-center">
-            <NavButtons bind:active={activeTab} onrandom={pickRandomSong} />
-          </div>
-
-          <div class="min-h-0 flex-1">
-            <SongCarousel {songs} bind:selected />
-          </div>
-
-          <!-- Fixed side columns keep the song info on the frame's centre line
-               however wide the rails get. -->
-          <div
-            class="grid h-[240px] shrink-0 grid-cols-[minmax(0,1fr)_640px_minmax(0,1fr)] items-end gap-6"
-          >
-            <RecentlyPlayed
-              tracks={recentTracks}
-              onselect={(songIndex) => (selected = songIndex)}
-            />
-
-            <SongInfo
-              description={selectedSong.description ?? ""}
-              difficulty={selectedSong.difficulty}
-              bestScore={selectedSong.bestScore ?? 0}
-              badge={selectedSong.badge}
-              {generating}
-              canStart={Boolean(selectedChart)}
-              ondifficultychange={changeDifficulty}
-              onstart={startSong}
-            />
-
-            <BottomPanel
-              notifications={unreadCount}
-              version={__APP_VERSION__}
-              onquickplay={pickRandomSong}
-              onupload={addUploadedSong}
-            />
-          </div>
+          {#if openPanel === "messages"}
+            <MenuPanel
+              title="Messages"
+              subtitle="{unreadCount} unread"
+              onclose={() => (openPanel = null)}
+            >
+              <MessagesPanel />
+            </MenuPanel>
+          {:else if openPanel === "stats"}
+            <MenuPanel
+              title="Stats"
+              subtitle="This session"
+              onclose={() => (openPanel = null)}
+            >
+              <StatsPanel
+                libraryCount={songs.length}
+                {playCount}
+                bestScore={selectedSong.bestScore ?? 0}
+                rating={12.41}
+                fragments={8756}
+                memories={315}
+              />
+            </MenuPanel>
+          {:else if openPanel === "settings"}
+            <MenuPanel
+              title="Settings"
+              subtitle="Audio"
+              onclose={() => (openPanel = null)}
+            >
+              <SettingsPanel />
+            </MenuPanel>
+          {/if}
         </div>
-
-        {#if openPanel === "messages"}
-          <MenuPanel
-            title="Messages"
-            subtitle="{unreadCount} unread"
-            onclose={() => (openPanel = null)}
-          >
-            <MessagesPanel />
-          </MenuPanel>
-        {:else if openPanel === "stats"}
-          <MenuPanel
-            title="Stats"
-            subtitle="This session"
-            onclose={() => (openPanel = null)}
-          >
-            <StatsPanel
-              libraryCount={songs.length}
-              {playCount}
-              bestScore={selectedSong.bestScore ?? 0}
-              rating={12.41}
-              fragments={8756}
-              memories={315}
-            />
-          </MenuPanel>
-        {:else if openPanel === "settings"}
-          <MenuPanel
-            title="Settings"
-            subtitle="Audio"
-            onclose={() => (openPanel = null)}
-          >
-            <SettingsPanel />
-          </MenuPanel>
-        {/if}
       {:else if page === "Game"}
-        <div class="relative h-full w-full bg-canvas">
+        <div
+          class="absolute inset-0 bg-canvas"
+          transition:fade={{ duration: PAGE_FADE_MS, easing: cubicOut }}
+        >
           <Canvas
             chart={selectedChart}
             buffer={selectedSong.buffer}
