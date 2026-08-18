@@ -10,10 +10,16 @@ import {
 import type { RuntimeNote, JudgmentResult } from "./types";
 import { createNoteTextures, PALETTE, type NoteTextureSet } from "./noteTextures";
 
-const NOTE_R = 105;
+/** Note radius as a share of playfield height, and the bounds it may not
+ *  leave. A fixed pixel radius was authored against one design resolution and
+ *  grew or shrank against the screen as soon as the playfield stopped being a
+ *  scaled copy of it. */
+const NOTE_R_SHARE = 0.075;
+const MIN_NOTE_R = 42;
+const MAX_NOTE_R = 96;
 // Drag nodes stay a little smaller than taps so a chain still reads as one
 // gesture rather than a row of separate notes.
-const CHAIN_R = Math.round(NOTE_R * 0.7);
+const CHAIN_R_RATIO = 0.7;
 const HIT_DURATION = 420;
 
 /** Seconds a note is on screen ahead of its hit time. */
@@ -141,16 +147,24 @@ export class NoteRenderer {
   private popups: Popup[] = [];
   private holdBreaks: HoldBreak[] = [];
 
+  private readonly noteR: number;
+  private readonly chainR: number;
+
   constructor(
     app: Application,
     stage: Container,
     private W: number,
     private H: number,
   ) {
+    this.noteR = Math.round(
+      Math.min(Math.max(H * NOTE_R_SHARE, MIN_NOTE_R), MAX_NOTE_R),
+    );
+    this.chainR = Math.round(this.noteR * CHAIN_R_RATIO);
+
     this.textures = createNoteTextures(
       app.renderer as Renderer,
-      NOTE_R,
-      CHAIN_R,
+      this.noteR,
+      this.chainR,
     );
 
     this.connectorGfx = new Graphics();
@@ -200,7 +214,7 @@ export class NoteRenderer {
       x: note.pixelX,
       y: note.pixelY,
       alpha,
-      radius: NOTE_R,
+      radius: this.noteR,
       texture: "body",
       approach: this.approachProgress(note.timeSeconds, elapsed),
       charge: this.chargeLevel(note.timeSeconds, elapsed),
@@ -228,7 +242,7 @@ export class NoteRenderer {
         x: node.pixelX,
         y: node.pixelY,
         alpha,
-        radius: CHAIN_R,
+        radius: this.chainR,
         texture: "chainBody",
         approach: this.approachProgress(node.timeSeconds, elapsed),
         charge: this.chargeLevel(node.timeSeconds, elapsed),
@@ -674,7 +688,7 @@ export class NoteRenderer {
 
   private drawHitEffect(effect: HitEffect) {
     const t = effect.age / HIT_DURATION;
-    const radius = effect.isChain ? CHAIN_R : NOTE_R;
+    const radius = effect.isChain ? this.chainR : this.noteR;
 
     effect.flash.alpha = (1 - t) * 0.9;
     effect.flash.scale.set((radius * (1.6 + t * 2.6)) / 128);
@@ -714,7 +728,7 @@ export class NoteRenderer {
       }),
     });
     text.anchor.set(0.5);
-    text.position.set(x, y - NOTE_R - 24);
+    text.position.set(x, y - this.noteR - 24);
 
     this.popupLayer.addChild(text);
     this.popups.push({ text, life: 500 });

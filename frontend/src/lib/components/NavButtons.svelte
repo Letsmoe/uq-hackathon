@@ -20,7 +20,6 @@
     label: string;
     sub: string;
     icon: Component;
-    clip: string;
     locked: boolean;
   };
 
@@ -30,7 +29,6 @@
       label: "Solo",
       sub: "Play",
       icon: DiamondIcon,
-      clip: "clip-slant-right",
       locked: false,
     },
     {
@@ -38,7 +36,6 @@
       label: "Course",
       sub: "Challenge",
       icon: StackSimpleIcon,
-      clip: "clip-slant-both",
       locked: true,
     },
     {
@@ -46,7 +43,6 @@
       label: "Event",
       sub: "Limited",
       icon: SparkleIcon,
-      clip: "clip-slant-left",
       locked: true,
     },
   ];
@@ -64,27 +60,34 @@
     }
     return "regular";
   }
+
+  function tabClass(button: NavButton) {
+    if (active === button.id) {
+      return "is-active";
+    }
+    return "";
+  }
 </script>
 
-<nav class="flex flex-row items-stretch">
+<nav class="flex w-60 flex-col gap-5">
   {#each buttons as button (button.id)}
     <button
       onclick={() => select(button)}
       disabled={button.locked}
       aria-current={active === button.id}
-      class="nav-tab {button.clip} {active === button.id ? 'is-active' : ''}"
+      class="nav-tab hard-press border-hard cut {tabClass(button)}"
     >
-      <span class="icon-slot flex h-5 w-5 shrink-0 items-center justify-center">
-        <button.icon size={18} weight={iconWeight(button.id)} />
+      <span class="icon-slot flex h-7 w-7 shrink-0 items-center justify-center">
+        <button.icon size={26} weight={iconWeight(button.id)} />
       </span>
 
-      <span class="flex flex-col items-start gap-1.5">
-        <span class="text-base leading-none font-semibold tracking-ui uppercase">
+      <span class="flex flex-col items-start gap-1">
+        <span class="text-lg leading-none font-black tracking-ui uppercase">
           {button.label}
         </span>
         <span class="sub-label">
           {#if button.locked}
-            <LockSimpleIcon size={10} weight="fill" />
+            <LockSimpleIcon size={12} weight="fill" />
           {/if}
           {button.sub}
         </span>
@@ -97,31 +100,23 @@
   @reference "tailwindcss";
   @reference "../../style/global.css";
 
-  /* The slanted clips overlap by the width of the cut, so the four tabs read as
-     one continuous strip rather than as separate pills. */
   .nav-tab {
-    @apply -mr-[32px] flex cursor-pointer flex-row items-center gap-3 border-none bg-raised py-3 pr-12 pl-13 text-fg-muted transition-colors duration-150;
+    @apply flex w-full cursor-pointer flex-row items-center gap-4 bg-raised px-5 py-4 text-left text-fg transition-colors duration-150;
   }
 
   .nav-tab:not(:disabled):hover {
-    @apply bg-hover text-fg;
+    @apply bg-hover;
   }
 
   .nav-tab:disabled {
-    @apply cursor-not-allowed text-fg-dim;
+    @apply cursor-not-allowed bg-canvas text-fg-dim;
   }
 
-  /* Later tabs paint over the slanted edge of earlier ones, so the active tab
-     has to be lifted for its cut to stay visible. */
   .nav-tab.is-active {
-    @apply relative z-10 bg-ink text-ink-fg;
-  }
-
-  .nav-tab.is-active .icon-slot {
-    @apply text-accent;
+    @apply bg-accent text-ink-fg;
   }
 
   .sub-label {
-    @apply flex flex-row items-center gap-1.5 text-2xs leading-none tracking-loose uppercase opacity-70;
+    @apply flex flex-row items-center gap-1.5 text-2xs leading-none font-bold tracking-loose uppercase opacity-75;
   }
 </style>

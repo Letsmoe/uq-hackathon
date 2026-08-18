@@ -24,10 +24,6 @@
     onpause = () => {},
   }: Props = $props();
 
-  const DOTS_COLS = 8;
-  const DOTS_ROWS = 2;
-  const DOT_COUNT = DOTS_COLS * DOTS_ROWS;
-
   let hudBlock: HTMLElement;
 
   // The playfield sizes itself under the HUD, so it needs the measured height
@@ -58,22 +54,22 @@
     bind:this={hudBlock}
     data-hud-block
   >
-    <div class="relative flex items-start justify-between px-8 pt-5">
+    <div class="relative flex items-start justify-between px-6 pt-4">
       <!-- LEFT: pause + song info -->
       <div class="pointer-events-auto flex flex-row items-start gap-5">
         <button
           onclick={onpause}
           aria-label="Pause"
-          class="mt-1 cursor-pointer border-none bg-transparent p-0 text-play-ink-muted transition-opacity duration-150 hover:opacity-70"
+          class="hard-press border-hard cut-sm flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center bg-raised text-fg transition-colors duration-150 hover:bg-hover"
         >
-          <PauseIcon size={32} weight="fill" />
+          <PauseIcon size={20} weight="fill" />
         </button>
 
         <div class="flex flex-col gap-0.5">
-          <span class="text-lg font-light tracking-display text-play-ink">
+          <span class="text-base font-black tracking-ui text-fg uppercase">
             {title}
           </span>
-          <span class="text-base tracking-display text-play-ink-dim">
+          <span class="text-2xs font-bold tracking-loose text-fg-muted uppercase">
             {artist}
           </span>
         </div>
@@ -83,46 +79,31 @@
       <div
         class="absolute left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
       >
-        {#snippet dotGrid()}
-          <div
-            class="grid gap-[6px]"
-            style="grid-template-columns: repeat({DOTS_COLS}, 1fr);"
-          >
-            {#each Array(DOT_COUNT) as _, index (index)}
-              <div class="h-[4px] w-[4px] rounded-full bg-play-dot"></div>
-            {/each}
-          </div>
-        {/snippet}
-
-        {@render dotGrid()}
-
-        <div class="flex flex-col items-center gap-0.5">
+        <div class="border-hard cut flex flex-col items-center gap-0.5 bg-raised px-5 py-2">
           <!-- Keyed on the value so a new combo replays the pop. -->
           {#key combo}
-            <span class="numeral combo-pop text-[3.5rem] font-black">
+            <span class="numeral combo-pop text-[clamp(1.6rem,3.4vh,2.4rem)] font-black">
               {combo}
             </span>
           {/key}
-          <span class="hud-label text-play-ink-muted">Combo</span>
+          <span class="hud-label text-fg-muted">Combo</span>
         </div>
-
-        {@render dotGrid()}
       </div>
 
       <!-- RIGHT: score + TP -->
       <div class="flex flex-col items-end gap-3">
         <div class="flex flex-col items-end gap-0.5">
-          <span class="hud-label text-play-ink-muted">Score</span>
-          <span class="numeral text-[2.6rem] font-bold tabular-nums">
+          <span class="hud-label text-fg-muted">Score</span>
+          <span class="numeral text-[clamp(1.3rem,2.8vh,1.9rem)] font-bold tabular-nums">
             {String(score).padStart(7, "0")}
           </span>
-          <div class="mt-1 h-px w-full bg-play-accent"></div>
+          <div class="mt-1 h-1 w-full bg-accent"></div>
         </div>
 
         <div class="flex flex-col items-end gap-0.5">
-          <span class="hud-label text-play-ink-dim">TP</span>
+          <span class="hud-label text-fg-dim">TP</span>
           <span
-            class="text-[1.4rem] leading-none tabular-nums text-play-ink-muted"
+            class="text-[clamp(0.8rem,1.6vh,1.05rem)] leading-none tabular-nums text-fg-muted"
             style="font-family: var(--font-numeral); letter-spacing: 0.06em;"
           >
             {tp.toFixed(2)}%
@@ -134,7 +115,7 @@
     <!-- ── PROGRESS BAR ──────────────────────────────────────────────────── -->
     <!-- Scaled rather than resized: this advances every frame of the song, and
          a width animation would relayout the bar on each one. -->
-    <div class="mt-6 h-[3px] w-full overflow-hidden bg-play-line">
+    <div class="border-t-hard border-b-hard mt-4 h-2.5 w-full overflow-hidden bg-raised">
       <div
         class="progress-fill h-full w-full origin-left"
         style="transform: scaleX({progress});"
@@ -145,7 +126,7 @@
   <!-- ── BOTTOM LEFT: logo watermark ────────────────────────────────────── -->
   <div class="absolute bottom-6 left-8 flex flex-row items-center gap-4">
     <svg
-      class="h-9 w-9 text-play-ink-dim"
+      class="h-7 w-7 text-fg-dim"
       viewBox="0 0 40 40"
       fill="none"
       stroke="currentColor"
@@ -173,8 +154,8 @@
     </svg>
 
     <div class="flex flex-col gap-0.5">
-      <span class="hud-label leading-none text-play-ink-muted">Synapse</span>
-      <span class="hud-label leading-none text-play-ink-dim">
+      <span class="hud-label leading-none text-fg-muted">Synapse</span>
+      <span class="hud-label leading-none text-fg-dim">
         Rhythm Protocol
       </span>
     </div>
@@ -182,9 +163,9 @@
 
   <!-- ── BOTTOM RIGHT: difficulty badge ─────────────────────────────────── -->
   <div class="absolute right-8 bottom-6 flex flex-row items-end gap-3">
-    <div class="h-12 w-px bg-play-accent"></div>
+    <div class="h-9 w-1.5 bg-accent"></div>
     <span
-      class="text-[2rem] leading-none font-bold text-play-accent"
+      class="border-hard cut-sm bg-accent px-3 py-1.5 text-[clamp(1.1rem,2.4vh,1.6rem)] leading-none font-bold text-ink-fg"
       style="font-family: var(--font-numeral); letter-spacing: 0.12em;"
     >
       {difficulty}
@@ -209,17 +190,11 @@
     font-family: var(--font-numeral);
     letter-spacing: 0.08em;
     line-height: 1;
-    color: #ffffff;
-    text-shadow: var(--shadow-numeral);
+    color: var(--color-fg);
   }
 
   .progress-fill {
-    background: linear-gradient(
-      90deg,
-      var(--color-play-accent),
-      var(--color-play-accent-bright)
-    );
-    box-shadow: 0 0 10px rgba(125, 103, 210, 0.6);
+    background: var(--color-accent);
   }
 
   @keyframes combo-pop {

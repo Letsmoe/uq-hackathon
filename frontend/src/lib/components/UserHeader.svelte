@@ -30,13 +30,13 @@
   const ratingFraction = $derived(ratingCurrent / ratingMax);
 
   const iconButtonClass =
-    "relative flex h-12 w-12 items-center justify-center border-2 border-line bg-raised text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg cursor-pointer";
+    "hard-press border-hard cut relative flex h-[clamp(48px,6vh,64px)] w-[clamp(48px,6vh,64px)] items-center justify-center bg-raised text-fg transition-colors duration-150 hover:bg-hover cursor-pointer";
 </script>
 
 <header class="flex flex-row items-center gap-5">
   <!-- Identity -->
   <div class="flex shrink-0 flex-row items-center gap-3">
-    <div class="h-12 w-12 shrink-0 overflow-hidden border-2 border-line">
+    <div class="h-12 w-12 shrink-0 overflow-hidden border-hard cut-sm">
       <img
         src={avatarSrc}
         alt="avatar"

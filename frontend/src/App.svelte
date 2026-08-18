@@ -75,9 +75,10 @@
 
   const RECENT_LIMIT = 4;
   const PAGE_FADE_MS = 220;
-  // The menu's three bands arrive in reading order.
-  const CAROUSEL_ENTRY_DELAY_MS = 70;
-  const BOTTOM_ENTRY_DELAY_MS = 140;
+  // The menu's bands arrive in reading order.
+  const NAV_ENTRY_DELAY_MS = 70;
+  const CAROUSEL_ENTRY_DELAY_MS = 140;
+  const BOTTOM_ENTRY_DELAY_MS = 210;
 
   const selectedSong = $derived(songs[selected]);
   const selectedChart = $derived(selectedSong.charts[selectedSong.difficulty]);
@@ -161,20 +162,6 @@
     }
   }
 
-  // ── Scaling ────────────────────────────────────────────────────────────────
-  // Menu and game are authored against a fixed design resolution and uniformly
-  // scaled onto the frame. Lowering it renders every element larger on device.
-  const DESIGN_WIDTH = 1440;
-  const DESIGN_HEIGHT = 900;
-
-  let content: HTMLDivElement;
-  let frame: HTMLDivElement;
-
-  function resizeGame() {
-    if (!frame || !content) return;
-    content.style.transform = `scale(${frame.clientWidth / DESIGN_WIDTH})`;
-  }
-
   // Generating the chart for the demo track goes through the same decode →
   // wasm → chart path as an upload, so this exercises the real pipeline.
   async function addDemoSong() {
@@ -201,20 +188,11 @@
   }
 
   onMount(() => {
-    resizeGame();
     void addDemoSong();
   });
 </script>
 
-<svelte:window onresize={resizeGame} onorientationchange={resizeGame} />
-
 <div id="viewport">
-  <div id="content-frame" bind:this={frame}>
-    <div
-      id="content"
-      bind:this={content}
-      style="width: {DESIGN_WIDTH}px; height: {DESIGN_HEIGHT}px;"
-    >
       {#if page === "Menu"}
         <!-- Menu and game overlap for the length of the crossfade, so both
              sides are taken out of flow. -->
@@ -230,15 +208,13 @@
             alt=""
           />
 
-          <!-- Rows are fixed height so no zone can grow into the one below it;
-               only the carousel takes up the slack. Navigation shares the
-               header row, which is what buys the carousel its height. -->
-          <div class="relative flex h-full w-full flex-col px-10 pt-6 pb-6">
+          <!-- The carousel takes the slack in the column; every other band
+               is sized by its own content. -->
+          <div class="relative flex h-full w-full flex-col gap-5 p-6">
             <div
-              class="rise-in flex h-16 shrink-0 flex-row items-center justify-between gap-8"
+              class="rise-in flex shrink-0 flex-row items-center justify-between gap-6"
             >
               <Logo />
-              <NavButtons bind:active={activeTab} />
               <UserHeader
                 username="ink"
                 rating={12.41}
@@ -252,17 +228,28 @@
               />
             </div>
 
-            <div
-              class="rise-in min-h-0 flex-1"
-              style="animation-delay: {CAROUSEL_ENTRY_DELAY_MS}ms;"
-            >
-              <SongCarousel {songs} bind:selected onshuffle={pickRandomSong} />
+            <!-- Modes sit in the rail the wide layout leaves free, rather
+                 than competing with the logo across the top. -->
+            <div class="flex min-h-0 flex-1 flex-row gap-6">
+              <div
+                class="rise-in flex shrink-0 items-start"
+                style="animation-delay: {NAV_ENTRY_DELAY_MS}ms;"
+              >
+                <NavButtons bind:active={activeTab} />
+              </div>
+
+              <div
+                class="rise-in min-h-0 flex-1"
+                style="animation-delay: {CAROUSEL_ENTRY_DELAY_MS}ms;"
+              >
+                <SongCarousel {songs} bind:selected />
+              </div>
             </div>
 
-            <!-- Fixed side columns keep the song info on the frame's centre
-                 line however wide the rails get. -->
+            <!-- Flexible side rails keep the song info on the centre line
+                 however wide they get. -->
             <div
-              class="rise-in grid h-[212px] shrink-0 grid-cols-[minmax(0,1fr)_640px_minmax(0,1fr)] items-end gap-6"
+              class="rise-in grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-6"
               style="animation-delay: {BOTTOM_ENTRY_DELAY_MS}ms;"
             >
               <RecentlyPlayed
@@ -279,6 +266,7 @@
                 canStart={Boolean(selectedChart)}
                 ondifficultychange={changeDifficulty}
                 onstart={startSong}
+                onshuffle={pickRandomSong}
               />
 
               <BottomPanel
@@ -339,40 +327,25 @@
           ></Canvas>
         </div>
       {/if}
-    </div>
-  </div>
 </div>
 
 <style>
   @reference "tailwindcss";
   @reference "./style/global.css";
 
+  /* The menu fills the viewport and lays itself out, rather than being a
+     fixed design resolution scaled onto a letterboxed frame. Controls are
+     then sized in real pixels instead of inheriting whatever scale factor
+     the frame happened to land on. */
   #viewport {
+    position: relative;
     width: 100vw;
     height: 100dvh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* The frame is fixed-size with nothing to scroll. Releasing touch
-       gestures to the browser only costs pointer events to pointercancel. */
+    overflow: hidden;
+    background-color: var(--color-canvas);
+    /* Nothing here scrolls. Releasing touch gestures to the browser only
+       costs pointer events to pointercancel. */
     touch-action: none;
     overscroll-behavior: none;
-  }
-
-  #content-frame {
-    width: 100vw;
-    max-width: calc(100dvh * 16 / 10);
-    aspect-ratio: 16 / 10;
-    background: #000;
-    overflow: hidden;
-    position: relative;
-  }
-
-  #content {
-    position: absolute;
-    left: 0;
-    top: 0;
-    transform-origin: top left;
-    background-color: var(--color-canvas);
   }
 </style>

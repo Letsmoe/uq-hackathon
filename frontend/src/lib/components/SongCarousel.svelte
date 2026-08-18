@@ -1,23 +1,16 @@
 <script lang="ts">
   import { Spring } from "svelte/motion";
-  import ShuffleIcon from "phosphor-svelte/lib/ShuffleIcon";
   import { carouselMotion } from "../carouselMotion";
   import {
-    CENTER_SIZE,
-    STAGE_HEIGHT,
-    STEP_TO_ADJACENT,
-    SCALE_STOPS,
     OPACITY_STOPS,
     DIM_STOPS,
+    metricsForStage,
     interpolateStops,
     cardShift,
     withEdgeResistance,
     clamp,
   } from "./carouselGeometry";
 
-  // Finger travel that moves the stage by one card. Matching the on-screen
-  // step means the cards stay locked to the finger for the whole drag.
-  const DRAG_PIXELS_PER_STEP = STEP_TO_ADJACENT;
   const DRAG_INTENT_PX = 12;
   const EDGE_RESISTANCE = 0.35;
 
@@ -32,19 +25,18 @@
   interface Props {
     songs: CarouselSong[];
     selected?: number;
-    onshuffle?: () => void;
   }
 
-  let {
-    songs,
-    selected = $bindable(0),
-    onshuffle = () => {},
-  }: Props = $props();
+  let { songs, selected = $bindable(0) }: Props = $props();
 
   // Continuous carousel position in song indexes. Everything on screen is a
   // function of this one number, so a drag moves the cards through the same
   // states the spring settles into.
   const position = new Spring(selected, { stiffness: 0.16, damping: 0.72 });
+
+  let stage: HTMLElement;
+  let stageWidth = $state(0);
+  let stageHeight = $state(0);
 
   let dragging = $state(false);
   let didDrag = false;
@@ -53,6 +45,16 @@
   let pressedIndex = $state(-1);
 
   const lastIndex = $derived(songs.length - 1);
+  const metrics = $derived(metricsForStage(stageWidth, stageHeight));
+  // Finger travel that moves the stage by one card. Matching the on-screen
+  // step means the cards stay locked to the finger for the whole drag.
+  const dragPixelsPerStep = $derived(metrics.stepToAdjacent);
+
+  $effect(() => {
+    const observer = new ResizeObserver(() => measureStage());
+    observer.observe(stage);
+    return () => observer.disconnect();
+  });
 
   $effect(() => {
     if (dragging) {
@@ -66,6 +68,11 @@
   $effect(() => {
     carouselMotion.position = position.current;
   });
+
+  function measureStage() {
+    stageWidth = stage.clientWidth;
+    stageHeight = stage.clientHeight;
+  }
 
   function prev() {
     if (selected > 0) selected--;
@@ -93,7 +100,7 @@
       pressedIndex = -1;
     }
 
-    const raw = dragStartIndex + travelled / DRAG_PIXELS_PER_STEP;
+    const raw = dragStartIndex + travelled / dragPixelsPerStep;
     position.set(withEdgeResistance(raw, lastIndex, EDGE_RESISTANCE), {
       instant: true,
     });
@@ -143,11 +150,11 @@
     return {
       offset: index - selected,
       distance,
-      scale: interpolateStops(distance, SCALE_STOPS),
+      scale: interpolateStops(distance, metrics.scaleStops),
       opacity: interpolateStops(distance, OPACITY_STOPS),
       dim: interpolateStops(distance, DIM_STOPS),
-      shift: cardShift(offset),
-      // Accent ring and glow belong to whichever card holds the centre.
+      shift: cardShift(offset, metrics),
+      // The accent frame belongs to whichever card holds the centre.
       focus: ramp(1 - distance * 2),
       // The centre card's name is spelled out below the stage, so its label
       // only fades in as it leaves.
@@ -167,18 +174,18 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="flex h-full w-full touch-none flex-col items-center justify-center select-none"
+  class="flex h-full w-full touch-none flex-col items-center justify-center gap-3 select-none"
   onpointerdown={handlePointerDown}
   onpointermove={handlePointerMove}
   onpointerup={endDrag}
   onpointercancel={endDrag}
   onpointerleave={endDrag}
 >
-  <!-- Cards stage. shrink-0 keeps the fixed height from collapsing under the
-       flex column, which would let the absolute cards spill over the title. -->
+  <!-- Cards stage. It takes the slack in the column, and the cards size
+       themselves to whatever it ends up being. -->
   <div
-    class="relative flex w-full shrink-0 items-center justify-center overflow-hidden"
-    style="height: {STAGE_HEIGHT}px;"
+    class="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden"
+    bind:this={stage}
   >
     {#each songs as song, index}
       {@const card = getCardProps(index)}
@@ -189,8 +196,8 @@
         aria-label={song.title}
         class="card absolute top-1/2 left-1/2 cursor-pointer p-0"
         style="
-          width: {CENTER_SIZE}px;
-          height: {CENTER_SIZE}px;
+          width: {metrics.centerSize}px;
+          height: {metrics.centerSize}px;
           z-index: {card.zIndex};
           opacity: {card.opacity};
           transform: translate(-50%, -50%) translateX({card.shift}px) scale({card.scale});
@@ -198,7 +205,7 @@
         "
       >
         <div
-          class="card-body relative h-full w-full overflow-hidden border-2 border-line"
+          class="card-body cut border-hard relative h-full w-full overflow-hidden bg-raised"
           style="transform: scale({pressScale(index)});"
         >
           <img
@@ -212,44 +219,34 @@
             style="opacity: {card.dim};"
           ></div>
 
+          <!-- Selection chrome. Fading a ready-made frame keeps the border off
+               the animated properties. -->
           <div
-            class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent"
-          ></div>
-
-          <!-- Selection chrome. Fading a ready-made ring keeps the border off
-               the animated properties. The centre card is marked by the weight
-               of its rule, not by a glow. -->
-          <div
-            class="pointer-events-none absolute inset-0 border-4 border-accent"
+            class="pointer-events-none absolute inset-0 border-[6px] border-accent"
             style="opacity: {card.focus};"
           ></div>
 
-          <!-- Cross-faded rather than recoloured: two opacities composite,
-               a changing colour repaints the glyph. -->
-          <span class="absolute top-3 left-3 text-base tracking-loose text-white/50">
-            {String(index).padStart(2, "0")}
-          </span>
+          <!-- Index plate -->
           <span
-            class="absolute top-3 left-3 text-base tracking-loose text-accent"
-            style="opacity: {card.focus};"
+            class="absolute top-0 left-0 border-r-hard border-b-hard bg-ink px-3 py-1.5 text-sm font-bold text-ink-fg"
           >
             {String(index).padStart(2, "0")}
           </span>
 
           <div
-            class="absolute bottom-4 left-4 flex flex-col items-start gap-1"
+            class="absolute right-0 bottom-0 left-0 border-t-hard bg-raised px-4 py-3 text-left"
             style="opacity: {card.label};"
           >
-            <p class="leading-none font-semibold tracking-ui text-white text-lg">
+            <p class="truncate text-lg leading-none font-bold text-fg uppercase">
               {song.title}
             </p>
-            <p class="text-sm leading-none tracking-loose text-white/50 uppercase">
+            <p class="mt-1 truncate text-sm leading-none font-semibold text-fg-muted uppercase">
               {song.artist}
             </p>
           </div>
 
           <span
-            class="absolute right-4 bottom-3 text-3xl leading-none font-bold text-white/25"
+            class="absolute top-0 right-0 border-b-hard border-l-hard bg-accent px-3 py-1.5 text-sm font-black text-ink-fg"
           >
             {song.badge}
           </span>
@@ -259,46 +256,32 @@
   </div>
 
   <!-- Title -->
-  <div class="mt-6 flex shrink-0 flex-col items-center gap-2">
+  <div class="flex shrink-0 flex-col items-center gap-1">
     <h2
-      class="text-center text-xl leading-none font-semibold tracking-display text-fg uppercase"
+      class="text-center text-xl leading-none font-black tracking-display text-fg uppercase"
     >
       {songs[selected].title}
     </h2>
-    <span class="text-sm tracking-loose text-fg-muted uppercase">
+    <span class="text-sm font-bold tracking-loose text-fg-muted uppercase">
       {songs[selected].artist}
     </span>
   </div>
 
-  <!-- Dots, and the reroll that used to live on the far side of the screen.
-       The mark is small, the target around it is not. -->
-  <div class="mt-2 flex shrink-0 flex-row items-center gap-2">
-    <div class="flex flex-row">
-      {#each songs as song, index}
-        <button
-          onclick={() => (selected = index)}
-          aria-label="Go to {song.title}"
-          class="flex h-9 w-9 cursor-pointer items-center justify-center border-none bg-transparent p-0"
-        >
-          <span
-            class="h-1.5 transition-all duration-300 {index === selected
-              ? 'w-6 bg-accent'
-              : 'w-2 bg-line-strong'}"
-          ></span>
-        </button>
-      {/each}
-    </div>
-
-    {#if songs.length > 1}
+  <!-- Dots. The mark is small, the target around it is not. -->
+  <div class="flex shrink-0 flex-row gap-2">
+    {#each songs as song, index}
       <button
-        onclick={onshuffle}
-        title="Random song"
-        aria-label="Random song"
-        class="flex h-9 w-9 cursor-pointer items-center justify-center border-2 border-line bg-raised text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg"
+        onclick={() => (selected = index)}
+        aria-label="Go to {song.title}"
+        class="flex h-8 w-8 cursor-pointer items-center justify-center border-none bg-transparent p-0"
       >
-        <ShuffleIcon size={14} />
+        <span
+          class="h-3 border-hard transition-all duration-300 {index === selected
+            ? 'w-10 bg-accent'
+            : 'w-3 bg-raised'}"
+        ></span>
       </button>
-    {/if}
+    {/each}
   </div>
 </div>
 

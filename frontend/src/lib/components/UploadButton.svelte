@@ -67,7 +67,7 @@
 </script>
 
 <label
-  class="flex aspect-square shrink-0 cursor-pointer items-center justify-center self-stretch border-2 border-line bg-raised text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg"
+  class="hard-press border-hard cut flex h-[clamp(48px,6vh,64px)] w-[clamp(48px,6vh,64px)] shrink-0 cursor-pointer items-center justify-center bg-raised text-fg transition-colors duration-150 hover:bg-hover"
   title="Upload a track"
 >
   <input

@@ -114,13 +114,11 @@ void main() {
   float swipe = clamp(abs(u_drift) * 7.0, 0.0, 1.0);
   p.x += u_drift * 1.6;
 
-  // Colors — mirrors the --color-canvas / --color-accent tokens. The canvas is
-  // black and the marks are neutral: depth is carried by the rules, not by a
-  // stack of greys.
-  vec3 bg         = vec3(0.0);
-  vec3 dotColor   = vec3(1.0);
-  vec3 lineColor  = vec3(1.0);
-  vec3 crossColor = vec3(1.0);
+  // Colors — mirrors the --color-canvas / --color-accent tokens. The field is
+  // cream and every mark on it is drawn in the same black as the rules, so the
+  // grid reads as ruled paper rather than as a glow.
+  vec3 bg         = vec3(242.0, 237.0, 227.0) / 255.0;
+  vec3 ink        = vec3(0.0);
   vec3 accent     = vec3(124.0, 107.0, 245.0) / 255.0;
 
   // -----------------------------
@@ -158,18 +156,20 @@ void main() {
   // Final compositing
   vec3 color = bg;
 
-  // Draw order: background -> minor dots -> dotted lines -> crosses
-  color = mix(color, dotColor,   dots * 0.13);
-  color = mix(color, lineColor,  gridLines * 0.17);
-  color = mix(color, crossColor, crosses * 0.26);
+  // Draw order: background -> minor dots -> dotted lines -> crosses.
+  // Everything is mixed toward ink rather than added, because adding light
+  // to a pale field washes it out instead of marking it.
+  color = mix(color, ink, dots      * 0.10);
+  color = mix(color, ink, gridLines * 0.13);
+  color = mix(color, ink, crosses   * 0.22);
 
-  color += accent * cursorGlow * 0.14;
-  color = mix(color, accent, cursorRing * 0.55);
+  color = mix(color, accent, cursorGlow * 0.10);
+  color = mix(color, accent, cursorRing * 0.65);
 
-  color += accent * swipe * (dots * 0.35 + gridLines * 0.25);
+  color = mix(color, accent, swipe * (dots * 0.4 + gridLines * 0.3));
 
   float noise = fract(sin(dot(frag + u_time, vec2(12.9898, 78.233))) * 43758.5453);
-  color += (noise - 0.5) * 0.012;
+  color += (noise - 0.5) * 0.008;
 
   gl_FragColor = vec4(color, 1.0);
 }`;

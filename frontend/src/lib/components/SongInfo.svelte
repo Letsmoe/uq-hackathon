@@ -2,6 +2,7 @@
   import type { MouseEventHandler } from "svelte/elements";
   import { Tween } from "svelte/motion";
   import { cubicOut } from "svelte/easing";
+  import ShuffleIcon from "phosphor-svelte/lib/ShuffleIcon";
   import { DIFFICULTIES } from "../chartGeneration";
   import type { Difficulty } from "../chartGeneration";
 
@@ -17,6 +18,7 @@
     canStart?: boolean;
     ondifficultychange?: (difficulty: Difficulty) => void;
     onstart?: MouseEventHandler<HTMLButtonElement>;
+    onshuffle?: () => void;
   }
 
   let {
@@ -28,15 +30,25 @@
     canStart = true,
     ondifficultychange = () => {},
     onstart = () => {},
+    onshuffle = () => {},
   }: Props = $props();
 
-  const difficultyColor: Record<Difficulty, string> = {
-    easy: "text-success",
-    normal: "text-signal",
-    hard: "text-accent",
-    expert: "text-warning",
-    chaos: "text-danger",
+  /** The picked difficulty fills with its own status colour; the rest stay
+   *  white blocks, so the grade reads as a state and not as decoration. */
+  const difficultyFill: Record<Difficulty, string> = {
+    easy: "bg-success",
+    normal: "bg-signal",
+    hard: "bg-accent",
+    expert: "bg-warning",
+    chaos: "bg-danger",
   };
+
+  function difficultyClass(option: Difficulty) {
+    if (option === difficulty) {
+      return `${difficultyFill[option]} text-ink-fg`;
+    }
+    return "bg-raised text-fg hover:bg-hover";
+  }
 
   const startLabel = $derived.by(() => {
     if (generating) {
@@ -61,47 +73,67 @@
   );
 </script>
 
-<div class="flex h-full w-full flex-col items-center justify-end gap-3">
-  <p
-    class="h-4 text-center text-2xs leading-none tracking-loose text-fg-muted uppercase"
-  >
-    {description}
-  </p>
+<div class="flex w-full flex-col items-center gap-3">
+  <!-- Description and score share a line. They are both one short string, and
+       the row each used to hold came out of the carousel's height. -->
+  <div class="flex w-full flex-row items-center justify-between gap-6">
+    <p
+      class="truncate text-2xs leading-none font-bold tracking-loose text-fg-muted uppercase"
+    >
+      {description}
+    </p>
+
+    <div class="flex shrink-0 flex-row items-center gap-3">
+      <span class="label-caps">Best</span>
+      <span
+        class="text-lg leading-none font-black tracking-num text-fg tabular-nums"
+      >
+        {scoreDigits}
+      </span>
+      <span
+        class="border-hard cut-sm bg-accent px-2.5 py-1 text-base leading-none font-black text-ink-fg"
+      >
+        {badge}
+      </span>
+    </div>
+  </div>
 
   <!-- Difficulty — one target per difficulty beats a pair of tiny arrows -->
-  <div class="flex w-full flex-row gap-2">
+  <div class="flex w-full flex-row gap-3">
     {#each DIFFICULTIES as option (option)}
       <button
         onclick={() => ondifficultychange(option)}
         disabled={generating}
-        class="flex h-12 flex-1 cursor-pointer items-center justify-center border text-sm font-semibold tracking-ui uppercase transition-colors duration-150 disabled:cursor-not-allowed {option ===
-        difficulty
-          ? `border-line-strong bg-raised ${difficultyColor[option]}`
-          : 'border-line bg-canvas/40 text-fg-dim hover:bg-raised hover:text-fg-muted'}"
+        class="hard-press border-hard cut flex h-[clamp(44px,6.5vh,64px)] min-w-24 flex-1 cursor-pointer items-center justify-center text-base font-black tracking-ui uppercase transition-colors duration-150 disabled:cursor-not-allowed {difficultyClass(
+          option,
+        )}"
       >
         {option}
       </button>
     {/each}
   </div>
 
-  <!-- Score readout -->
-  <div class="flex w-full flex-row items-baseline justify-center gap-4">
-    <span class="label-caps">Best Score</span>
-    <span class="text-xl leading-none font-semibold tracking-num text-fg tabular-nums">
-      {scoreDigits}
-    </span>
-    <span class="text-2xl leading-none font-bold text-accent">{badge}</span>
-  </div>
+  <!-- Start, with the reroll beside it: both are ways of choosing what to
+       play next, so they belong on the same line. -->
+  <div class="flex w-full flex-row items-stretch justify-center gap-3">
+    <button
+      onclick={onstart}
+      disabled={generating || !canStart}
+      class="hard-press border-hard cut flex h-[clamp(52px,8vh,84px)] w-full max-w-[640px] cursor-pointer flex-row items-center justify-center gap-5 bg-accent text-2xl font-black tracking-display text-ink-fg uppercase transition-colors duration-150 disabled:cursor-not-allowed disabled:bg-hover disabled:text-fg-dim"
+    >
+      {startLabel}
+      <svg class="h-7 w-7 shrink-0 fill-current" viewBox="0 0 10 10">
+        <polygon points="0,0 10,5 0,10" />
+      </svg>
+    </button>
 
-  <!-- Start -->
-  <button
-    onclick={onstart}
-    disabled={generating || !canStart}
-    class="clip-arrow-right flex h-[76px] w-[560px] cursor-pointer flex-row items-center justify-center gap-4 border-none bg-ink pr-10 text-2xl tracking-display text-ink-fg uppercase transition-opacity duration-150 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-25"
-  >
-    {startLabel}
-    <svg class="h-4 w-4 shrink-0 fill-ink-fg/50" viewBox="0 0 10 10">
-      <polygon points="0,0 10,5 0,10" />
-    </svg>
-  </button>
+    <button
+      onclick={onshuffle}
+      title="Random song"
+      aria-label="Random song"
+      class="hard-press border-hard cut flex aspect-square h-[clamp(52px,8vh,84px)] shrink-0 cursor-pointer items-center justify-center bg-raised text-fg transition-colors duration-150 hover:bg-hover"
+    >
+      <ShuffleIcon size={26} weight="bold" />
+    </button>
+  </div>
 </div>

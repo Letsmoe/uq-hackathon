@@ -7,102 +7,105 @@
    SYNAPSE RHYTHM PROTOCOL — DESIGN SYSTEM
    Tailwind v4 theme tokens
 
-   The menu is dark: light chrome and cover art sit on a deep
-   canvas. Names are semantic — components never reach for a
-   raw hex, and the whole look retunes from this block.
+   Neo-brutalist: a cream field, flat saturated fills, solid
+   black rules, and hard offset shadows with no blur. Nothing
+   glows and nothing gradients. Depth is a shadow that looks
+   like a second, displaced copy of the shape.
+
+   Names are semantic — components never reach for a raw hex,
+   and the whole look retunes from this block.
    ============================================================ */
 
 @theme {
   /* ----------------------------------------------------------
-     SURFACES — each step is one shade above what it sits on
+     SURFACES
+     Only two: the field, and the white blocks sitting on it.
   ---------------------------------------------------------- */
-  --color-canvas: #000000; /* page background, behind the grid    */
-  --color-raised: #0e0e0e; /* cards, controls, quiet panels       */
-  --color-overlay: #141414; /* panels floating above the menu      */
-  --color-hover: #1c1c1c; /* hover state for raised surfaces     */
+  --color-canvas: #f2ede3; /* page background, behind the grid    */
+  --color-raised: #ffffff; /* cards, controls, quiet panels       */
+  --color-overlay: #ffffff; /* panels floating above the menu      */
+  --color-hover: #ebe4d6; /* hover state for raised surfaces     */
 
-  /* Inverted chrome — white blocks punched into the black canvas.
+  /* Inverted chrome — black blocks punched into the cream field.
      This is the primary action colour: START, the active tab.  */
-  --color-ink: #ffffff;
-  --color-ink-fg: #000000;
+  --color-ink: #000000;
+  --color-ink-fg: #ffffff;
 
   /* ----------------------------------------------------------
      LINES
-     Depth comes from rules, not from glow or from stacked greys,
-     so these carry more weight than a border usually would.
+     Solid black at full strength. A neo-brutalist rule is a
+     structural element, not a hairline hint, so there is no
+     alpha here and no weaker variant to reach for.
   ---------------------------------------------------------- */
-  --color-line: rgba(255, 255, 255, 0.14); /* dividers, card edges     */
-  --color-line-strong: rgba(255, 255, 255, 0.34); /* focused, selected */
+  --color-line: #000000;
+  --color-line-strong: #000000;
+
+  /* Rule thickness. Everything structural uses these two. */
+  --rule: 3px;
+  --rule-thick: 6px;
+
+  /* Depth of the cut on a bevelled corner. Corners are cut, never rounded. */
+  --bevel: 20px;
+  --bevel-sm: 10px;
 
   /* ----------------------------------------------------------
      FOREGROUND
   ---------------------------------------------------------- */
-  --color-fg: #ffffff; /* headings, values, anything that must read */
-  --color-fg-muted: #a1a1a1; /* labels, secondary copy             */
-  --color-fg-dim: #5e5e5e; /* disabled, decorative captions        */
+  --color-fg: #000000; /* headings, values, anything that must read */
+  --color-fg-muted: #3d3a34; /* labels, secondary copy             */
+  --color-fg-dim: #868075; /* disabled, decorative captions        */
 
   /* ----------------------------------------------------------
      ACCENTS
-     Accent is the only colour on the menu, and it marks
-     selection. Everything else is black, white or a rule.
+     Flat fills, used at full saturation or not at all. Accent
+     marks selection; the rest are status.
   ---------------------------------------------------------- */
   --color-accent: #7c6bf5;
-  --color-accent-soft: rgba(124, 107, 245, 0.2);
+  --color-accent-soft: #ded9ff;
 
-  /* Status only — a difficulty grade, never decoration. */
   --color-signal: #35e0f0;
-  --color-signal-soft: rgba(53, 224, 240, 0.14);
+  --color-signal-soft: #c9f6fa;
 
-  /* Status — never decoration */
   --color-success: #3fd68a;
-  --color-warning: #ffc24d;
+  --color-warning: #ffd34f;
   --color-danger: #ff5c6e;
 
   /* ----------------------------------------------------------
-     PLAY SURFACE
-     The playfield inverts the menu: dark chrome on a pale
-     field, so cover art and note glow have something to sit
-     against. These are the only tokens the in-game HUD uses.
+     SHADOWS
+     Solid, offset, no blur — a displaced copy of the shape.
+     A pressed control slides into its own shadow.
   ---------------------------------------------------------- */
-  --color-play-ink: #2e2840; /* song title, anything that must read  */
-  --color-play-ink-muted: rgba(46, 40, 64, 0.62); /* labels          */
-  --color-play-ink-dim: rgba(46, 40, 64, 0.4); /* captions, watermark */
-  --color-play-line: rgba(60, 52, 90, 0.12); /* rules, empty track   */
-  --color-play-dot: rgba(60, 52, 90, 0.22); /* dot grid              */
-  --color-play-accent: #7d67d2;
-  --color-play-accent-bright: #b07cff;
+  --shadow-hard: 6px 6px 0 var(--color-ink);
+  --shadow-lifted: 10px 10px 0 var(--color-ink);
+  --shadow-pressed: 2px 2px 0 var(--color-ink);
+  --shadow-hard-accent: 6px 6px 0 var(--color-accent);
 
-  /* Big numerals are white on a pale field, so they carry their own
-     shadow to stay legible over the playfield. */
-  --shadow-numeral:
-    0 1px 2px rgba(46, 40, 64, 0.28), 0 0 22px rgba(125, 103, 210, 0.5),
-    0 0 55px rgba(125, 103, 210, 0.25);
-
-  --font-numeral: "Orbitron", ui-monospace, monospace;
+  /* Travel of a press. Matches the difference between the resting
+     and pressed shadows, so the shape lands exactly on it. */
+  --press-travel: 4px;
 
   /* ----------------------------------------------------------
      TYPOGRAPHY
+     Heavy and tight. The old spaced-out caps read as sci-fi
+     chrome; neo-brutalism wants weight instead of air.
   ---------------------------------------------------------- */
-
-  /* Rajdhani carries the game's condensed-but-spaced look. */
   --font-ui: "Rajdhani", "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  --font-numeral: "Orbitron", ui-monospace, monospace;
 
-  /* Scale — the UI is mostly caps with a tight hierarchy */
-  --text-2xs: 0.625rem; /* 10px — captions, index labels        */
-  --text-xs: 0.6875rem; /* 11px — sub-labels                    */
-  --text-sm: 0.75rem; /* 12px — section labels                  */
-  --text-base: 0.9375rem; /* 15px — body, menu items            */
-  --text-lg: 1.125rem; /* 18px — headings, nav items            */
-  --text-xl: 1.5rem; /* 24px — start button, song title        */
-  --text-2xl: 2rem; /* 32px — display headings                 */
-  --text-3xl: 3rem; /* 48px — hero numbers (level)             */
+  --text-2xs: 0.75rem; /* 12px — captions, index labels          */
+  --text-xs: 0.8125rem; /* 13px — sub-labels                     */
+  --text-sm: 0.875rem; /* 14px — section labels                  */
+  --text-base: 1rem; /* 16px — body, menu items                  */
+  --text-lg: 1.25rem; /* 20px — headings, nav items              */
+  --text-xl: 1.75rem; /* 28px — start button, song title         */
+  --text-2xl: 2.5rem; /* 40px — display headings                 */
+  --text-3xl: 3.5rem; /* 56px — hero numbers (level)             */
 
-  /* Letter-spacing — everything reads spaced-out */
-  --tracking-ui: 0.15em; /* menu items                          */
-  --tracking-loose: 0.25em; /* section labels, captions         */
-  --tracking-display: 0.5em; /* song title, START               */
-  --tracking-num: 0.05em; /* large display numbers              */
+  --tracking-ui: 0.06em;
+  --tracking-loose: 0.12em;
+  --tracking-display: 0.1em;
+  --tracking-num: 0.02em;
 
   /* ----------------------------------------------------------
      MOTION
@@ -135,21 +138,78 @@
     -webkit-tap-highlight-color: transparent;
     /* Only the release is eased. Going down is instant, which is what makes
        a press read as registered. */
-    transition: transform var(--duration-base) var(--ease-ui);
+    transition:
+      transform var(--duration-base) var(--ease-ui),
+      box-shadow var(--duration-base) var(--ease-ui);
   }
 
+  /* A press moves the control toward its shadow rather than scaling it.
+     Controls carrying a hard shadow also collapse it, so the shape appears
+     to be pushed down onto the page. */
   button:not(:disabled):active,
   label:active,
   [role="button"]:active {
     transition-duration: 0ms;
+    transform: translate(var(--press-travel), var(--press-travel));
   }
+}
 
-  button:not(:disabled):active,
-  label:active,
-  [role="button"]:active {
-    transform: scale(0.96);
-    filter: brightness(1.12);
-  }
+/* ============================================================
+   RULES
+   Tailwind's border utilities take a colour but not a width
+   token, and every structural edge here is the same weight.
+   ============================================================ */
+
+.border-hard {
+  border: var(--rule) solid var(--color-line);
+}
+.border-t-hard {
+  border-top: var(--rule) solid var(--color-line);
+}
+.border-r-hard {
+  border-right: var(--rule) solid var(--color-line);
+}
+.border-b-hard {
+  border-bottom: var(--rule) solid var(--color-line);
+}
+.border-l-hard {
+  border-left: var(--rule) solid var(--color-line);
+}
+
+/* A control that sits on a hard shadow and drops onto it when pressed. */
+.hard-press {
+  box-shadow: var(--shadow-hard);
+}
+
+.hard-press:not(:disabled):active {
+  box-shadow: var(--shadow-pressed);
+}
+
+.hard-press:disabled {
+  box-shadow: none;
+}
+
+/* ============================================================
+   CUT
+   The shape language: two corners cut away, two rounded off.
+
+   `corner-shape` is what makes this possible as one element —
+   the border, the radius and the hard shadow all follow the cut.
+   A clip-path would have removed the border and the shadow
+   outright, forcing the shape to be stacked from three layers.
+   Where `corner-shape` is unsupported the declaration is
+   dropped and the control is simply rounded, which is a fine
+   place to land.
+   ============================================================ */
+
+.cut {
+  border-radius: var(--bevel) 0 var(--bevel) 0;
+  corner-shape: bevel;
+}
+
+.cut-sm {
+  border-radius: var(--bevel-sm) 0 var(--bevel-sm) 0;
+  corner-shape: bevel;
 }
 
 /* ============================================================
@@ -184,35 +244,13 @@
 
 /* ============================================================
    CHROME
-   The one shape language Tailwind has no utility for: hard
-   panels with a cut leading or trailing edge.
    ============================================================ */
 
 /* Caps label sitting above a value: "DIFFICULTY", "BEST SCORE" */
 .label-caps {
   font-size: var(--text-2xs);
+  font-weight: 700;
   letter-spacing: var(--tracking-loose);
   text-transform: uppercase;
   color: var(--color-fg-muted);
-}
-
-.clip-slant-right {
-  clip-path: polygon(0 0, 100% 0, calc(100% - 32px) 100%, 0 100%);
-}
-.clip-slant-left {
-  clip-path: polygon(32px 0, 100% 0, 100% 100%, 0 100%);
-}
-.clip-slant-both {
-  clip-path: polygon(32px 0, 100% 0, calc(100% - 32px) 100%, 0 100%);
-}
-
-/* Arrowhead trailing edge — the START button */
-.clip-arrow-right {
-  clip-path: polygon(
-    0 0,
-    calc(100% - 48px) 0,
-    100% 50%,
-    calc(100% - 48px) 100%,
-    0 100%
-  );
 }
