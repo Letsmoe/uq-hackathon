@@ -6,12 +6,18 @@
   import ShuffleIcon from "phosphor-svelte/lib/ShuffleIcon";
   import { DIFFICULTIES } from "../chartGeneration";
   import type { Difficulty } from "../chartGeneration";
+  import { formatCount, formatDuration } from "../trackStats";
+  import type { TrackStats } from "../trackStats";
 
   const SCORE_COUNT_MS = 520;
 
   interface Props {
     description?: string;
     difficulty?: Difficulty;
+    /** Chart level per difficulty, so the jump between them is a number. */
+    levels?: Record<Difficulty, number>;
+    /** Tempo, length and note count of the picked chart. */
+    stats?: TrackStats | null;
     bestScore?: number;
     badge?: string;
     /** True while the chart for the picked difficulty is still being generated. */
@@ -27,6 +33,8 @@
   let {
     description = "",
     difficulty = "normal",
+    levels = { easy: 3, normal: 5, hard: 7, expert: 11, chaos: 14 },
+    stats = null,
     bestScore = 0,
     badge = "S",
     generating = false,
@@ -75,9 +83,40 @@
   const scoreDigits = $derived(
     String(Math.round(countedScore.current)).padStart(7, "0"),
   );
+
+  const PLACEHOLDER = "———";
+
+  // One line of chart facts, read left to right: tempo, length, note count.
+  const statParts = $derived.by(() => {
+    if (!stats) {
+      return [`${PLACEHOLDER} BPM`, PLACEHOLDER, `${PLACEHOLDER} Notes`];
+    }
+
+    return [
+      `${stats.bpm} BPM`,
+      formatDuration(stats.durationSeconds),
+      `${formatCount(stats.noteCount)} Notes`,
+    ];
+  });
 </script>
 
 <div class="flex w-full flex-col items-center gap-3">
+  <!-- Tempo, length and note count: what a player checks before committing to
+       a run, so it sits under the title rather than in a corner. -->
+  <div class="flex flex-row items-center gap-4">
+    {#each statParts as part, index (part)}
+      {#if index > 0}
+        <span class="h-3 w-px shrink-0 bg-line opacity-40"></span>
+      {/if}
+
+      <span
+        class="text-2xs leading-none font-bold tracking-loose text-fg-muted uppercase tabular-nums"
+      >
+        {part}
+      </span>
+    {/each}
+  </div>
+
   <!-- Description, indicator and score share a line. Equal side columns put
        the indicator on the same centre line as the middle difficulty. -->
   <div class="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-6">
@@ -112,11 +151,16 @@
       <button
         onclick={() => ondifficultychange(option)}
         disabled={generating}
-        class="hard-press border-hard cut flex h-[clamp(44px,6.5vh,64px)] min-w-24 flex-1 cursor-pointer items-center justify-center text-base font-black tracking-ui uppercase transition-colors duration-150 disabled:cursor-not-allowed {difficultyClass(
+        class="hard-press border-hard cut flex h-[clamp(52px,7.5vh,72px)] min-w-24 flex-1 cursor-pointer flex-col items-center justify-center gap-1 transition-colors duration-150 disabled:cursor-not-allowed {difficultyClass(
           option,
         )}"
       >
-        {option}
+        <span class="text-base leading-none font-black tracking-ui uppercase">
+          {option}
+        </span>
+        <span class="text-2xs leading-none font-black tracking-num tabular-nums opacity-80">
+          LV {levels[option]}
+        </span>
       </button>
     {/each}
   </div>

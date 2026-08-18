@@ -12,7 +12,7 @@
   import RecentlyPlayed from "./lib/components/RecentlyPlayed.svelte";
   import type { RecentTrack } from "./lib/components/RecentlyPlayed.svelte";
   import Logo from "./lib/components/Logo.svelte";
-  import BottomPanel from "./lib/components/BottomPanel.svelte";
+  import VersionTag from "./lib/components/VersionTag.svelte";
   import UploadButton from "./lib/components/UploadButton.svelte";
   import MenuPanel from "./lib/components/MenuPanel.svelte";
   import MessagesPanel from "./lib/components/MessagesPanel.svelte";
@@ -22,8 +22,9 @@
   import type { Chart } from "./lib/game/chart";
   import { loadDemoSong } from "./lib/demoSong";
   import { messages } from "./lib/messages.svelte";
-  import { generateChart } from "./lib/chartGeneration";
+  import { generateChart, DIFFICULTIES } from "./lib/chartGeneration";
   import type { Difficulty } from "./lib/chartGeneration";
+  import { levelForDifficulty, statsForChart } from "./lib/trackStats";
 
   // ── Types ──────────────────────────────────────────────────────────────────
   type Song = {
@@ -87,6 +88,20 @@
     messages.filter((message) => !message.read).length,
   );
   const songTitles = $derived(songs.map((song) => song.title));
+  const selectedStats = $derived.by(() => {
+    if (!selectedChart) {
+      return null;
+    }
+    return statsForChart(selectedChart);
+  });
+  const difficultyLevels = $derived(
+    Object.fromEntries(
+      DIFFICULTIES.map((difficulty) => [
+        difficulty,
+        levelForDifficulty(difficulty, selectedSong.charts[difficulty]),
+      ]),
+    ) as Record<Difficulty, number>,
+  );
   const recentTracks: RecentTrack[] = $derived(
     recentIndexes.map((songIndex) => ({
       songIndex,
@@ -213,10 +228,10 @@
               <Logo />
               <NavButtons bind:active={activeTab} />
 
-              <div class="mt-auto">
-                <BottomPanel
-                  notifications={unreadCount}
-                  version={__APP_VERSION__}
+              <div class="mt-auto w-60">
+                <RecentlyPlayed
+                  tracks={recentTracks}
+                  onselect={(songIndex) => (selected = songIndex)}
                 />
               </div>
             </div>
@@ -250,14 +265,13 @@
                 class="rise-in grid shrink-0 grid-cols-[minmax(120px,1fr)_auto_minmax(120px,1fr)] items-end gap-6"
                 style="animation-delay: {BOTTOM_ENTRY_DELAY_MS}ms;"
               >
-                <RecentlyPlayed
-                  tracks={recentTracks}
-                  onselect={(songIndex) => (selected = songIndex)}
-                />
+                <div aria-hidden="true"></div>
 
                 <SongInfo
                   description={selectedSong.description ?? ""}
                   difficulty={selectedSong.difficulty}
+                  levels={difficultyLevels}
+                  stats={selectedStats}
                   bestScore={selectedSong.bestScore ?? 0}
                   badge={selectedSong.badge}
                   {generating}
@@ -274,6 +288,8 @@
                 <div aria-hidden="true"></div>
               </div>
             </div>
+
+            <VersionTag version={__APP_VERSION__} />
           </div>
 
           {#if openPanel === "messages"}

@@ -1,10 +1,11 @@
 <script module lang="ts">
-  export type NavId = "solo" | "course" | "event";
+  export type NavId = "solo" | "practice" | "course" | "event";
 </script>
 
 <script lang="ts">
   import DiamondIcon from "phosphor-svelte/lib/DiamondIcon";
   import LockSimpleIcon from "phosphor-svelte/lib/LockSimpleIcon";
+  import MetronomeIcon from "phosphor-svelte/lib/MetronomeIcon";
   import SparkleIcon from "phosphor-svelte/lib/SparkleIcon";
   import StackSimpleIcon from "phosphor-svelte/lib/StackSimpleIcon";
   import type { Component } from "svelte";
@@ -30,6 +31,13 @@
       sub: "Play",
       icon: DiamondIcon,
       locked: false,
+    },
+    {
+      id: "practice",
+      label: "Practice",
+      sub: "Drill",
+      icon: MetronomeIcon,
+      locked: true,
     },
     {
       id: "course",
