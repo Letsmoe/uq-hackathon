@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-@import url("https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+/* Rajdhani, JetBrains Mono and Orbitron are linked from index.html — see the
+   comment there for why they cannot be @imported from this file. */
 
 /* ============================================================
    SYNAPSE RHYTHM PROTOCOL — DESIGN SYSTEM
@@ -51,6 +52,28 @@
   --color-success: #3fd68a;
   --color-warning: #ffc24d;
   --color-danger: #ff5c6e;
+
+  /* ----------------------------------------------------------
+     PLAY SURFACE
+     The playfield inverts the menu: dark chrome on a pale
+     field, so cover art and note glow have something to sit
+     against. These are the only tokens the in-game HUD uses.
+  ---------------------------------------------------------- */
+  --color-play-ink: #2e2840; /* song title, anything that must read  */
+  --color-play-ink-muted: rgba(46, 40, 64, 0.62); /* labels          */
+  --color-play-ink-dim: rgba(46, 40, 64, 0.4); /* captions, watermark */
+  --color-play-line: rgba(60, 52, 90, 0.12); /* rules, empty track   */
+  --color-play-dot: rgba(60, 52, 90, 0.22); /* dot grid              */
+  --color-play-accent: #7d67d2;
+  --color-play-accent-bright: #b07cff;
+
+  /* Big numerals are white on a pale field, so they carry their own
+     shadow to stay legible over the playfield. */
+  --shadow-numeral:
+    0 1px 2px rgba(46, 40, 64, 0.28), 0 0 22px rgba(125, 103, 210, 0.5),
+    0 0 55px rgba(125, 103, 210, 0.25);
+
+  --font-numeral: "Orbitron", ui-monospace, monospace;
 
   /* ----------------------------------------------------------
      TYPOGRAPHY

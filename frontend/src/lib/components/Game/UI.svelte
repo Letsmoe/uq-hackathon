@@ -8,16 +8,17 @@
     combo?: number;
     tp?: number;
     difficulty?: string;
-    progress?: number; // 0–1
+    /** 0–1 through the song. */
+    progress?: number;
     onpause?: () => void;
   };
 
   let {
-    title = "Stardust",
-    artist = "Nhato",
-    score = $bindable(628731),
-    combo = $bindable(125),
-    tp = $bindable(98.42),
+    title = "",
+    artist = "",
+    score = 0,
+    combo = 0,
+    tp = 100,
     difficulty = "EX",
     progress = 0,
     onpause = () => {},
@@ -25,171 +26,104 @@
 
   const DOTS_COLS = 8;
   const DOTS_ROWS = 2;
-
-  const INK = "#2e2840";
-
-  // Big numerals read as light-on-pale, so they carry their own soft shadow
-  // to stay legible against the playfield.
-  const NUMERAL_GLOW =
-    "0 1px 2px rgba(46,40,64,0.28), 0 0 22px rgba(125,103,210,0.5), 0 0 55px rgba(125,103,210,0.25)";
+  const DOT_COUNT = DOTS_COLS * DOTS_ROWS;
 
   let hudBlock: HTMLElement;
-  let hudHeight = $state(210);
 
+  // The playfield sizes itself under the HUD, so it needs the measured height
+  // rather than a guess that breaks when the song title wraps.
   $effect(() => {
-    if (!hudBlock) return;
-    const ro = new ResizeObserver(() => {
-      hudHeight = hudBlock.offsetHeight;
-      const wrapper = hudBlock.closest(
-        ".game-wrapper, [data-game-wrapper]",
-      ) as HTMLElement | null;
-      if (wrapper) wrapper.style.setProperty("--hud-height", hudHeight + "px");
-    });
-    ro.observe(hudBlock);
-    return () => ro.disconnect();
+    if (!hudBlock) {
+      return;
+    }
+    const observer = new ResizeObserver(() => publishHudHeight());
+    observer.observe(hudBlock);
+    return () => observer.disconnect();
   });
+
+  function publishHudHeight() {
+    const wrapper = hudBlock.closest("[data-game-wrapper]");
+    if (!(wrapper instanceof HTMLElement)) {
+      return;
+    }
+    wrapper.style.setProperty("--hud-height", `${hudBlock.offsetHeight}px`);
+  }
 </script>
 
-<svelte:head>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap"
-    rel="stylesheet"
-  />
-</svelte:head>
-
 <!-- Full overlay, pointer-events passthrough except interactive elements -->
-<div
-  class="absolute inset-0 pointer-events-none select-none"
-  style="font-family: 'Rajdhani', sans-serif;"
->
+<div class="hud pointer-events-none absolute inset-0 select-none">
   <!-- ── TOP HUD BLOCK ──────────────────────────────────────────────────── -->
   <div
-    class="absolute top-0 left-0 right-0 flex flex-col"
+    class="absolute top-0 right-0 left-0 flex flex-col"
     bind:this={hudBlock}
     data-hud-block
   >
     <div class="relative flex items-start justify-between px-8 pt-5">
       <!-- LEFT: pause + song info -->
-      <div class="flex flex-row items-start gap-5 pointer-events-auto">
+      <div class="pointer-events-auto flex flex-row items-start gap-5">
         <button
           onclick={onpause}
-          class="mt-1 flex flex-col gap-[5px] cursor-pointer bg-transparent border-none p-0 transition-colors"
-          style="color: rgba(46,40,64,0.7);"
           aria-label="Pause"
+          class="mt-1 cursor-pointer border-none bg-transparent p-0 text-play-ink-muted transition-opacity duration-150 hover:opacity-70"
         >
           <PauseIcon size={32} weight="fill" />
         </button>
+
         <div class="flex flex-col gap-0.5">
-          <span
-            class="text-lg tracking-widest font-light"
-            style="color: {INK};">{title}</span
-          >
-          <span
-            class="text-base"
-            style="color: rgba(46,40,64,0.42); letter-spacing: 0.3em;"
-            >{artist}</span
-          >
+          <span class="text-lg font-light tracking-display text-play-ink">
+            {title}
+          </span>
+          <span class="text-base tracking-display text-play-ink-dim">
+            {artist}
+          </span>
         </div>
       </div>
 
       <!-- CENTRE: dot grid + combo -->
       <div
-        class="flex flex-col items-center gap-3 absolute left-1/2 -translate-x-1/2"
+        class="absolute left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
       >
-        <div
-          class="grid gap-[6px]"
-          style="grid-template-columns: repeat({DOTS_COLS}, 1fr);"
-        >
-          {#each Array(DOTS_COLS * DOTS_ROWS) as _, i}
-            <div
-              class="w-[4px] h-[4px] rounded-full"
-              style="background: rgba(60,52,90,0.22);"
-            ></div>
-          {/each}
-        </div>
+        {#snippet dotGrid()}
+          <div
+            class="grid gap-[6px]"
+            style="grid-template-columns: repeat({DOTS_COLS}, 1fr);"
+          >
+            {#each Array(DOT_COUNT) as _, index (index)}
+              <div class="h-[4px] w-[4px] rounded-full bg-play-dot"></div>
+            {/each}
+          </div>
+        {/snippet}
+
+        {@render dotGrid()}
+
         <div class="flex flex-col items-center gap-0.5">
-          <span
-            class="leading-none"
-            style="
-              font-family: 'Orbitron', monospace;
-              font-size: 3.5rem;
-              font-weight: 900;
-              letter-spacing: 0.08em;
-              color: #ffffff;
-              text-shadow: {NUMERAL_GLOW};
-            ">{combo}</span
-          >
-          <span
-            class="uppercase"
-            style="
-              font-size: 0.6rem;
-              letter-spacing: 0.4em;
-              color: rgba(46,40,64,0.5);
-            ">Combo</span
-          >
+          <!-- Keyed on the value so a new combo replays the pop. -->
+          {#key combo}
+            <span class="numeral combo-pop text-[3.5rem] font-black">
+              {combo}
+            </span>
+          {/key}
+          <span class="hud-label text-play-ink-muted">Combo</span>
         </div>
-        <div
-          class="grid gap-[6px]"
-          style="grid-template-columns: repeat({DOTS_COLS}, 1fr);"
-        >
-          {#each Array(DOTS_COLS * DOTS_ROWS) as _, i}
-            <div
-              class="w-[4px] h-[4px] rounded-full"
-              style="background: rgba(60,52,90,0.22);"
-            ></div>
-          {/each}
-        </div>
+
+        {@render dotGrid()}
       </div>
 
       <!-- RIGHT: score + TP -->
       <div class="flex flex-col items-end gap-3">
         <div class="flex flex-col items-end gap-0.5">
-          <span
-            class="uppercase"
-            style="
-              font-size: 0.6rem;
-              letter-spacing: 0.3em;
-              color: rgba(46,40,64,0.5);
-            ">Score</span
-          >
-          <span
-            class="leading-none tabular-nums"
-            style="
-              font-family: 'Orbitron', monospace;
-              font-size: 2.6rem;
-              font-weight: 700;
-              letter-spacing: 0.06em;
-              color: #ffffff;
-              text-shadow: {NUMERAL_GLOW};
-            "
-          >
+          <span class="hud-label text-play-ink-muted">Score</span>
+          <span class="numeral text-[2.6rem] font-bold tabular-nums">
             {String(score).padStart(7, "0")}
           </span>
-          <div
-            class="mt-1"
-            style="width: 100%; height: 1px; background: rgba(125,103,210,0.75);"
-          ></div>
+          <div class="mt-1 h-px w-full bg-play-accent"></div>
         </div>
+
         <div class="flex flex-col items-end gap-0.5">
+          <span class="hud-label text-play-ink-dim">TP</span>
           <span
-            class="uppercase"
-            style="
-              font-size: 0.6rem;
-              letter-spacing: 0.3em;
-              color: rgba(46,40,64,0.4);
-            ">TP</span
-          >
-          <span
-            class="leading-none"
-            style="
-              font-family: 'Orbitron', monospace;
-              font-size: 1.4rem;
-              font-weight: 400;
-              letter-spacing: 0.06em;
-              color: rgba(46,40,64,0.8);
-            "
+            class="text-[1.4rem] leading-none tabular-nums text-play-ink-muted"
+            style="font-family: var(--font-numeral); letter-spacing: 0.06em;"
           >
             {tp.toFixed(2)}%
           </span>
@@ -198,10 +132,12 @@
     </div>
 
     <!-- ── PROGRESS BAR ──────────────────────────────────────────────────── -->
-    <div class="w-full mt-6" style="height: 3px; background: rgba(60,52,90,0.12);">
+    <!-- Scaled rather than resized: this advances every frame of the song, and
+         a width animation would relayout the bar on each one. -->
+    <div class="mt-6 h-[3px] w-full overflow-hidden bg-play-line">
       <div
-        style="height: 100%; width: {progress *
-          100}%; background: linear-gradient(90deg, #7d67d2, #b07cff); box-shadow: 0 0 10px rgba(125,103,210,0.6); transition: width 0.08s linear;"
+        class="progress-fill h-full w-full origin-left"
+        style="transform: scaleX({progress});"
       ></div>
     </div>
   </div>
@@ -209,8 +145,7 @@
   <!-- ── BOTTOM LEFT: logo watermark ────────────────────────────────────── -->
   <div class="absolute bottom-6 left-8 flex flex-row items-center gap-4">
     <svg
-      class="w-9 h-9"
-      style="color: rgba(60,52,90,0.4);"
+      class="h-9 w-9 text-play-ink-dim"
       viewBox="0 0 40 40"
       fill="none"
       stroke="currentColor"
@@ -236,34 +171,73 @@
         y2="25"
       />
     </svg>
+
     <div class="flex flex-col gap-0.5">
-      <span
-        class="uppercase leading-none"
-        style="font-size: 0.72rem; letter-spacing: 0.34em; color: rgba(46,40,64,0.62);"
-        >Synapse</span
-      >
-      <span
-        class="uppercase leading-none"
-        style="font-size: 0.6rem; letter-spacing: 0.28em; color: rgba(46,40,64,0.38);"
-        >Rhythm Protocol</span
-      >
+      <span class="hud-label leading-none text-play-ink-muted">Synapse</span>
+      <span class="hud-label leading-none text-play-ink-dim">
+        Rhythm Protocol
+      </span>
     </div>
   </div>
 
   <!-- ── BOTTOM RIGHT: difficulty badge ─────────────────────────────────── -->
-  <div class="absolute bottom-6 right-8 flex flex-row items-end gap-3">
-    <div style="width: 1px; height: 3rem; background: rgba(125,103,210,0.7);"></div>
-    <div class="flex flex-col items-start gap-0.5">
-      <span
-        class="leading-none"
-        style="
-          font-family: 'Orbitron', monospace;
-          font-size: 2rem;
-          font-weight: 700;
-          letter-spacing: 0.12em;
-          color: #7d67d2;
-        ">{difficulty}</span
-      >
-    </div>
+  <div class="absolute right-8 bottom-6 flex flex-row items-end gap-3">
+    <div class="h-12 w-px bg-play-accent"></div>
+    <span
+      class="text-[2rem] leading-none font-bold text-play-accent"
+      style="font-family: var(--font-numeral); letter-spacing: 0.12em;"
+    >
+      {difficulty}
+    </span>
   </div>
 </div>
+
+<style>
+  @reference "tailwindcss";
+  @reference "../../../style/global.css";
+
+  .hud {
+    font-family: var(--font-ui);
+  }
+
+  .hud-label {
+    @apply text-[0.6rem] uppercase;
+    letter-spacing: 0.34em;
+  }
+
+  .numeral {
+    font-family: var(--font-numeral);
+    letter-spacing: 0.08em;
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: var(--shadow-numeral);
+  }
+
+  .progress-fill {
+    background: linear-gradient(
+      90deg,
+      var(--color-play-accent),
+      var(--color-play-accent-bright)
+    );
+    box-shadow: 0 0 10px rgba(125, 103, 210, 0.6);
+  }
+
+  @keyframes combo-pop {
+    from {
+      transform: scale(1.14);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+
+  .combo-pop {
+    animation: combo-pop var(--duration-base) var(--ease-ui);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .combo-pop {
+      animation: none;
+    }
+  }
+</style>

@@ -6,6 +6,15 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
+    <!-- Fonts are linked here rather than @imported from global.css. Tailwind's
+         own @import is inlined ahead of any later one, which puts a font
+         @import past the top of the file, where the parser drops it. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Orbitron:wght@400;700;900&display=swap"
+      rel="stylesheet"
+    />
     <link href="/src/style/global.css" rel="stylesheet" />
     <meta name="description" content="Synapse: Rhythm Protocol" />
     <link rel="icon" href="/favicon.svg" />
