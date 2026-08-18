@@ -3,6 +3,11 @@ import type { PageEntry } from './chart';
 import { getScanLineY, getCurrentPageDir } from './chart';
 import { PALETTE } from './noteTextures';
 
+/** Beam weight, matching the design system's thick rule. */
+const BEAM_HEIGHT = 6;
+const MARKER_COUNT = 14;
+const MARKER_SIZE = 12;
+
 export class Scanner {
   private gfx: Graphics;
   private _scanY = 0;
@@ -36,44 +41,41 @@ export class Scanner {
     this._dir   = getCurrentPageDir(elapsed, pageList, bpm, timeBase);
 
     const scanY = this.PLAY_TOP + this._scanY * this.PLAY_H;
-    const pulse  = 0.9 + 0.1 * Math.sin(elapsed * 2.8);
-    const bright = pulse * (1 + activeBoost * 0.4);
 
     this.gfx.clear();
+    this.drawBeam(scanY, activeBoost);
+    this.drawMarkers(scanY);
+    this.drawDirectionCaps(scanY);
+  }
 
-    // Soft bloom. Stacked bands rather than one wide fill so the falloff
-    // reads as a glow against the pale playfield instead of a grey slab.
-    for (let i = 4; i >= 1; i--) {
-      const halfHeight = i * 9;
-      this.gfx.rect(0, scanY - halfHeight, this.W, halfHeight * 2);
-      this.gfx.fill({ color: PALETTE.scanline, alpha: 0.09 * bright });
+  /** The beam is a rule, not a glow: solid black, full bleed, no falloff. */
+  private drawBeam(scanY: number, activeBoost: number) {
+    const height = BEAM_HEIGHT + activeBoost * 2;
+
+    this.gfx.rect(0, scanY - height / 2, this.W, height);
+    this.gfx.fill({ color: PALETTE.ink, alpha: 1 });
+  }
+
+  /** Accent blocks punched along the beam, marking the lanes. */
+  private drawMarkers(scanY: number) {
+    const spacing = this.W / MARKER_COUNT;
+    const half = MARKER_SIZE / 2;
+
+    for (let i = 0; i <= MARKER_COUNT; i++) {
+      const x = i * spacing;
+      this.gfx.rect(x - half, scanY - half, MARKER_SIZE, MARKER_SIZE);
+      this.gfx.fill({ color: PALETTE.accent, alpha: 1 });
     }
+  }
 
-    // Accent fringe gives the beam an edge on a light background.
-    this.gfx.rect(0, scanY - 7, this.W, 14);
-    this.gfx.fill({ color: PALETTE.accent, alpha: 0.1 * bright });
+  /** Travel direction, marked at both ends. */
+  private drawDirectionCaps(scanY: number) {
+    const size = 12;
+    const tip = this._dir === -1 ? scanY + size : scanY - size;
 
-    // Core
-    this.gfx.rect(0, scanY - 1.5, this.W, 3);
-    this.gfx.fill({ color: PALETTE.scanline, alpha: bright });
-
-    // Static diamond markers along the beam.
-    const spacing = this.W / 14;
-    for (let i = 0; i <= 14; i++) {
-      const tx = i * spacing;
-      const size = 5;
-      this.gfx.poly([tx, scanY - size, tx + size, scanY, tx, scanY + size, tx - size, scanY]);
-      this.gfx.fill({ color: PALETTE.scanline, alpha: 0.95 * bright });
-      this.gfx.poly([tx, scanY - size, tx + size, scanY, tx, scanY + size, tx - size, scanY]);
-      this.gfx.stroke({ width: 1, color: PALETTE.accent, alpha: 0.35 * bright });
-    }
-
-    // Travel direction, marked at both ends.
-    const arrow = 9;
-    const tip = this._dir === -1 ? scanY + arrow : scanY - arrow;
     for (const edgeX of [26, this.W - 26]) {
-      this.gfx.poly([edgeX, tip, edgeX - arrow, scanY, edgeX + arrow, scanY]);
-      this.gfx.fill({ color: PALETTE.accent, alpha: 0.55 * bright });
+      this.gfx.poly([edgeX, tip, edgeX - size, scanY, edgeX + size, scanY]);
+      this.gfx.fill({ color: PALETTE.ink, alpha: 1 });
     }
   }
 

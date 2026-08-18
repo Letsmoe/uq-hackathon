@@ -203,17 +203,6 @@
     "
   />
 
-  <!-- Ruled field. Same black as every other rule, just thinner and sparse. -->
-  <div
-    class="pointer-events-none absolute inset-0"
-    style="
-      background-image:
-        linear-gradient(rgba(0, 0, 0, 0.07) 2px, transparent 2px),
-        linear-gradient(90deg, rgba(0, 0, 0, 0.07) 2px, transparent 2px);
-      background-size: 88px 88px;
-    "
-  ></div>
-
   <canvas bind:this={canvas} class="absolute inset-0 h-full w-full"></canvas>
 
   <GameUI

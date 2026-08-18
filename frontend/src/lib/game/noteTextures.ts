@@ -1,132 +1,142 @@
 import { Graphics, Texture, type Renderer } from "pixi.js";
 
 /**
- * Palette for the in-game surface. The playfield is a pale field with dark
- * note wells and bright cores, matching the menu's shader grid rather than
- * inverting it.
+ * The playfield speaks the menu's language: flat saturated fills, solid black
+ * rules and hard offset shadows. Nothing glows and nothing gradients, so a note
+ * is read by its shape, its colour and the gap left by its approach frame.
  */
 export const PALETTE = {
-  bezelLight: 0xffffff,
-  bezelMid: 0xdcdae2,
-  bezelEdge: 0x8f8b9c,
-  wellDeep: 0x120e22,
-  wellRim: 0x2c2448,
-  coreApproach: 0x4db8ff,
-  coreActive: 0xb07cff,
-  coreHot: 0xffffff,
-  connector: 0x4a3f7a,
-  holdTrack: 0x2a2148,
-  holdRim: 0x7d67d2,
-  holdCharge: 0x9a74ff,
-  holdHot: 0xe6dcff,
-  accent: 0x7d67d2,
-  scanline: 0xffffff,
+  ink: 0x000000,
+  canvas: 0xf2ede3,
+  raised: 0xffffff,
+  accent: 0x7c6bf5,
+  signal: 0x35e0f0,
+  warning: 0xffd34f,
+  danger: 0xff5c6e,
 } as const;
 
+/** Note type carries a colour and a silhouette, not just a size. */
+export type NoteSkin = "tap" | "hold" | "flick" | "chain";
+
+export const SKIN_COLOR: Record<NoteSkin, number> = {
+  tap: PALETTE.accent,
+  hold: PALETTE.signal,
+  flick: PALETTE.warning,
+  chain: PALETTE.raised,
+};
+
 export interface NoteTextureSet {
-  body: Texture;
-  chainBody: Texture;
-  glow: Texture;
-  approachRing: Texture;
+  tap: Texture;
+  hold: Texture;
+  flick: Texture;
+  chain: Texture;
+  approachFrame: Texture;
+}
+
+/** Rule weight and shadow throw, as shares of the note's half-size. */
+const RULE_SHARE = 0.11;
+const SHADOW_SHARE = 0.16;
+const BEVEL_SHARE = 0.28;
+
+export function ruleWidth(half: number): number {
+  return Math.max(2, half * RULE_SHARE);
+}
+
+export function shadowOffset(half: number): number {
+  return Math.max(3, half * SHADOW_SHARE);
 }
 
 /**
- * Soft radial falloff used for every glow in the scene. Drawn on a 2D canvas
- * because a gradient bakes into one texture that can then be tinted and drawn
- * with additive blending, which is far cheaper than a bloom pass.
+ * The shape language: two opposite corners cut away, two left square. Same cut
+ * the menu's `.cut` class makes, traced by hand because Pixi has no corner
+ * shape of its own.
  */
-function createGlowTexture(size: number): Texture {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
+export function traceBevelSquare(
+  graphics: Graphics,
+  centerX: number,
+  centerY: number,
+  half: number,
+) {
+  const bevel = half * BEVEL_SHARE * 2;
+  const left = centerX - half;
+  const right = centerX + half;
+  const top = centerY - half;
+  const bottom = centerY + half;
 
-  const context = canvas.getContext("2d");
-  if (!context) {
-    throw new Error("Could not get a 2D context for the glow texture");
-  }
-
-  const half = size / 2;
-  const gradient = context.createRadialGradient(half, half, 0, half, half, half);
-  gradient.addColorStop(0.0, "rgba(255, 255, 255, 1)");
-  gradient.addColorStop(0.12, "rgba(255, 255, 255, 0.85)");
-  gradient.addColorStop(0.35, "rgba(255, 255, 255, 0.32)");
-  gradient.addColorStop(0.7, "rgba(255, 255, 255, 0.07)");
-  gradient.addColorStop(1.0, "rgba(255, 255, 255, 0)");
-
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, size, size);
-
-  return Texture.from(canvas);
+  graphics.moveTo(left + bevel, top);
+  graphics.lineTo(right, top);
+  graphics.lineTo(right, bottom - bevel);
+  graphics.lineTo(right - bevel, bottom);
+  graphics.lineTo(left, bottom);
+  graphics.lineTo(left, top + bevel);
+  graphics.closePath();
 }
 
-/** Short radial ticks around the bezel, with gaps for the segmented look. */
-function drawBezelTicks(graphics: Graphics, radius: number, tickCount: number) {
-  const inner = radius * 0.845;
-  const outer = radius * 0.945;
-
-  for (let i = 0; i < tickCount; i++) {
-    // Leaves four arcs bare so the ring reads as segmented hardware.
-    if (i % 8 === 3 || i % 8 === 4) {
-      continue;
-    }
-    const angle = (i / tickCount) * Math.PI * 2;
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    graphics.moveTo(cos * inner, sin * inner);
-    graphics.lineTo(cos * outer, sin * outer);
-  }
-  graphics.stroke({ width: radius * 0.025, color: PALETTE.bezelEdge, alpha: 0.55 });
+export function traceDiamond(
+  graphics: Graphics,
+  centerX: number,
+  centerY: number,
+  half: number,
+) {
+  graphics.moveTo(centerX, centerY - half);
+  graphics.lineTo(centerX + half, centerY);
+  graphics.lineTo(centerX, centerY + half);
+  graphics.lineTo(centerX - half, centerY);
+  graphics.closePath();
 }
 
-/** Heavier arc segments that break up the outer edge. */
-function drawBezelSegments(graphics: Graphics, radius: number) {
-  const segments: Array<[number, number]> = [
-    [-0.55, 0.35],
-    [2.0, 2.7],
-    [3.6, 3.95],
-  ];
-
-  for (const [start, end] of segments) {
-    graphics.arc(0, 0, radius * 0.895, start, end);
-    graphics.stroke({ width: radius * 0.1, color: PALETTE.bezelEdge, alpha: 0.32 });
-  }
+/** A pennant: square base, one edge drawn out to a point that reads as travel. */
+function traceFlick(graphics: Graphics, half: number) {
+  graphics.moveTo(-half, -half);
+  graphics.lineTo(half * 0.35, -half);
+  graphics.lineTo(half * 1.15, 0);
+  graphics.lineTo(half * 0.35, half);
+  graphics.lineTo(-half, half);
+  graphics.closePath();
 }
 
-function createBodyTexture(renderer: Renderer, radius: number): Texture {
+type Trace = (graphics: Graphics, half: number) => void;
+
+const TRACES: Record<NoteSkin, Trace> = {
+  tap: (graphics, half) => traceBevelSquare(graphics, 0, 0, half),
+  hold: (graphics, half) => traceBevelSquare(graphics, 0, 0, half),
+  flick: traceFlick,
+  chain: (graphics, half) => traceDiamond(graphics, 0, 0, half),
+};
+
+/**
+ * Bodies are baked with their fill and their rule already in them. The shadow
+ * is the same texture tinted flat black, which is why nothing here may rely on
+ * a tint of its own.
+ */
+function createBodyTexture(
+  renderer: Renderer,
+  skin: NoteSkin,
+  half: number,
+): Texture {
   const graphics = new Graphics();
+  const rule = ruleWidth(half);
 
-  // Outer hairline
-  graphics.circle(0, 0, radius);
-  graphics.stroke({ width: radius * 0.018, color: PALETTE.bezelEdge, alpha: 0.45 });
-
-  // Bright metallic band
-  graphics.circle(0, 0, radius * 0.895);
-  graphics.stroke({ width: radius * 0.15, color: PALETTE.bezelLight, alpha: 1 });
-
-  drawBezelSegments(graphics, radius);
-  drawBezelTicks(graphics, radius, 40);
-
-  // Shaded inner lip of the band
-  graphics.circle(0, 0, radius * 0.815);
-  graphics.stroke({ width: radius * 0.03, color: PALETTE.bezelMid, alpha: 0.9 });
-
-  // Dark well
-  graphics.circle(0, 0, radius * 0.8);
-  graphics.fill({ color: PALETTE.wellDeep, alpha: 1 });
-
-  // Rim light inside the well
-  graphics.circle(0, 0, radius * 0.72);
-  graphics.stroke({ width: radius * 0.055, color: PALETTE.wellRim, alpha: 0.75 });
+  TRACES[skin](graphics, half - rule / 2);
+  graphics.fill({ color: SKIN_COLOR[skin], alpha: 1 });
+  graphics.stroke({ width: rule, color: PALETTE.ink, alpha: 1, alignment: 0.5 });
 
   const texture = renderer.generateTexture({ target: graphics, resolution: 2 });
   graphics.destroy();
   return texture;
 }
 
-function createApproachRingTexture(renderer: Renderer, radius: number): Texture {
+/**
+ * The timing cue. A hard black outline that collapses onto the note and lands
+ * flush with its edge at the hit time, so the gap between the two is the count
+ * down rather than a brightness the player has to judge.
+ */
+function createApproachFrameTexture(renderer: Renderer, half: number): Texture {
   const graphics = new Graphics();
-  graphics.circle(0, 0, radius * 0.94);
-  graphics.stroke({ width: radius * 0.02, color: PALETTE.accent, alpha: 0.9 });
+  const rule = ruleWidth(half) * 0.75;
+
+  traceBevelSquare(graphics, 0, 0, half - rule / 2);
+  graphics.stroke({ width: rule, color: PALETTE.ink, alpha: 1, alignment: 0.5 });
 
   const texture = renderer.generateTexture({ target: graphics, resolution: 2 });
   graphics.destroy();
@@ -135,13 +145,14 @@ function createApproachRingTexture(renderer: Renderer, radius: number): Texture 
 
 export function createNoteTextures(
   renderer: Renderer,
-  noteRadius: number,
-  chainRadius: number,
+  noteHalf: number,
+  chainHalf: number,
 ): NoteTextureSet {
   return {
-    body: createBodyTexture(renderer, noteRadius),
-    chainBody: createBodyTexture(renderer, chainRadius),
-    glow: createGlowTexture(256),
-    approachRing: createApproachRingTexture(renderer, noteRadius),
+    tap: createBodyTexture(renderer, "tap", noteHalf),
+    hold: createBodyTexture(renderer, "hold", noteHalf),
+    flick: createBodyTexture(renderer, "flick", noteHalf),
+    chain: createBodyTexture(renderer, "chain", chainHalf),
+    approachFrame: createApproachFrameTexture(renderer, noteHalf),
   };
 }
