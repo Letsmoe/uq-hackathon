@@ -260,22 +260,6 @@
     </span>
   </div>
 
-  <!-- Dots. The mark is small, the target around it is not. -->
-  <div class="flex shrink-0 flex-row gap-2">
-    {#each songs as song, index}
-      <button
-        onclick={() => (selected = index)}
-        aria-label="Go to {song.title}"
-        class="flex h-8 w-8 cursor-pointer items-center justify-center border-none bg-transparent p-0"
-      >
-        <span
-          class="h-3 border-hard transition-all duration-300 {index === selected
-            ? 'w-10 bg-accent'
-            : 'w-3 bg-raised'}"
-        ></span>
-      </button>
-    {/each}
-  </div>
 </div>
 
 <style>

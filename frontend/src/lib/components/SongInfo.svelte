@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import type { MouseEventHandler } from "svelte/elements";
   import { Tween } from "svelte/motion";
   import { cubicOut } from "svelte/easing";
@@ -19,6 +20,8 @@
     ondifficultychange?: (difficulty: Difficulty) => void;
     onstart?: MouseEventHandler<HTMLButtonElement>;
     onshuffle?: () => void;
+    /** Carousel position marks, shown between the description and the score. */
+    indicator?: Snippet;
   }
 
   let {
@@ -31,6 +34,7 @@
     ondifficultychange = () => {},
     onstart = () => {},
     onshuffle = () => {},
+    indicator,
   }: Props = $props();
 
   /** The picked difficulty fills with its own status colour; the rest stay
@@ -74,16 +78,20 @@
 </script>
 
 <div class="flex w-full flex-col items-center gap-3">
-  <!-- Description and score share a line. They are both one short string, and
-       the row each used to hold came out of the carousel's height. -->
-  <div class="flex w-full flex-row items-center justify-between gap-6">
+  <!-- Description, indicator and score share a line. Equal side columns put
+       the indicator on the same centre line as the middle difficulty. -->
+  <div class="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-6">
     <p
       class="truncate text-2xs leading-none font-bold tracking-loose text-fg-muted uppercase"
     >
       {description}
     </p>
 
-    <div class="flex shrink-0 flex-row items-center gap-3">
+    <div class="flex shrink-0 justify-center">
+      {@render indicator?.()}
+    </div>
+
+    <div class="flex shrink-0 flex-row items-center justify-end gap-3">
       <span class="label-caps">Best</span>
       <span
         class="text-lg leading-none font-black tracking-num text-fg tabular-nums"
@@ -119,7 +127,7 @@
     <button
       onclick={onstart}
       disabled={generating || !canStart}
-      class="hard-press border-hard cut flex h-[clamp(52px,8vh,84px)] w-full max-w-[520px] cursor-pointer flex-row items-center justify-center gap-5 bg-accent text-2xl font-black tracking-display text-ink-fg uppercase transition-colors duration-150 disabled:cursor-not-allowed disabled:bg-hover disabled:text-fg-dim"
+      class="hard-press border-hard cut flex h-[clamp(64px,10vh,104px)] w-full max-w-[520px] cursor-pointer flex-row items-center justify-center gap-5 bg-accent text-2xl font-black tracking-display text-ink-fg uppercase transition-colors duration-150 disabled:cursor-not-allowed disabled:bg-hover disabled:text-fg-dim"
     >
       {startLabel}
       <svg class="h-7 w-7 shrink-0 fill-current" viewBox="0 0 10 10">
@@ -131,7 +139,7 @@
       onclick={onshuffle}
       title="Random song"
       aria-label="Random song"
-      class="hard-press border-hard cut flex aspect-square h-[clamp(52px,8vh,84px)] shrink-0 cursor-pointer items-center justify-center bg-raised text-fg transition-colors duration-150 hover:bg-hover"
+      class="hard-press border-hard cut flex aspect-square h-[clamp(64px,10vh,104px)] shrink-0 cursor-pointer items-center justify-center bg-raised text-fg transition-colors duration-150 hover:bg-hover"
     >
       <ShuffleIcon size={26} weight="bold" />
     </button>

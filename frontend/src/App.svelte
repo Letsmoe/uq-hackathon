@@ -8,6 +8,7 @@
   import type { NavId } from "./lib/components/NavButtons.svelte";
   import SongCarousel from "./lib/components/SongCarousel.svelte";
   import SongInfo from "./lib/components/SongInfo.svelte";
+  import CarouselDots from "./lib/components/CarouselDots.svelte";
   import RecentlyPlayed from "./lib/components/RecentlyPlayed.svelte";
   import type { RecentTrack } from "./lib/components/RecentlyPlayed.svelte";
   import Logo from "./lib/components/Logo.svelte";
@@ -85,6 +86,7 @@
   const unreadCount = $derived(
     messages.filter((message) => !message.read).length,
   );
+  const songTitles = $derived(songs.map((song) => song.title));
   const recentTracks: RecentTrack[] = $derived(
     recentIndexes.map((songIndex) => ({
       songIndex,
@@ -263,7 +265,11 @@
                   ondifficultychange={changeDifficulty}
                   onstart={startSong}
                   onshuffle={pickRandomSong}
-                />
+                >
+                  {#snippet indicator()}
+                    <CarouselDots titles={songTitles} bind:selected />
+                  {/snippet}
+                </SongInfo>
 
                 <div aria-hidden="true"></div>
               </div>
