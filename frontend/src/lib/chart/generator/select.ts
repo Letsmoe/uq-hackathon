@@ -27,8 +27,20 @@ const MAX_HOLD_BEATS = 4;
 // takes longer than tapping twice, so this floor applies at every difficulty.
 // Without it back to back holds are unplayable at the faster settings.
 export const HOLD_RELEASE_SEC = 0.18;
-const MAX_DRAG_SPACING_SLOTS = SLOTS_PER_BEAT / 2;
+// A sweep may run as slow as one node per beat. Anything sparser reads as
+// separate notes joined by a line rather than as one gesture.
+const MAX_DRAG_SPACING_SLOTS = SLOTS_PER_BEAT;
+// Quantisation puts a node a slot either side of where the run wants it, which
+// should not end the run.
+const DRAG_SPACING_TOLERANCE_SLOTS = 1;
+// A sweep is a phrase, not a whole section: past this it stops reading as one
+// gesture and the hand has nowhere left to go.
+const MAX_DRAG_NODES = 12;
 const QUIET_SECTION_FLOOR = 0.2;
+// Onset detection turns up the odd weak blip in a decay or a room tail. They
+// are not hits a player can hear, so they never earn a note however much room
+// the budget has left.
+const MIN_ONSET_STRENGTH = 0.5;
 
 export type NoteKind = "tap" | "hold" | "drag";
 
@@ -73,7 +85,34 @@ function selectSectionEvents(
   const noteBudget = budgetFor(section, spec, grid);
   const chosen = chooseSlots(rankByPriority(candidates), spec, grid, noteBudget);
 
-  return buildEvents(chosen, spec, grid);
+  return limitHolds(buildEvents(chosen, spec, grid), spec);
+}
+
+/**
+ * Plenty of music sustains, so anything that merely rings on qualifies as a
+ * hold and a chart built on that alone comes out as a wall of them. Holds are
+ * an accent: only the longest few in a section survive, and the rest go back to
+ * being taps.
+ */
+function limitHolds(events: NoteEvent[], spec: DifficultySpec): NoteEvent[] {
+  const allowance = Math.floor(events.length * spec.holdShare);
+  const kept = new Set(longestHoldSlots(events, allowance));
+
+  return events.map((event) => {
+    if (event.kind !== "hold" || kept.has(event.slot)) {
+      return event;
+    }
+
+    return { ...event, kind: "tap" as NoteKind, durationSlots: 0 };
+  });
+}
+
+function longestHoldSlots(events: NoteEvent[], allowance: number): number[] {
+  return events
+    .filter((event) => event.kind === "hold")
+    .sort((first, second) => second.durationSlots - first.durationSlots)
+    .slice(0, allowance)
+    .map((event) => event.slot);
 }
 
 // ── Candidate filtering and ranking ─────────────────────────────────────────
@@ -87,6 +126,7 @@ function candidatesFor(
     if (onset.beatPosition < section.startBeat) return false;
     if (onset.beatPosition >= section.endBeat) return false;
     if (!spec.voices.includes(onset.voice)) return false;
+    if (onset.strength < MIN_ONSET_STRENGTH) return false;
 
     return spec.allowedSubdivisions.includes(onset.subdivision);
   });
@@ -129,18 +169,27 @@ function chooseSlots(
   grid: BeatGrid,
   noteBudget: number,
 ): SlotMap {
-  const minimumGapSlots = gapSlots(spec, grid);
+  const room: SelectionRoom = {
+    minimumGapSlots: gapSlots(spec, grid),
+    chords: Math.floor(noteBudget * spec.chordShare),
+  };
   const chosen: SlotMap = new Map();
   let noteCount = 0;
 
   for (const onset of ranked) {
     if (noteCount >= noteBudget) break;
-    if (!acceptOnset(chosen, onset, spec, minimumGapSlots)) continue;
+    if (!acceptOnset(chosen, onset, spec, room)) continue;
 
     noteCount++;
   }
 
   return chosen;
+}
+
+/** What selection has left to hand out, spent as it walks the ranked onsets. */
+interface SelectionRoom {
+  minimumGapSlots: number;
+  chords: number;
 }
 
 function gapSlots(spec: DifficultySpec, grid: BeatGrid): number {
@@ -153,16 +202,16 @@ function acceptOnset(
   chosen: SlotMap,
   onset: GridOnset,
   spec: DifficultySpec,
-  minimumGapSlots: number,
+  room: SelectionRoom,
 ): boolean {
   const slot = Math.round(onset.beatPosition * SLOTS_PER_BEAT);
   const existing = chosen.get(slot);
 
   if (existing) {
-    return widenChord(existing, onset, spec);
+    return widenChord(existing, onset, spec, room);
   }
 
-  if (hasNeighbourWithin(chosen, slot, minimumGapSlots)) {
+  if (hasNeighbourWithin(chosen, slot, room.minimumGapSlots)) {
     return false;
   }
 
@@ -171,8 +220,25 @@ function acceptOnset(
   return true;
 }
 
-function widenChord(existing: GridOnset[], onset: GridOnset, spec: DifficultySpec): boolean {
+/**
+ * Several registers landing together is the normal case in mixed music, so a
+ * chart that chords every one of them is a wall of doubles with no run of
+ * single notes long enough to sweep. Chords are an accent, and the onsets
+ * arrive strongest first, so the allowance falls to the hardest hits of the
+ * section. Turning one down leaves its place in the budget for another slot.
+ */
+function widenChord(
+  existing: GridOnset[],
+  onset: GridOnset,
+  spec: DifficultySpec,
+  room: SelectionRoom,
+): boolean {
   if (existing.length >= spec.maxNotesPerTick) return false;
+  if (existing.length === 1 && room.chords <= 0) return false;
+
+  if (existing.length === 1) {
+    room.chords--;
+  }
 
   existing.push(onset);
 
@@ -219,11 +285,16 @@ function assembleEvents(
   return events;
 }
 
+/**
+ * The trailing slots of a run become nodes of the drag its head builds, so they
+ * raise no note of their own. The head is not consumed: it is the one slot that
+ * still has an event to build.
+ */
 function collectConsumedSlots(dragRuns: Map<number, number[]>): Set<number> {
   const consumed = new Set<number>();
 
   for (const run of dragRuns.values()) {
-    run.forEach((slot) => consumed.add(slot));
+    run.slice(1).forEach((slot) => consumed.add(slot));
   }
 
   return consumed;
@@ -360,35 +431,48 @@ function findDragRuns(
     return runs;
   }
 
+  const room = { slots: Math.floor(slots.length * spec.dragShare) };
   let index = 0;
 
   while (index < slots.length) {
-    index = takeRunAt(slots, index, chosen, spec, runs);
+    index = takeRunAt(slots, index, chosen, spec, room, runs);
   }
 
   return runs;
 }
 
+/**
+ * Sweeps are a texture the chart reaches for now and then. Left uncapped they
+ * swallow every even run in the track and the player spends the song dragging
+ * rather than hitting notes.
+ */
 function takeRunAt(
   slots: number[],
   start: number,
   chosen: SlotMap,
   spec: DifficultySpec,
+  room: { slots: number },
   runs: Map<number, number[]>,
 ): number {
-  const run = evenlySpacedRun(slots, start, chosen);
+  const run = evenlySpacedRun(slots, start, chosen, spec);
 
-  if (run.length < spec.minDragNotes) {
+  if (run.length < spec.minDragNotes || run.length > room.slots) {
     return start + 1;
   }
 
+  room.slots -= run.length;
   runs.set(run[0], run);
 
   return start + run.length;
 }
 
-function evenlySpacedRun(slots: number[], start: number, chosen: SlotMap): number[] {
-  if (start + 1 >= slots.length || chosen.get(slots[start])!.length > 1) {
+function evenlySpacedRun(
+  slots: number[],
+  start: number,
+  chosen: SlotMap,
+  spec: DifficultySpec,
+): number[] {
+  if (start + 1 >= slots.length || !carriesOneNote(chosen, slots[start], spec)) {
     return [slots[start]];
   }
 
@@ -398,7 +482,12 @@ function evenlySpacedRun(slots: number[], start: number, chosen: SlotMap): numbe
     return [slots[start]];
   }
 
-  return extendRun(slots, start, spacing, chosen);
+  return extendRun(slots, start, spacing, chosen, spec);
+}
+
+/** A slot that plays as one note can carry a sweep; a chord cannot. */
+function carriesOneNote(chosen: SlotMap, slot: number, spec: DifficultySpec): boolean {
+  return chordSizeFor(chosen.get(slot)!, spec) === 1;
 }
 
 function extendRun(
@@ -406,17 +495,23 @@ function extendRun(
   start: number,
   spacing: number,
   chosen: SlotMap,
+  spec: DifficultySpec,
 ): number[] {
   const run = [slots[start]];
 
   for (let index = start + 1; index < slots.length; index++) {
-    if (slots[index] - slots[index - 1] !== spacing) break;
-    if (chosen.get(slots[index])!.length > 1) break;
+    if (run.length >= MAX_DRAG_NODES) break;
+    if (!evenlyFollows(slots[index] - slots[index - 1], spacing)) break;
+    if (!carriesOneNote(chosen, slots[index], spec)) break;
 
     run.push(slots[index]);
   }
 
   return run;
+}
+
+function evenlyFollows(gap: number, spacing: number): boolean {
+  return Math.abs(gap - spacing) <= DRAG_SPACING_TOLERANCE_SLOTS;
 }
 
 function buildDragEvent(slot: number, run: number[], chosen: SlotMap): NoteEvent {

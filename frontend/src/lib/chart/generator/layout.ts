@@ -2,19 +2,36 @@ import type { Voice } from "../dsp/onsets";
 import type { BeatGrid } from "../dsp/tempo";
 import type { DifficultySpec } from "./difficulty";
 import { SLOTS_PER_BEAT, type NoteEvent, type NoteKind } from "./select";
+import { scanYGap, scanYRange, type ScanYRange } from "./pageGeometry";
 
 // Notes are drawn at x * screenWidth with a fixed pixel radius, so on the
 // narrowest screen the game targets a note body spans about MIN_NOTE_GAP of the
 // playfield. The margins keep a note body fully on screen.
 const PLAYFIELD_MIN_X = 0.08;
 const PLAYFIELD_MAX_X = 0.92;
-const CHORD_GAP = 0.18;
-const MIN_NOTE_GAP = 0.18;
+// Half-widths of what gets drawn, as a share of the playfield. Two things
+// clear each other once they are the sum of their half-widths apart, so two
+// note bodies need a full body between them and a hold tail, being a narrow
+// slab, needs much less.
+const NOTE_HALF_WIDTH = 0.1;
+const HOLD_TAIL_HALF_WIDTH = 0.03;
+// Drag nodes are drawn smaller than a tap, so they clear their neighbours at a
+// smaller distance. Nodes of the same drag are one gesture and are exempt from
+// each other.
+const CHAIN_HALF_WIDTH = NOTE_HALF_WIDTH * 0.62;
 
-// Time is the vertical axis: a note this far from another in time is already a
-// note body away from it vertically and needs no horizontal clearance at all.
-// In between the two bodies trace an ellipse, which is what requiredGap solves.
-const OVERLAP_WINDOW_SEC = 0.24;
+// Members of a chord are drawn at the same height, so they need the same
+// clearance from each other as any other pair of bodies.
+const CHORD_GAP = NOTE_HALF_WIDTH * 2;
+
+// A note body and its shadow stand about this tall, as a share of the
+// playfield. Two notes closer than this vertically need horizontal clearance;
+// in between, the two bodies trace an ellipse, which is what requiredGap solves.
+const NOTE_HEIGHT = 0.17;
+
+// Seconds a note is on screen around its own hit time. Two notes further apart
+// than this never share the screen, so they may sit at the same height.
+const CO_VISIBLE_SEC = 1.3;
 
 // Candidate anchors are tried outwards from the wanted position in these steps.
 const NUDGE_STEP = 0.04;
@@ -54,11 +71,13 @@ export interface PlacedNote {
   dragNodes: DragNode[];
 }
 
-/** A stretch of one lane that is already taken, in slots. */
+/** A patch of playfield that is already taken. */
 interface Occupancy {
   fromSlot: number;
   toSlot: number;
+  scanY: ScanYRange;
   x: number;
+  halfWidth: number;
 }
 
 interface SlotSpan {
@@ -123,20 +142,35 @@ function placeEvent(
     return null;
   }
 
-  const note = buildPlacedNote(event, anchor);
+  const note = buildPlacedNote(event, anchor, grid, state);
+
+  if (!note) {
+    return null;
+  }
 
   rememberPlaced(note, grid, state);
 
   return note;
 }
 
-function buildPlacedNote(event: NoteEvent, anchor: number): PlacedNote {
+function buildPlacedNote(
+  event: NoteEvent,
+  anchor: number,
+  grid: BeatGrid,
+  state: LayoutState,
+): PlacedNote | null {
+  const dragNodes = placeDragNodes(event, anchor, grid, state);
+
+  if (!dragNodes) {
+    return null;
+  }
+
   return {
     slot: event.slot,
     kind: event.kind,
     xs: spreadChord(anchor, event.chordSize),
     durationSlots: event.durationSlots,
-    dragNodes: placeDragNodes(event, anchor),
+    dragNodes,
   };
 }
 
@@ -196,7 +230,28 @@ function avoidOverlap(
   const half = chordHalfWidth(event.chordSize);
 
   for (const candidate of candidateAnchors(anchor, event.chordSize)) {
-    if (worstClearance(candidate, half, span, grid, state) >= 0) return candidate;
+    if (worstClearance(candidate, half, span, NOTE_HALF_WIDTH, grid, state) >= 0) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+/** The nearest position at which one drawn thing clears everything around it. */
+function clearPosition(
+  wanted: number,
+  slot: number,
+  halfWidth: number,
+  grid: BeatGrid,
+  state: LayoutState,
+): number | null {
+  const span = { fromSlot: slot, toSlot: slot };
+
+  for (const candidate of candidateAnchors(wanted, 1)) {
+    if (worstClearance(candidate, 0, span, halfWidth, grid, state) >= 0) {
+      return candidate;
+    }
   }
 
   return null;
@@ -209,8 +264,21 @@ function avoidOverlap(
  */
 export function placedFits(note: PlacedNote, grid: BeatGrid, state: LayoutState): boolean {
   const span = { fromSlot: note.slot, toSlot: endSlotOf(note) };
+  const bodiesFit = note.xs.every(
+    (x) => worstClearance(x, 0, span, NOTE_HALF_WIDTH, grid, state) >= 0,
+  );
 
-  return note.xs.every((x) => worstClearance(x, 0, span, grid, state) >= 0);
+  if (!bodiesFit) {
+    return false;
+  }
+
+  return note.dragNodes.every((node) => nodeFits(node, grid, state));
+}
+
+function nodeFits(node: DragNode, grid: BeatGrid, state: LayoutState): boolean {
+  const span = { fromSlot: node.slot, toSlot: node.slot };
+
+  return worstClearance(node.x, 0, span, CHAIN_HALF_WIDTH, grid, state) >= 0;
 }
 
 /** The wanted position first, then alternating outwards from it. */
@@ -230,56 +298,93 @@ function worstClearance(
   x: number,
   half: number,
   span: SlotSpan,
+  halfWidth: number,
   grid: BeatGrid,
   state: LayoutState,
 ): number {
+  const scanY = scanYRange(span.fromSlot, span.toSlot);
   let worst = Infinity;
 
   for (const taken of state.occupied) {
-    const gapSec = timeGapSec(taken, span, grid);
+    if (!sharesTheScreen(taken, span, grid)) continue;
 
-    if (gapSec >= OVERLAP_WINDOW_SEC) continue;
+    const heightGap = scanYGap(taken.scanY, scanY);
 
-    worst = Math.min(worst, Math.abs(taken.x - x) - half - requiredGap(gapSec));
+    if (heightGap >= NOTE_HEIGHT) continue;
+
+    worst = Math.min(worst, Math.abs(taken.x - x) - half - requiredGap(heightGap, halfWidth, taken));
   }
 
   return worst;
 }
 
-/** Seconds between two notes being on screen together; zero while they overlap in time. */
-function timeGapSec(taken: Occupancy, span: SlotSpan, grid: BeatGrid): number {
+function sharesTheScreen(taken: Occupancy, span: SlotSpan, grid: BeatGrid): boolean {
   const slotGap = Math.max(0, taken.fromSlot - span.toSlot, span.fromSlot - taken.toSlot);
 
-  return (slotGap / SLOTS_PER_BEAT) * grid.beatPeriodSec;
+  return (slotGap / SLOTS_PER_BEAT) * grid.beatPeriodSec < CO_VISIBLE_SEC;
 }
 
 /**
- * Horizontal clearance two note bodies need at a given vertical separation.
- * Notes sharing a tick need the full gap; notes a whole window apart need none.
+ * Horizontal clearance a note needs from something already drawn, at a given
+ * vertical separation. Level with it they must be a full pair of half-widths
+ * apart; a note body's height above it they may share an x.
  */
-function requiredGap(gapSec: number): number {
-  const closeness = 1 - (gapSec / OVERLAP_WINDOW_SEC) * (gapSec / OVERLAP_WINDOW_SEC);
+function requiredGap(heightGap: number, halfWidth: number, taken: Occupancy): number {
+  const closeness = 1 - (heightGap / NOTE_HEIGHT) * (heightGap / NOTE_HEIGHT);
 
-  return MIN_NOTE_GAP * Math.sqrt(Math.max(0, closeness));
+  return (halfWidth + taken.halfWidth) * Math.sqrt(Math.max(0, closeness));
 }
 
+/**
+ * A note claims a body-sized patch where it sits. A hold claims that patch too,
+ * plus the narrow slab its tail runs down.
+ */
 function registerOccupancy(note: PlacedNote, state: LayoutState): void {
-  const fromSlot = note.slot;
-  const toSlot = endSlotOf(note);
+  const headY = scanYRange(note.slot, note.slot);
 
   for (const x of note.xs) {
-    state.occupied.push({ fromSlot, toSlot, x });
+    state.occupied.push({
+      fromSlot: note.slot,
+      toSlot: note.slot,
+      scanY: headY,
+      x,
+      halfWidth: NOTE_HALF_WIDTH,
+    });
   }
 
+  registerHoldTail(note, state);
+
   note.dragNodes.forEach((node) => {
-    state.occupied.push({ fromSlot: node.slot, toSlot: node.slot, x: node.x });
+    state.occupied.push({
+      fromSlot: node.slot,
+      toSlot: node.slot,
+      scanY: scanYRange(node.slot, node.slot),
+      x: node.x,
+      halfWidth: CHAIN_HALF_WIDTH,
+    });
+  });
+}
+
+function registerHoldTail(note: PlacedNote, state: LayoutState): void {
+  if (note.durationSlots <= 0) {
+    return;
+  }
+
+  const endSlot = note.slot + note.durationSlots;
+
+  state.occupied.push({
+    fromSlot: note.slot,
+    toSlot: endSlot,
+    scanY: scanYRange(note.slot, endSlot),
+    x: note.xs[0],
+    halfWidth: HOLD_TAIL_HALF_WIDTH,
   });
 }
 
 function pruneOccupancy(slot: number, grid: BeatGrid, state: LayoutState): void {
-  const windowSlots = (OVERLAP_WINDOW_SEC / grid.beatPeriodSec) * SLOTS_PER_BEAT;
+  const windowSlots = (CO_VISIBLE_SEC / grid.beatPeriodSec) * SLOTS_PER_BEAT;
 
-  state.occupied = state.occupied.filter((taken) => taken.toSlot >= slot - windowSlots * 2);
+  state.occupied = state.occupied.filter((taken) => taken.toSlot >= slot - windowSlots);
 }
 
 // ── Note geometry ───────────────────────────────────────────────────────────
@@ -309,17 +414,51 @@ function clampAnchor(anchor: number, chordSize: number): number {
   return Math.min(PLAYFIELD_MAX_X - half, Math.max(PLAYFIELD_MIN_X + half, anchor));
 }
 
-function placeDragNodes(event: NoteEvent, headX: number): DragNode[] {
+/**
+ * Returns null when a node has nowhere clear to go. The sweep is one gesture,
+ * so a chart with a node buried under another note is worse than no sweep.
+ */
+function placeDragNodes(
+  event: NoteEvent,
+  headX: number,
+  grid: BeatGrid,
+  state: LayoutState,
+): DragNode[] | null {
   if (event.kind !== "drag") {
     return [];
   }
 
   const region = VOICE_REGION[event.voice];
+  const nodes: DragNode[] = [];
 
-  return event.dragNodeSlots.map((offset, index) => ({
-    slot: event.slot + offset,
-    x: dragNodeX(region, event.dragNodePitch[index], headX),
-  }));
+  for (let index = 0; index < event.dragNodeSlots.length; index++) {
+    const node = placeDragNode(event, index, region, headX, grid, state);
+
+    if (!node) return null;
+
+    nodes.push(node);
+  }
+
+  return nodes;
+}
+
+function placeDragNode(
+  event: NoteEvent,
+  index: number,
+  region: { from: number; to: number },
+  headX: number,
+  grid: BeatGrid,
+  state: LayoutState,
+): DragNode | null {
+  const slot = event.slot + event.dragNodeSlots[index];
+  const wanted = dragNodeX(region, event.dragNodePitch[index], headX);
+  const x = clearPosition(wanted, slot, CHAIN_HALF_WIDTH, grid, state);
+
+  if (x === null) {
+    return null;
+  }
+
+  return { slot, x };
 }
 
 /** Drag nodes stay near the head so the sweep reads as one gesture. */

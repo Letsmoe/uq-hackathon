@@ -2,7 +2,7 @@ import { test, expect, describe } from "bun:test";
 import { analyzeAudio, type AudioAnalysis } from "../frontend/src/lib/chart/analyze";
 import { buildChart } from "../frontend/src/lib/chart/generator/chart";
 import { DIFFICULTIES, specForDifficulty } from "../frontend/src/lib/chart/generator/difficulty";
-import { tickToSeconds } from "../frontend/src/lib/game/chart";
+import { getScanLineY, tickToSeconds } from "../frontend/src/lib/game/chart";
 import type { Chart, ChartNote } from "../frontend/src/lib/game/chart";
 import { SAMPLE_RATE, synthesizeTrack, type BarLayer } from "./synthesizeTrack";
 
@@ -77,13 +77,11 @@ describe("chart building", () => {
     const chart = buildChart(analysis, difficulty);
     const spec = specForDifficulty(difficulty);
 
-    expect(chart.note_list.length / chart.length).toBeLessThanOrEqual(
-      spec.targetNotesPerSecond * 1.1,
-    );
+    expect(hitCount(chart) / chart.length).toBeLessThanOrEqual(spec.targetNotesPerSecond * 1.1);
   });
 
   test("difficulty raises the note count monotonically", () => {
-    const counts = DIFFICULTIES.map((difficulty) => buildChart(analysis, difficulty).note_list.length);
+    const counts = DIFFICULTIES.map((difficulty) => hitCount(buildChart(analysis, difficulty)));
 
     for (let index = 1; index < counts.length; index++) {
       expect(counts[index]).toBeGreaterThan(counts[index - 1]);
@@ -101,6 +99,34 @@ describe("chart building", () => {
     const chart = buildChart(analysis, difficulty);
 
     expectNoOverlap(chart);
+  });
+
+  test.each(DIFFICULTIES)("%s keeps holds a minority of its notes", (difficulty) => {
+    const chart = buildChart(analysis, difficulty);
+    const spec = specForDifficulty(difficulty);
+    const holds = chart.note_list.filter((note) => (note.duration ?? 0) > 0);
+
+    expect(holds.length / chart.note_list.length).toBeLessThanOrEqual(spec.holdShare);
+  });
+
+  test("holds and drags both reach the chart", () => {
+    const holds = buildChart(analysis, "normal").note_list.filter(
+      (note) => (note.duration ?? 0) > 0,
+    );
+    const drags = buildChart(analysis, "chaos").note_list.filter((note) => note.type === 3);
+
+    expect(holds.length).toBeGreaterThan(0);
+    expect(drags.length).toBeGreaterThan(0);
+  });
+
+  test.each(DIFFICULTIES)("%s keeps drags a texture rather than the chart", (difficulty) => {
+    const chart = buildChart(analysis, difficulty);
+    const spec = specForDifficulty(difficulty);
+    const dragNodes = chart.note_list
+      .filter((note) => note.type === 3)
+      .reduce((total, note) => total + (note.nodes?.length ?? 0), 0);
+
+    expect(dragNodes / hitCount(chart)).toBeLessThanOrEqual(spec.dragShare + 0.15);
   });
 
   test.each(DIFFICULTIES)("%s leaves room to release a hold", (difficulty) => {
@@ -205,6 +231,17 @@ function noteTimes(chart: Chart): number[] {
   return chart.note_list.map((note) => tickToSeconds(startTickOf(note), chart.bpm, chart.time_base));
 }
 
+/** What the player actually hits: a drag counts once per node. */
+function hitCount(chart: Chart): number {
+  return chart.note_list.reduce((total, note) => {
+    if (note.nodes) {
+      return total + note.nodes.length;
+    }
+
+    return total + 1;
+  }, 0);
+}
+
 function allNoteX(chart: Chart): number[] {
   return chart.note_list.flatMap((note) => {
     if (note.nodes) {
@@ -248,44 +285,111 @@ function expectMinimumInterval(chart: Chart, minIntervalSec: number): void {
   }
 }
 
-// A note body spans about this much of the playfield horizontally and about
-// this long vertically, time being the vertical axis. Two note bodies overlap
-// when they are inside the ellipse those two extents describe.
-const MIN_VISUAL_GAP_X = 0.18;
-const OVERLAP_WINDOW_SEC = 0.24;
+// What a note takes up on screen, as a share of the playfield. Notes are
+// static and the beam sweeps over them, so two of them at the same height are
+// drawn on top of each other however far apart in time they are.
+const NOTE_HEIGHT = 0.17;
+const NOTE_HALF_WIDTH = 0.1;
+const HOLD_TAIL_HALF_WIDTH = 0.03;
+// A drag node is drawn smaller than a tap, so it clears its neighbours at a
+// smaller distance.
+const CHAIN_HALF_WIDTH = NOTE_HALF_WIDTH * 0.62;
+const CO_VISIBLE_SEC = 1.3;
 
-function requiredGapAt(timeGapSec: number): number {
-  const closeness = 1 - (timeGapSec / OVERLAP_WINDOW_SEC) ** 2;
+function requiredGapAt(heightGap: number, halfWidths: number): number {
+  const closeness = 1 - (heightGap / NOTE_HEIGHT) ** 2;
 
-  return MIN_VISUAL_GAP_X * Math.sqrt(Math.max(0, closeness));
+  return halfWidths * Math.sqrt(Math.max(0, closeness));
 }
 
 interface DrawnNote {
+  /** Index of the chart note this came from; a hold draws two of these. */
+  owner: number;
   startSec: number;
   endSec: number;
+  /** Where it sits on the playfield: 0 is the top edge, 1 the bottom. */
+  yFrom: number;
+  yTo: number;
   x: number;
+  halfWidth: number;
 }
 
 function drawnNotes(chart: Chart): DrawnNote[] {
-  const toSeconds = (tick: number) => tickToSeconds(tick, chart.bpm, chart.time_base);
-
-  return chart.note_list.flatMap((note) => {
+  return chart.note_list.flatMap((note, owner) => {
     if (note.nodes) {
       return note.nodes.map((node) => ({
-        startSec: toSeconds(node.tick),
-        endSec: toSeconds(node.tick),
-        x: node.x,
+        ...drawnBody(chart, node.tick, node.x),
+        halfWidth: CHAIN_HALF_WIDTH,
+        owner,
       }));
     }
 
-    return [
-      {
-        startSec: toSeconds(note.tick!),
-        endSec: toSeconds(note.tick! + note.duration!),
-        x: note.x!,
-      },
-    ];
+    return holdOrBody(chart, note, owner);
   });
+}
+
+function holdOrBody(chart: Chart, note: ChartNote, owner: number): DrawnNote[] {
+  const head = { ...drawnBody(chart, note.tick!, note.x!), owner };
+
+  if (!note.duration) {
+    return [head];
+  }
+
+  return [head, { ...drawnTail(chart, note), owner }];
+}
+
+function drawnBody(chart: Chart, tick: number, x: number): DrawnNote {
+  const timeSec = tickToSeconds(tick, chart.bpm, chart.time_base);
+  const y = getScanLineY(timeSec, chart.page_list, chart.bpm, chart.time_base);
+
+  return {
+    owner: -1,
+    startSec: timeSec,
+    endSec: timeSec,
+    yFrom: y,
+    yTo: y,
+    x,
+    halfWidth: NOTE_HALF_WIDTH,
+  };
+}
+
+/** The slab between a hold's head and its tail end, folds included. */
+function drawnTail(chart: Chart, note: ChartNote): DrawnNote {
+  const startSec = tickToSeconds(note.tick!, chart.bpm, chart.time_base);
+  const endSec = tickToSeconds(note.tick! + note.duration!, chart.bpm, chart.time_base);
+  const samples = sampleScanY(chart, startSec, endSec);
+
+  return {
+    owner: -1,
+    startSec,
+    endSec,
+    yFrom: Math.min(...samples),
+    yTo: Math.max(...samples),
+    x: note.x!,
+    halfWidth: HOLD_TAIL_HALF_WIDTH,
+  };
+}
+
+function sampleScanY(chart: Chart, startSec: number, endSec: number): number[] {
+  const steps = 24;
+  const samples: number[] = [];
+
+  for (let step = 0; step <= steps; step++) {
+    const timeSec = startSec + ((endSec - startSec) * step) / steps;
+    samples.push(getScanLineY(timeSec, chart.page_list, chart.bpm, chart.time_base));
+  }
+
+  return samples;
+}
+
+function heightGapBetween(first: DrawnNote, second: DrawnNote): number {
+  return Math.max(0, first.yFrom - second.yTo, second.yFrom - first.yTo);
+}
+
+function sharesTheScreen(first: DrawnNote, second: DrawnNote): boolean {
+  const timeGap = Math.max(0, first.startSec - second.endSec, second.startSec - first.endSec);
+
+  return timeGap < CO_VISIBLE_SEC;
 }
 
 function expectNoOverlap(chart: Chart): void {
@@ -300,13 +404,15 @@ function expectClearOfEarlier(drawn: DrawnNote[], index: number): void {
   const note = drawn[index];
 
   for (let earlier = index - 1; earlier >= 0; earlier--) {
-    const timeGap = Math.max(0, note.startSec - drawn[earlier].endSec);
+    const other = drawn[earlier];
 
-    if (timeGap > OVERLAP_WINDOW_SEC) break;
+    if (other.owner === note.owner) continue;
+    if (!sharesTheScreen(note, other)) continue;
 
-    expect(Math.abs(note.x - drawn[earlier].x)).toBeGreaterThanOrEqual(
-      requiredGapAt(timeGap) - 1e-6,
-    );
+    const heightGap = heightGapBetween(note, other);
+    const needed = requiredGapAt(heightGap, note.halfWidth + other.halfWidth);
+
+    expect(Math.abs(note.x - other.x)).toBeGreaterThanOrEqual(needed - 1e-6);
   }
 }
 

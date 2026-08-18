@@ -18,9 +18,11 @@ import {
   SLOTS_PER_BEAT,
   type SectionEvents,
 } from "./select";
+import { BEATS_PER_PAGE } from "./pageGeometry";
+
+export { BEATS_PER_PAGE };
 
 export const TIME_BASE = 480;
-export const BEATS_PER_PAGE = 4;
 const TICKS_PER_SLOT = TIME_BASE / SLOTS_PER_BEAT;
 const FALLBACK_BPM = 120;
 

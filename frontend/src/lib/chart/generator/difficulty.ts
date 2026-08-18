@@ -19,13 +19,19 @@ export interface DifficultySpec {
   minNoteIntervalSec: number;
   maxNotesPerTick: number;
   allowHolds: boolean;
+  /** Ceiling on the share of a section's notes that may be holds. */
+  holdShare: number;
   allowDrags: boolean;
   /** Shortest run of evenly spaced notes that becomes a drag instead of taps. */
   minDragNotes: number;
+  /** Ceiling on the share of a section's slots that drags may swallow. */
+  dragShare: number;
   /** Budget for how far a hand may travel across the playfield per second. */
   handSpeedPerSecond: number;
   /** Combined strength a grid position needs before it widens into a chord. */
   chordStrength: number;
+  /** Ceiling on the share of a section's slots that may play as chords. */
+  chordShare: number;
 }
 
 const SPECS: Record<Difficulty, DifficultySpec> = {
@@ -36,10 +42,13 @@ const SPECS: Record<Difficulty, DifficultySpec> = {
     minNoteIntervalSec: 0.3,
     maxNotesPerTick: 1,
     allowHolds: true,
+    holdShare: 0.14,
     allowDrags: false,
     minDragNotes: 99,
+    dragShare: 0.0,
     handSpeedPerSecond: 0.55,
     chordStrength: 2,
+    chordShare: 0.0,
   },
   normal: {
     voices: ["low", "mid"],
@@ -48,10 +57,13 @@ const SPECS: Record<Difficulty, DifficultySpec> = {
     minNoteIntervalSec: 0.2,
     maxNotesPerTick: 2,
     allowHolds: true,
+    holdShare: 0.1,
     allowDrags: true,
     minDragNotes: 5,
+    dragShare: 0.12,
     handSpeedPerSecond: 0.85,
     chordStrength: 1.5,
+    chordShare: 0.06,
   },
   hard: {
     voices: ["low", "mid", "high"],
@@ -60,10 +72,13 @@ const SPECS: Record<Difficulty, DifficultySpec> = {
     minNoteIntervalSec: 0.14,
     maxNotesPerTick: 3,
     allowHolds: true,
+    holdShare: 0.08,
     allowDrags: true,
-    minDragNotes: 4,
+    minDragNotes: 3,
+    dragShare: 0.18,
     handSpeedPerSecond: 1.25,
     chordStrength: 1.3,
+    chordShare: 0.1,
   },
   expert: {
     voices: ["low", "mid", "high"],
@@ -72,10 +87,13 @@ const SPECS: Record<Difficulty, DifficultySpec> = {
     minNoteIntervalSec: 0.1,
     maxNotesPerTick: 3,
     allowHolds: true,
+    holdShare: 0.06,
     allowDrags: true,
-    minDragNotes: 4,
+    minDragNotes: 3,
+    dragShare: 0.22,
     handSpeedPerSecond: 1.7,
     chordStrength: 1.15,
+    chordShare: 0.14,
   },
   chaos: {
     voices: ["low", "mid", "high"],
@@ -84,10 +102,13 @@ const SPECS: Record<Difficulty, DifficultySpec> = {
     minNoteIntervalSec: 0.075,
     maxNotesPerTick: 3,
     allowHolds: true,
+    holdShare: 0.05,
     allowDrags: true,
-    minDragNotes: 4,
+    minDragNotes: 3,
+    dragShare: 0.28,
     handSpeedPerSecond: 2.2,
     chordStrength: 1,
+    chordShare: 0.18,
   },
 };
 
