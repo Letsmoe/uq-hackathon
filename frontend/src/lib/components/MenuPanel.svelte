@@ -33,7 +33,7 @@
 >
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <section
-    class="flex h-full flex-col border-l border-line-strong bg-overlay"
+    class="flex h-full flex-col border-l-2 border-line-strong bg-overlay"
     style="width: {PANEL_WIDTH}px;"
     onclick={(event) => event.stopPropagation()}
     transition:fly={{ x: PANEL_WIDTH, duration: PANEL_MS, easing: cubicOut }}
@@ -53,7 +53,7 @@
       <button
         onclick={onclose}
         aria-label="Close"
-        class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center border border-line bg-raised text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg"
+        class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center border-2 border-line bg-raised text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg"
       >
         <XIcon size={16} weight="bold" />
       </button>

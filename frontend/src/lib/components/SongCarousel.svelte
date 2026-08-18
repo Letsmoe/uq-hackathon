@@ -198,7 +198,7 @@
         "
       >
         <div
-          class="card-body relative h-full w-full overflow-hidden border border-line"
+          class="card-body relative h-full w-full overflow-hidden border-2 border-line"
           style="transform: scale({pressScale(index)});"
         >
           <img
@@ -216,10 +216,11 @@
             class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent"
           ></div>
 
-          <!-- Selection chrome. Fading a ready-made ring keeps the border and
-               shadow off the animated properties. -->
+          <!-- Selection chrome. Fading a ready-made ring keeps the border off
+               the animated properties. The centre card is marked by the weight
+               of its rule, not by a glow. -->
           <div
-            class="pointer-events-none absolute inset-0 border-2 border-accent shadow-[0_0_64px_rgba(124,107,245,0.35)]"
+            class="pointer-events-none absolute inset-0 border-4 border-accent"
             style="opacity: {card.focus};"
           ></div>
 
@@ -293,7 +294,7 @@
         onclick={onshuffle}
         title="Random song"
         aria-label="Random song"
-        class="flex h-9 w-9 cursor-pointer items-center justify-center border border-line bg-raised text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg"
+        class="flex h-9 w-9 cursor-pointer items-center justify-center border-2 border-line bg-raised text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg"
       >
         <ShuffleIcon size={14} />
       </button>

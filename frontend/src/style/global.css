@@ -16,35 +16,40 @@
   /* ----------------------------------------------------------
      SURFACES — each step is one shade above what it sits on
   ---------------------------------------------------------- */
-  --color-canvas: #0d0e13; /* page background, behind the grid    */
-  --color-raised: #16171e; /* cards, controls, quiet panels       */
-  --color-overlay: #1c1e27; /* panels floating above the menu      */
-  --color-hover: #23252f; /* hover state for raised surfaces     */
+  --color-canvas: #000000; /* page background, behind the grid    */
+  --color-raised: #0e0e0e; /* cards, controls, quiet panels       */
+  --color-overlay: #141414; /* panels floating above the menu      */
+  --color-hover: #1c1c1c; /* hover state for raised surfaces     */
 
-  /* Inverted chrome — light blocks punched into the dark canvas.
+  /* Inverted chrome — white blocks punched into the black canvas.
      This is the primary action colour: START, the active tab.  */
-  --color-ink: #f0f0f4;
-  --color-ink-fg: #0d0e13;
+  --color-ink: #ffffff;
+  --color-ink-fg: #000000;
 
   /* ----------------------------------------------------------
      LINES
+     Depth comes from rules, not from glow or from stacked greys,
+     so these carry more weight than a border usually would.
   ---------------------------------------------------------- */
-  --color-line: rgba(255, 255, 255, 0.08); /* dividers, card edges     */
-  --color-line-strong: rgba(255, 255, 255, 0.18); /* focused, selected */
+  --color-line: rgba(255, 255, 255, 0.14); /* dividers, card edges     */
+  --color-line-strong: rgba(255, 255, 255, 0.34); /* focused, selected */
 
   /* ----------------------------------------------------------
      FOREGROUND
   ---------------------------------------------------------- */
-  --color-fg: #f0f0f4; /* headings, values, anything that must read */
-  --color-fg-muted: #9a9aa8; /* labels, secondary copy             */
-  --color-fg-dim: #61616e; /* disabled, decorative captions        */
+  --color-fg: #ffffff; /* headings, values, anything that must read */
+  --color-fg-muted: #a1a1a1; /* labels, secondary copy             */
+  --color-fg-dim: #5e5e5e; /* disabled, decorative captions        */
 
   /* ----------------------------------------------------------
      ACCENTS
-     Accent marks selection. Signal marks something live.
+     Accent is the only colour on the menu, and it marks
+     selection. Everything else is black, white or a rule.
   ---------------------------------------------------------- */
   --color-accent: #7c6bf5;
-  --color-accent-soft: rgba(124, 107, 245, 0.16);
+  --color-accent-soft: rgba(124, 107, 245, 0.2);
+
+  /* Status only — a difficulty grade, never decoration. */
   --color-signal: #35e0f0;
   --color-signal-soft: rgba(53, 224, 240, 0.14);
 
@@ -192,22 +197,22 @@
 }
 
 .clip-slant-right {
-  clip-path: polygon(0 0, 100% 0, calc(100% - 24px) 100%, 0 100%);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 32px) 100%, 0 100%);
 }
 .clip-slant-left {
-  clip-path: polygon(24px 0, 100% 0, 100% 100%, 0 100%);
+  clip-path: polygon(32px 0, 100% 0, 100% 100%, 0 100%);
 }
 .clip-slant-both {
-  clip-path: polygon(24px 0, 100% 0, calc(100% - 24px) 100%, 0 100%);
+  clip-path: polygon(32px 0, 100% 0, calc(100% - 32px) 100%, 0 100%);
 }
 
 /* Arrowhead trailing edge — the START button */
 .clip-arrow-right {
   clip-path: polygon(
     0 0,
-    calc(100% - 40px) 0,
+    calc(100% - 48px) 0,
     100% 50%,
-    calc(100% - 40px) 100%,
+    calc(100% - 48px) 100%,
     0 100%
   );
 }

@@ -114,11 +114,13 @@ void main() {
   float swipe = clamp(abs(u_drift) * 7.0, 0.0, 1.0);
   p.x += u_drift * 1.6;
 
-  // Colors — mirrors the --color-canvas / --color-accent tokens
-  vec3 bg         = vec3(13.0, 14.0, 19.0) / 255.0;
-  vec3 dotColor   = vec3(0.62, 0.62, 0.70);
-  vec3 lineColor  = vec3(0.50, 0.50, 0.60);
-  vec3 crossColor = vec3(0.88, 0.88, 0.94);
+  // Colors — mirrors the --color-canvas / --color-accent tokens. The canvas is
+  // black and the marks are neutral: depth is carried by the rules, not by a
+  // stack of greys.
+  vec3 bg         = vec3(0.0);
+  vec3 dotColor   = vec3(1.0);
+  vec3 lineColor  = vec3(1.0);
+  vec3 crossColor = vec3(1.0);
   vec3 accent     = vec3(124.0, 107.0, 245.0) / 255.0;
 
   // -----------------------------
@@ -157,22 +159,17 @@ void main() {
   vec3 color = bg;
 
   // Draw order: background -> minor dots -> dotted lines -> crosses
-  color = mix(color, dotColor,   dots * 0.16);
-  color = mix(color, lineColor,  gridLines * 0.20);
-  color = mix(color, crossColor, crosses * 0.22);
+  color = mix(color, dotColor,   dots * 0.13);
+  color = mix(color, lineColor,  gridLines * 0.17);
+  color = mix(color, crossColor, crosses * 0.26);
 
-  color += accent * cursorGlow * 0.22;
-  color = mix(color, accent, cursorRing * 0.45);
+  color += accent * cursorGlow * 0.14;
+  color = mix(color, accent, cursorRing * 0.55);
 
-  color += accent * swipe * (dots * 0.35 + gridLines * 0.25 + 0.02);
-
-  // Darkening the edges on a light canvas reads as depth; on a dark one it
-  // crushes to black, so the vignette lifts the centre instead.
-  float vignette = smoothstep(1.0, 0.18, length((uv - 0.5) * vec2(1.25, 1.0)));
-  color += vignette * 0.025;
+  color += accent * swipe * (dots * 0.35 + gridLines * 0.25);
 
   float noise = fract(sin(dot(frag + u_time, vec2(12.9898, 78.233))) * 43758.5453);
-  color += (noise - 0.5) * 0.018;
+  color += (noise - 0.5) * 0.012;
 
   gl_FragColor = vec4(color, 1.0);
 }`;

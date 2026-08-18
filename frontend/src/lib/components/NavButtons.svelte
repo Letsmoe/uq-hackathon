@@ -100,7 +100,7 @@
   /* The slanted clips overlap by the width of the cut, so the four tabs read as
      one continuous strip rather than as separate pills. */
   .nav-tab {
-    @apply -mr-[24px] flex cursor-pointer flex-row items-center gap-3 border-none bg-raised py-3 pr-10 pl-11 text-fg-muted transition-colors duration-150;
+    @apply -mr-[32px] flex cursor-pointer flex-row items-center gap-3 border-none bg-raised py-3 pr-12 pl-13 text-fg-muted transition-colors duration-150;
   }
 
   .nav-tab:not(:disabled):hover {

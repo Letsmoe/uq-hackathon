@@ -17,7 +17,7 @@
   {#each messages as message (message.id)}
     <button
       onclick={() => toggle(message.id)}
-      class="flex cursor-pointer flex-col gap-2 border border-line bg-raised px-4 py-3 text-left transition-colors duration-150 hover:bg-hover"
+      class="flex cursor-pointer flex-col gap-2 border-2 border-line bg-raised px-4 py-3 text-left transition-colors duration-150 hover:bg-hover"
     >
       <div class="flex flex-row items-center gap-3">
         <span

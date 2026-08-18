@@ -31,7 +31,7 @@
         <button
           onclick={() => onselect(track.songIndex)}
           title="{track.title} — {track.artist}"
-          class="group relative h-[68px] w-[68px] shrink-0 cursor-pointer overflow-hidden border border-line p-0 transition-colors duration-150 hover:border-line-strong"
+          class="group relative h-[68px] w-[68px] shrink-0 cursor-pointer overflow-hidden border-2 border-line p-0 transition-colors duration-150 hover:border-line-strong"
         >
           <img
             src={track.cover}

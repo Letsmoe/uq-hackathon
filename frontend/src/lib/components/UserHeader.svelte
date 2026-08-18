@@ -30,13 +30,13 @@
   const ratingFraction = $derived(ratingCurrent / ratingMax);
 
   const iconButtonClass =
-    "relative flex h-12 w-12 items-center justify-center border border-line bg-raised text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg cursor-pointer";
+    "relative flex h-12 w-12 items-center justify-center border-2 border-line bg-raised text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg cursor-pointer";
 </script>
 
 <header class="flex flex-row items-center gap-5">
   <!-- Identity -->
   <div class="flex shrink-0 flex-row items-center gap-3">
-    <div class="h-12 w-12 shrink-0 overflow-hidden border border-line">
+    <div class="h-12 w-12 shrink-0 overflow-hidden border-2 border-line">
       <img
         src={avatarSrc}
         alt="avatar"
@@ -51,14 +51,14 @@
         <span class="text-2xs tracking-loose text-fg-muted uppercase">
           Rating
         </span>
-        <span class="text-sm leading-none font-semibold text-signal">
+        <span class="text-sm leading-none font-semibold text-fg">
           {rating.toFixed(2)}
         </span>
         <!-- Scaled rather than resized: a width animation relayouts the row
              the bar sits in, a transform does not. -->
         <div class="relative h-1 w-20 overflow-hidden bg-line">
           <div
-            class="absolute inset-0 origin-left bg-signal transition-transform duration-300 ease-out"
+            class="absolute inset-0 origin-left bg-ink transition-transform duration-300 ease-out"
             style="transform: scaleX({ratingFraction});"
           ></div>
         </div>
