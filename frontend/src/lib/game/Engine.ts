@@ -307,6 +307,9 @@ export class GameEngine {
     if (!note) {
       return;
     }
+    if (note.holdActive && note.holdProgress < 1) {
+      this.renderer?.triggerHoldBreak(note);
+    }
     this.judgment?.judgeHoldEnd(note);
     this.onStateChange?.();
   }

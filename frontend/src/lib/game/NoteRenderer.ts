@@ -33,6 +33,10 @@ const CHARGE_S = 0.4;
 
 /** Width of the hold channel, in px. Wide enough to read as a conduit. */
 const HOLD_TRACK_WIDTH = 46;
+/** Seconds the arcs take to spool up once a hold is grabbed. */
+const HOLD_SPOOL_S = 0.18;
+/** Lifetime of the fizzle left by a hold that was released early. */
+const HOLD_BREAK_MS = 320;
 
 const HIT_COLOR: Record<JudgmentResult, number> = {
   perfect: 0xffffff,
@@ -79,6 +83,14 @@ interface Popup {
   life: number;
 }
 
+/** The dead length of conduit left behind when a hold is dropped early. */
+interface HoldBreak {
+  x: number;
+  headY: number;
+  endY: number;
+  age: number;
+}
+
 function lerpChannel(from: number, to: number, t: number): number {
   return Math.round(from + (to - from) * t);
 }
@@ -118,6 +130,7 @@ export class NoteRenderer {
 
   private hitEffects: HitEffect[] = [];
   private popups: Popup[] = [];
+  private holdBreaks: HoldBreak[] = [];
 
   constructor(
     app: Application,
@@ -149,6 +162,7 @@ export class NoteRenderer {
     for (const note of notes) {
       this.drawConnector(note, elapsed);
     }
+    this.updateHoldBreaks(deltaMs);
     for (const note of notes) {
       this.updateNoteVisual(note, elapsed);
     }
@@ -333,17 +347,21 @@ export class NoteRenderer {
     const bottom = Math.max(note.pixelY, note.endPixelY);
     if (bottom - top < 2) return;
 
-    let charge = this.chargeLevel(note.timeSeconds, elapsed);
-    if (note.holdActive) {
-      charge = 1;
-    }
-
+    // The channel lights with the approach so the hold can be seen coming, but
+    // it only carries current while a finger is actually on it.
+    const charge = this.chargeLevel(note.timeSeconds, elapsed);
     this.drawHoldChannel(note.pixelX, top, bottom, alpha, charge);
-    this.drawHoldArcs(note.pixelX, top, bottom, alpha, charge, elapsed);
+    if (!note.holdActive) return;
 
-    if (note.holdActive) {
-      this.drawHoldFill(note, alpha, elapsed);
-    }
+    const current = this.holdCurrent(note, elapsed);
+    this.drawHoldArcs(note.pixelX, top, bottom, alpha, current, elapsed);
+    this.drawHoldFill(note, alpha, elapsed);
+  }
+
+  /** Spools up on grab, then builds the rest of the way as the hold fills. */
+  private holdCurrent(note: RuntimeNote, elapsed: number): number {
+    const spool = smoothstep((elapsed - note.timeSeconds) / HOLD_SPOOL_S);
+    return spool * (0.5 + note.holdProgress * 0.5);
   }
 
   /** The conduit the energy runs through: a slab, not a hairline. */
@@ -372,19 +390,19 @@ export class NoteRenderer {
   }
 
   /**
-   * Stacked jittering bolts inside the channel. Thin and dim while the note is
-   * still far out, thick and near-white once it is due or being held.
+   * Stacked jittering bolts inside the channel. Only drawn for a hold that is
+   * being held; they widen and whiten as the current builds.
    */
   private drawHoldArcs(
     x: number,
     top: number,
     bottom: number,
     alpha: number,
-    charge: number,
+    current: number,
     elapsed: number,
   ) {
-    const spread = (HOLD_TRACK_WIDTH / 2) * (0.3 + charge * 0.55);
-    const color = mixColor(PALETTE.holdCharge, PALETTE.holdHot, charge);
+    const spread = (HOLD_TRACK_WIDTH / 2) * (0.35 + current * 0.5);
+    const color = mixColor(PALETTE.holdCharge, PALETTE.holdHot, current);
     const bolts = [
       { phase: elapsed * 17, width: 5, strength: 0.9 },
       { phase: elapsed * 23 + 11, width: 2.6, strength: 0.6 },
@@ -398,9 +416,9 @@ export class NoteRenderer {
         bottom,
         phase: bolt.phase,
         amplitude: spread,
-        width: bolt.width * (0.55 + charge * 0.75),
+        width: bolt.width * (0.5 + current * 0.8),
         color,
-        alpha: alpha * bolt.strength * (0.3 + charge * 0.7),
+        alpha: alpha * bolt.strength * current,
       });
     }
   }
@@ -451,6 +469,54 @@ export class NoteRenderer {
     const flare = half + 5 + 3 * Math.sin(elapsed * 30);
     this.connectorGfx.circle(note.pixelX, head, flare);
     this.connectorGfx.fill({ color: PALETTE.holdHot, alpha: alpha * 0.8 });
+  }
+
+  /** Called when a hold is let go before its tail has filled. */
+  triggerHoldBreak(note: RuntimeNote) {
+    const span = note.endPixelY - note.pixelY;
+    this.holdBreaks.push({
+      x: note.pixelX,
+      headY: note.pixelY + span * note.holdProgress,
+      endY: note.endPixelY,
+      age: 0,
+    });
+  }
+
+  private updateHoldBreaks(deltaMs: number) {
+    for (let i = this.holdBreaks.length - 1; i >= 0; i--) {
+      const holdBreak = this.holdBreaks[i];
+      holdBreak.age += deltaMs;
+
+      if (holdBreak.age >= HOLD_BREAK_MS) {
+        this.holdBreaks.splice(i, 1);
+        continue;
+      }
+      this.drawHoldBreak(holdBreak);
+    }
+  }
+
+  /** The severed arc whips wide and dies, with a snap ring at the cut. */
+  private drawHoldBreak(holdBreak: HoldBreak) {
+    const t = holdBreak.age / HOLD_BREAK_MS;
+    const fade = 1 - t;
+
+    this.strokeBolt({
+      x: holdBreak.x,
+      top: Math.min(holdBreak.headY, holdBreak.endY),
+      bottom: Math.max(holdBreak.headY, holdBreak.endY),
+      phase: holdBreak.age * 0.09,
+      amplitude: (HOLD_TRACK_WIDTH / 2) * (0.4 + t * 1.7),
+      width: 3.5 * fade,
+      color: HIT_COLOR.miss,
+      alpha: fade * fade * 0.85,
+    });
+
+    this.connectorGfx.circle(holdBreak.x, holdBreak.headY, 10 + t * 28);
+    this.connectorGfx.stroke({
+      width: 3.5 * fade,
+      color: HIT_COLOR.miss,
+      alpha: fade * 0.9,
+    });
   }
 
   private drawChainTrail(note: RuntimeNote, elapsed: number) {
