@@ -1,7 +1,9 @@
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <limits>
 #include <map>
 #include <random>
@@ -11,16 +13,39 @@
 #include <utility>
 #include <vector>
 
+#ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
+#define CHART_EXPORT EMSCRIPTEN_KEEPALIVE
+#else
+#define CHART_EXPORT
+#endif
+
 #include "vendor/nlohmann/json.hpp"
 
-// If vendor json.hpp locally instead, replace the above w/
-// #include "vendor/nlohmann/json.hpp"
+// Tick resolution the patterns in patterns.json are authored against.
+static const int PATTERN_TIME_BASE = 240;
 
-struct AudioInfo {
-    float bpm;
-    float duration_sec;
-};
+// Notes are drawn at x * screenWidth, so the outer margins keep the note
+// graphics fully on screen.
+static const float PLAYFIELD_MIN_X = 0.08f;
+static const float PLAYFIELD_MAX_X = 0.92f;
+
+// Horizontal clearance between two patterns that are on screen together.
+static const float PATTERN_X_GAP = 0.08f;
+
+static const float DENSITY_WINDOW_SEC = 4.0f;
+static const int ENERGY_WINDOW = 1024;
+
+// Musical intensity is measured this many times per beat, which is also the
+// finest grid a pattern may start on.
+static const int INTENSITY_SUBDIVISION = 4;
+
+// A pattern may start no further apart than this, so slow tracks subdivide the
+// beat instead of leaving multi-second holes.
+static const float MAX_SLOT_SEC = 0.35f;
+static const int MAX_STRETCH = 8;
+static const int PATTERN_TRIES = 12;
+static const int ANCHOR_TRIES = 6;
 
 static char* copyStringToHeap(const std::string& str) {
     char* result = static_cast<char*>(std::malloc(str.size() + 1));
@@ -30,109 +55,551 @@ static char* copyStringToHeap(const std::string& str) {
     return result;
 }
 
-float detectBPM(const std::vector<float>& mono, int sampleRate) {
-    if (mono.empty() || sampleRate <= 0) {
-        return 0.0f;
-    }
+// ── Audio analysis ──────────────────────────────────────────────────────────
 
-    const int windowSize = 1024;
+struct AudioAnalysis {
+    float bpm;
+    float durationSec;
+    float beatOffsetSec;
+    // How busy the track is, 0..1, sampled INTENSITY_SUBDIVISION times per beat
+    // starting at beatOffsetSec.
+    std::vector<float> gridIntensity;
+};
 
-    if ((int)mono.size() < windowSize * 4) {
-        return 0.0f;
-    }
-
+static std::vector<float> computeEnergyEnvelope(const std::vector<float>& mono) {
     std::vector<float> energy;
 
-    for (int i = 0; i + windowSize < (int)mono.size(); i += windowSize) {
+    for (size_t i = 0; i + ENERGY_WINDOW < mono.size(); i += ENERGY_WINDOW) {
         float sum = 0.0f;
 
-        for (int j = 0; j < windowSize; j++) {
+        for (int j = 0; j < ENERGY_WINDOW; ++j) {
             sum += mono[i + j] * mono[i + j];
         }
 
-        energy.push_back(std::sqrt(sum / windowSize));
+        energy.push_back(std::sqrt(sum / ENERGY_WINDOW));
     }
 
-    int n = (int)energy.size();
-    float energyRate = (float)sampleRate / windowSize;
+    return energy;
+}
 
-    int minLag = (int)(energyRate * 60.0f / 200.0f);
-    int maxLag = (int)(energyRate * 60.0f / 50.0f);
+/** Half-wave rectified energy difference: rises only where the track gets louder. */
+static std::vector<float> computeOnsetEnvelope(const std::vector<float>& energy) {
+    std::vector<float> onset(energy.size(), 0.0f);
 
-    minLag = std::max(1, minLag);
-    maxLag = std::min(maxLag, n - 1);
+    for (size_t i = 1; i < energy.size(); ++i) {
+        onset[i] = std::max(0.0f, energy[i] - energy[i - 1]);
+    }
+
+    return onset;
+}
+
+static float percentileOf(std::vector<float> values, float fraction) {
+    if (values.empty()) {
+        return 0.0f;
+    }
+
+    size_t index = (size_t)(fraction * (float)(values.size() - 1));
+    std::nth_element(values.begin(), values.begin() + index, values.end());
+
+    return values[index];
+}
+
+/** Scales values so that the given percentile maps to 1.0, then clamps to 0..1. */
+static void normalizeByPercentile(std::vector<float>& values, float fraction) {
+    float reference = percentileOf(values, fraction);
+
+    if (reference <= 0.0f) {
+        return;
+    }
+
+    for (float& value : values) {
+        value = std::clamp(value / reference, 0.0f, 1.0f);
+    }
+}
+
+static float envelopePeakNear(
+    const std::vector<float>& envelope,
+    float envelopeRate,
+    float timeSec,
+    float radiusSec
+) {
+    if (envelope.empty()) {
+        return 0.0f;
+    }
+
+    int center = (int)std::lround(timeSec * envelopeRate);
+    int radius = std::max(1, (int)std::lround(radiusSec * envelopeRate));
+    int from = std::max(0, center - radius);
+    int to = std::min((int)envelope.size() - 1, center + radius);
+    float peak = 0.0f;
+
+    for (int i = from; i <= to; ++i) {
+        peak = std::max(peak, envelope[i]);
+    }
+
+    return peak;
+}
+
+static float envelopeMeanNear(
+    const std::vector<float>& envelope,
+    float envelopeRate,
+    float timeSec,
+    float radiusSec
+) {
+    if (envelope.empty()) {
+        return 0.0f;
+    }
+
+    int center = (int)std::lround(timeSec * envelopeRate);
+    int radius = std::max(1, (int)std::lround(radiusSec * envelopeRate));
+    int from = std::max(0, center - radius);
+    int to = std::min((int)envelope.size() - 1, center + radius);
+    float sum = 0.0f;
+
+    for (int i = from; i <= to; ++i) {
+        sum += envelope[i];
+    }
+
+    return sum / (float)(to - from + 1);
+}
+
+static std::vector<float> autocorrelate(
+    const std::vector<float>& values,
+    int minLag,
+    int maxLag
+) {
+    std::vector<float> correlation(maxLag + 1, 0.0f);
+    int n = (int)values.size();
+
+    for (int lag = minLag; lag <= maxLag; ++lag) {
+        float sum = 0.0f;
+
+        for (int i = 0; i + lag < n; ++i) {
+            sum += values[i] * values[i + lag];
+        }
+
+        correlation[lag] = sum;
+    }
+
+    return correlation;
+}
+
+/**
+ * Autocorrelation locks onto whichever metrical level is strongest, which for
+ * drum-heavy tracks is usually half the real tempo. When the half lag is nearly
+ * as periodic, the faster reading is the musically correct one.
+ */
+static int preferFasterMetricalLevel(
+    const std::vector<float>& correlation,
+    int bestLag,
+    int minLag
+) {
+    for (int divisor : {2, 3}) {
+        int faster = bestLag / divisor;
+
+        if (faster < minLag) continue;
+        if (correlation[faster] >= correlation[bestLag] * 0.8f) return faster;
+    }
+
+    return bestLag;
+}
+
+static float detectBPM(const std::vector<float>& energy, float energyRate) {
+    int minLag = std::max(1, (int)(energyRate * 60.0f / 200.0f));
+    int maxLag = std::min((int)(energyRate * 60.0f / 50.0f), (int)energy.size() - 1);
 
     if (maxLag <= minLag) {
         return 0.0f;
     }
 
-    std::vector<float> autocorr(maxLag + 1, 0.0f);
+    std::vector<float> correlation = autocorrelate(energy, minLag, maxLag);
 
-    for (int lag = minLag; lag <= maxLag; lag++) {
-        float sum = 0.0f;
-
-        for (int i = 0; i + lag < n; i++) {
-            sum += energy[i] * energy[i + lag];
-        }
-
-        autocorr[lag] = sum;
-    }
-
-    int bestLag = minLag;
+    int bestLag = 0;
     float bestVal = 0.0f;
 
-    for (int lag = minLag; lag <= maxLag; lag++) {
-        if (autocorr[lag] > bestVal) {
-            bestVal = autocorr[lag];
-            bestLag = lag;
-        }
+    for (int lag = minLag; lag <= maxLag; ++lag) {
+        if (correlation[lag] <= bestVal) continue;
+
+        bestVal = correlation[lag];
+        bestLag = lag;
     }
 
     if (bestLag <= 0 || bestVal <= 0.0f) {
         return 0.0f;
     }
 
-    float bpm = 60.0f * energyRate / bestLag;
+    float bpm = 60.0f * energyRate / (float)preferFasterMetricalLevel(correlation, bestLag, minLag);
 
-    while (bpm > 160.0f) bpm /= 2.0f;
-    while (bpm > 0.0f && bpm < 50.0f) bpm *= 2.0f;
+    while (bpm >= 190.0f) bpm /= 2.0f;
+    while (bpm > 0.0f && bpm < 80.0f) bpm *= 2.0f;
 
     return bpm;
 }
 
-AudioInfo detectAudioFromMono(const float* samples, int sampleCount, int sampleRate) {
+/** Total onset strength landing on the beat grid for one candidate phase. */
+static float scoreBeatPhase(
+    const std::vector<float>& onset,
+    float envelopeRate,
+    float beatSec,
+    float offsetSec
+) {
+    float envelopeLengthSec = (float)onset.size() / envelopeRate;
+    float score = 0.0f;
+
+    for (float t = offsetSec; t < envelopeLengthSec; t += beatSec) {
+        score += envelopePeakNear(onset, envelopeRate, t, beatSec * 0.06f);
+    }
+
+    return score;
+}
+
+/**
+ * Finds where the beat grid actually starts. Without this the grid begins at
+ * sample zero and every note sits a fraction of a beat off the music.
+ */
+static float detectBeatOffset(
+    const std::vector<float>& onset,
+    float envelopeRate,
+    float bpm
+) {
+    if (onset.empty() || bpm <= 0.0f) {
+        return 0.0f;
+    }
+
+    const float beatSec = 60.0f / bpm;
+    const int phaseSteps = 48;
+
+    float bestOffset = 0.0f;
+    float bestScore = -1.0f;
+
+    for (int step = 0; step < phaseSteps; ++step) {
+        float offsetSec = beatSec * (float)step / (float)phaseSteps;
+        float score = scoreBeatPhase(onset, envelopeRate, beatSec, offsetSec);
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestOffset = offsetSec;
+        }
+    }
+
+    return bestOffset;
+}
+
+/**
+ * How much is going on musically at each grid position, blending attack
+ * strength with local loudness so that intros, breakdowns and outros end up
+ * clearly below the drops, and so that an off-beat slot only scores highly when
+ * the track actually plays something there.
+ */
+static std::vector<float> computeGridIntensity(
+    const std::vector<float>& energy,
+    const std::vector<float>& onset,
+    float envelopeRate,
+    float bpm,
+    float beatOffsetSec,
+    float durationSec
+) {
+    const float slotSec = 60.0f / bpm / (float)INTENSITY_SUBDIVISION;
+    const int slotCount = (int)((durationSec - beatOffsetSec) / slotSec);
+
+    if (slotCount <= 0) {
+        return {};
+    }
+
+    std::vector<float> attack;
+    std::vector<float> loudness;
+
+    for (int slot = 0; slot < slotCount; ++slot) {
+        float t = beatOffsetSec + (float)slot * slotSec;
+
+        attack.push_back(envelopePeakNear(onset, envelopeRate, t, slotSec * 0.5f));
+        loudness.push_back(envelopeMeanNear(energy, envelopeRate, t, slotSec * 2.0f));
+    }
+
+    normalizeByPercentile(attack, 0.9f);
+    normalizeByPercentile(loudness, 0.9f);
+
+    std::vector<float> intensity;
+    intensity.reserve(slotCount);
+
+    for (int slot = 0; slot < slotCount; ++slot) {
+        intensity.push_back(attack[slot] * 0.6f + loudness[slot] * 0.4f);
+    }
+
+    return intensity;
+}
+
+static AudioAnalysis analyzeAudio(const float* samples, int sampleCount, int sampleRate) {
     if (!samples || sampleCount <= 0 || sampleRate <= 0) {
         throw std::runtime_error("Invalid audio input");
     }
 
-    int start = (int)(sampleCount * 0.1f);
-    int end = (int)(sampleCount * 0.9f);
+    std::vector<float> mono(samples, samples + sampleCount);
 
-    if (end <= start) {
-        start = 0;
-        end = sampleCount;
+    AudioAnalysis analysis;
+    analysis.bpm = 0.0f;
+    analysis.durationSec = (float)sampleCount / (float)sampleRate;
+    analysis.beatOffsetSec = 0.0f;
+
+    if (sampleCount < ENERGY_WINDOW * 4) {
+        return analysis;
     }
 
-    std::vector<float> mono;
-    mono.reserve(end - start);
+    std::vector<float> energy = computeEnergyEnvelope(mono);
+    std::vector<float> onset = computeOnsetEnvelope(energy);
+    float envelopeRate = (float)sampleRate / (float)ENERGY_WINDOW;
 
-    for (int i = start; i < end; ++i) {
-        mono.push_back(samples[i]);
+    analysis.bpm = detectBPM(energy, envelopeRate);
+
+    if (analysis.bpm <= 0.0f) {
+        return analysis;
     }
 
-    float bpm = detectBPM(mono, sampleRate);
+    analysis.beatOffsetSec = detectBeatOffset(onset, envelopeRate, analysis.bpm);
+    analysis.gridIntensity = computeGridIntensity(
+        energy,
+        onset,
+        envelopeRate,
+        analysis.bpm,
+        analysis.beatOffsetSec,
+        analysis.durationSec
+    );
 
-    return {
-        bpm,
-        (float)sampleCount / sampleRate
-    };
+    return analysis;
 }
+
+// ── Difficulty ──────────────────────────────────────────────────────────────
+
+/**
+ * Every knob that separates one difficulty from the next. Density is a budget
+ * rather than a per-beat coin flip, so a chart cannot pile up notes faster than
+ * the player can clear them no matter how busy the track is.
+ */
+struct DifficultySpec {
+    // Highest patterns/level_N group the chart may draw from.
+    int maxPatternLevel;
+    // Ceiling on note density measured over a DENSITY_WINDOW_SEC window.
+    float targetNotesPerSecond;
+    // Floor on the time between two consecutive taps anywhere in the chart.
+    float minNoteIntervalSec;
+    // Widest chord allowed.
+    int maxNotesPerTick;
+    // How many patterns may be on screen at the same time.
+    int maxConcurrentPatterns;
+    // Beats quieter than this get no notes at all.
+    float intensityThreshold;
+    // Budget for how far a hand may travel across the playfield per second.
+    float handSpeedPerSecond;
+};
+
+static DifficultySpec specForDifficulty(const std::string& name) {
+    if (name == "easy") {
+        return {1, 1.3f, 0.30f, 1, 1, 0.50f, 0.55f};
+    }
+
+    if (name == "hard") {
+        return {3, 3.5f, 0.14f, 3, 2, 0.30f, 1.25f};
+    }
+
+    if (name == "expert") {
+        return {4, 5.0f, 0.10f, 3, 2, 0.22f, 1.70f};
+    }
+
+    if (name == "chaos") {
+        return {5, 6.5f, 0.075f, 4, 3, 0.15f, 2.20f};
+    }
+
+    return {2, 2.3f, 0.20f, 2, 1, 0.40f, 0.85f};
+}
+
+// ── Pattern library ─────────────────────────────────────────────────────────
+
+/** One entry from patterns.json plus the metadata placement decisions need. */
+struct Pattern {
+    nlohmann::json notes;
+    int level;
+    float minX;
+    float maxX;
+    // Authored ticks from the pattern start to its last note or hold tail.
+    int span;
+    // Authored ticks between the two closest taps, 0 when everything is one chord.
+    int minTapInterval;
+    // Authored tick → how many notes start on it.
+    std::map<int, int> tapTicks;
+    int maxNotesPerTick;
+    int noteCount;
+};
+
+static int noteStartTick(const nlohmann::json& note) {
+    if (!note.contains("nodes")) {
+        return note.value("tick", 0);
+    }
+
+    const nlohmann::json& nodes = note["nodes"];
+
+    if (nodes.empty()) {
+        return 0;
+    }
+
+    return nodes[0].value("tick", 0);
+}
+
+static std::vector<float> noteXValues(const nlohmann::json& note) {
+    if (!note.contains("nodes")) {
+        return {note.value("x", 0.0f)};
+    }
+
+    std::vector<float> values;
+
+    for (const nlohmann::json& node : note["nodes"]) {
+        values.push_back(node.value("x", 0.0f));
+    }
+
+    return values;
+}
+
+static std::pair<float, float> patternXExtent(const nlohmann::json& notes) {
+    float lo = std::numeric_limits<float>::max();
+    float hi = std::numeric_limits<float>::lowest();
+
+    for (const nlohmann::json& note : notes) {
+        for (float x : noteXValues(note)) {
+            lo = std::min(lo, x);
+            hi = std::max(hi, x);
+        }
+    }
+
+    if (lo > hi) {
+        return {0.0f, 0.0f};
+    }
+
+    return {lo, hi};
+}
+
+static int patternSpan(const nlohmann::json& notes) {
+    int last = 0;
+
+    for (const nlohmann::json& note : notes) {
+        if (note.contains("nodes")) {
+            for (const nlohmann::json& node : note["nodes"]) {
+                last = std::max(last, node.value("tick", 0));
+            }
+            continue;
+        }
+
+        last = std::max(last, note.value("tick", 0) + note.value("duration", 0));
+    }
+
+    return last;
+}
+
+static int smallestGap(const std::map<int, int>& tapTicks) {
+    int smallest = 0;
+    bool hasPrevious = false;
+    int previous = 0;
+
+    for (const auto& [tick, count] : tapTicks) {
+        if (hasPrevious && (smallest == 0 || tick - previous < smallest)) {
+            smallest = tick - previous;
+        }
+
+        previous = tick;
+        hasPrevious = true;
+    }
+
+    return smallest;
+}
+
+static Pattern makePattern(const nlohmann::json& notes, int level) {
+    Pattern pattern;
+
+    pattern.notes = notes;
+    pattern.level = level;
+    pattern.span = patternSpan(notes);
+    pattern.noteCount = (int)notes.size();
+    pattern.maxNotesPerTick = 0;
+
+    auto [lo, hi] = patternXExtent(notes);
+    pattern.minX = lo;
+    pattern.maxX = hi;
+
+    for (const nlohmann::json& note : notes) {
+        pattern.tapTicks[noteStartTick(note)]++;
+    }
+
+    for (const auto& [tick, count] : pattern.tapTicks) {
+        pattern.maxNotesPerTick = std::max(pattern.maxNotesPerTick, count);
+    }
+
+    pattern.minTapInterval = smallestGap(pattern.tapTicks);
+
+    return pattern;
+}
+
+static void collectPatterns(
+    const nlohmann::json& value,
+    int level,
+    std::vector<Pattern>& pool
+) {
+    if (value.is_array()) {
+        pool.push_back(makePattern(value, level));
+        return;
+    }
+
+    if (!value.is_object()) {
+        return;
+    }
+
+    if (value.contains("notes") && value["notes"].is_array()) {
+        pool.push_back(makePattern(value["notes"], level));
+        return;
+    }
+
+    for (const auto& [key, child] : value.items()) {
+        if (!key.empty() && key[0] == '_') continue;
+        collectPatterns(child, level, pool);
+    }
+}
+
+static int levelFromKey(const std::string& key) {
+    const std::string prefix = "level_";
+
+    if (key.rfind(prefix, 0) != 0) {
+        return 1;
+    }
+
+    int level = std::atoi(key.c_str() + prefix.size());
+
+    if (level <= 0) {
+        return 1;
+    }
+
+    return level;
+}
+
+static std::vector<Pattern> loadPatternPool(const nlohmann::json& patternsJson) {
+    std::vector<Pattern> pool;
+
+    if (!patternsJson.contains("patterns") || !patternsJson["patterns"].is_object()) {
+        return pool;
+    }
+
+    for (const auto& [levelName, level] : patternsJson["patterns"].items()) {
+        if (!level.is_object()) continue;
+        collectPatterns(level, levelFromKey(levelName), pool);
+    }
+
+    return pool;
+}
+
+// ── Chart building ──────────────────────────────────────────────────────────
 
 nlohmann::json buildPageList(
     float bpm,
     float durationSec,
-    int timeBase = 480,
-    int beatsPerPage = 4
+    float beatOffsetSec,
+    int timeBase,
+    int beatsPerPage
 ) {
     nlohmann::json pageList = nlohmann::json::array();
 
@@ -141,10 +608,21 @@ nlohmann::json buildPageList(
     }
 
     const int ticksPerPage = timeBase * beatsPerPage;
-    const float secondsPerTick = 60.0f / (bpm * timeBase);
+    const float secondsPerTick = 60.0f / (bpm * (float)timeBase);
     const int totalTicks = (int)(durationSec / secondsPerTick);
+    const int offsetTicks = (int)(beatOffsetSec / secondsPerTick);
 
-    int tick = 0;
+    // The lead-in page runs bottom→top so the scan line reaches the top exactly
+    // on the first beat, where the first regular top→bottom page takes over.
+    if (offsetTicks > 0) {
+        pageList.push_back({
+            {"start_tick", 0},
+            {"end_tick", offsetTicks},
+            {"scan_line_direction", 1}
+        });
+    }
+
+    int tick = offsetTicks;
     int direction = -1;
 
     while (tick < totalTicks) {
@@ -161,512 +639,457 @@ nlohmann::json buildPageList(
     return pageList;
 }
 
-static void collectPatterns(
-    const nlohmann::json& val,
-    std::vector<nlohmann::json>& pool
-) {
-    if (val.is_array()) {
-        pool.push_back(val);
-    } else if (val.is_object()) {
-        if (val.contains("notes") && val["notes"].is_array()) {
-            pool.push_back(val["notes"]);
-        } else {
-            for (auto& [k, v] : val.items()) {
-                if (!k.empty() && k[0] == '_') continue;
-                collectPatterns(v, pool);
-            }
-        }
-    }
-}
+struct ActivePattern {
+    float minX;
+    float maxX;
+    int endTick;
+};
 
-static std::pair<float, float> patternXExtent(const nlohmann::json& notes) {
-    float lo = 0.0f;
-    float hi = 0.0f;
-
-    for (auto& note : notes) {
-        if (note.contains("nodes")) {
-            for (auto& node : note["nodes"]) {
-                float x = node.value("x", 0.0f);
-                lo = std::min(lo, x);
-                hi = std::max(hi, x);
-            }
-        } else {
-            float x = note.value("x", 0.0f);
-            lo = std::min(lo, x);
-            hi = std::max(hi, x);
-        }
-    }
-
-    return {lo, hi};
-}
-
-static int patternSpan(const nlohmann::json& notes) {
-    int last = 0;
-
-    for (auto& note : notes) {
-        if (note.contains("nodes")) {
-            for (auto& node : note["nodes"]) {
-                last = std::max(last, node.value("tick", 0));
-            }
-        } else {
-            int tick = note.value("tick", 0);
-            int duration = note.value("duration", 0);
-            last = std::max(last, tick + duration);
-        }
+/**
+ * Walks the beat grid and places patterns under the difficulty's rules. The
+ * rules, in the order they are applied per grid slot:
+ *
+ *  1. the slot must be musically loud enough (intensityThreshold, relaxed on
+ *     downbeats), which is what keeps intros and breakdowns empty,
+ *  2. the screen must have room (maxConcurrentPatterns),
+ *  3. the trailing density must be under budget (targetNotesPerSecond),
+ *  4. the pattern's difficulty level is picked from the local intensity, so the
+ *     hardest shapes only show up where the track earns them,
+ *  5. the pattern is stretched until its taps clear minNoteIntervalSec,
+ *  6. no tap may land closer than minNoteIntervalSec to an existing one and no
+ *     tick may exceed maxNotesPerTick,
+ *  7. the x anchor must be reachable from the previous pattern at handSpeed and
+ *     must not collide with a pattern that is still on screen.
+ */
+class ChartBuilder {
+public:
+    ChartBuilder(
+        const AudioAnalysis& audio,
+        const DifficultySpec& spec,
+        int timeBase,
+        int beatsPerPage,
+        uint32_t seed
+    )
+        : audio(audio),
+          spec(spec),
+          timeBase(timeBase),
+          beatsPerPage(beatsPerPage),
+          rng(seed) {
+        secondsPerTick = 60.0f / (audio.bpm * (float)timeBase);
+        tickScale = std::max(1, timeBase / PATTERN_TIME_BASE);
+        offsetTicks = (int)(audio.beatOffsetSec / secondsPerTick);
+        minIntervalTicks = (int)(spec.minNoteIntervalSec / secondsPerTick);
+        maxPatternSpanTicks = timeBase * beatsPerPage * 2;
+        slotsPerBeat = slotsPerBeatFor(audio.bpm);
     }
 
-    return last;
-}
+    nlohmann::json build(const std::vector<Pattern>& pool) {
+        groupByLevel(pool);
 
-static bool isStreamPattern(const nlohmann::json& notes) {
-    std::set<int> seen;
+        const int stride = INTENSITY_SUBDIVISION / slotsPerBeat;
+        const int slotTicks = timeBase / slotsPerBeat;
 
-    for (auto& note : notes) {
-        if (note.contains("nodes")) continue;
+        for (size_t index = 0; index < audio.gridIntensity.size(); index += (size_t)stride) {
+            int slotTick = offsetTicks + (int)(index / (size_t)stride) * slotTicks;
 
-        int tick = note.value("tick", 0);
+            expireActive(slotTick);
+            tryPlaceOnSlot(pool, index, slotTick);
+        }
 
-        if (!seen.insert(tick).second) {
+        return sortedNoteList();
+    }
+
+    /** Keeps slots short enough that a slow track still gets a usable grid. */
+    static int slotsPerBeatFor(float bpm) {
+        float beatSec = 60.0f / bpm;
+        int slots = 1;
+
+        while (slots < INTENSITY_SUBDIVISION && beatSec / (float)slots > MAX_SLOT_SEC) {
+            slots *= 2;
+        }
+
+        return slots;
+    }
+
+private:
+    const AudioAnalysis& audio;
+    const DifficultySpec& spec;
+    int timeBase;
+    int beatsPerPage;
+    std::mt19937 rng;
+
+    float secondsPerTick = 0.0f;
+    int tickScale = 1;
+    int offsetTicks = 0;
+    int minIntervalTicks = 0;
+    int maxPatternSpanTicks = 0;
+    int slotsPerBeat = 1;
+
+    // Pattern indices per difficulty level, indexed by level - 1.
+    std::vector<std::vector<int>> patternsByLevel;
+
+    std::vector<nlohmann::json> notes;
+    std::map<int, int> notesPerTick;
+    std::set<int> occupiedTicks;
+    std::deque<float> recentNoteTimes;
+    std::vector<ActivePattern> active;
+
+    float previousCenter = 0.5f;
+    float previousPlacementSec = -100.0f;
+
+    void groupByLevel(const std::vector<Pattern>& pool) {
+        patternsByLevel.assign(spec.maxPatternLevel, {});
+
+        for (size_t index = 0; index < pool.size(); ++index) {
+            if (!patternAllowed(pool[index])) continue;
+            patternsByLevel[pool[index].level - 1].push_back((int)index);
+        }
+    }
+
+    bool patternAllowed(const Pattern& pattern) const {
+        if (pattern.level < 1 || pattern.level > spec.maxPatternLevel) return false;
+        if (pattern.noteCount <= 0) return false;
+        if (pattern.maxNotesPerTick > spec.maxNotesPerTick) return false;
+        if (pattern.maxX - pattern.minX > PLAYFIELD_MAX_X - PLAYFIELD_MIN_X) return false;
+
+        return stretchFor(pattern) > 0;
+    }
+
+    /**
+     * Smallest power-of-two tick multiplier that spaces the pattern's taps at
+     * least minNoteIntervalSec apart. Returns 0 when even the widest stretch
+     * would leave the pattern too fast or make it outstay its welcome.
+     */
+    int stretchFor(const Pattern& pattern) const {
+        for (int stretch = 1; stretch <= MAX_STRETCH; stretch *= 2) {
+            if (patternSpanTicks(pattern, stretch) > maxPatternSpanTicks) return 0;
+            if (tapsAreReachable(pattern, stretch)) return stretch;
+        }
+
+        return 0;
+    }
+
+    bool tapsAreReachable(const Pattern& pattern, int stretch) const {
+        if (pattern.minTapInterval <= 0) return true;
+        return pattern.minTapInterval * tickScale * stretch >= minIntervalTicks;
+    }
+
+    int patternSpanTicks(const Pattern& pattern, int stretch) const {
+        return pattern.span * tickScale * stretch;
+    }
+
+    void expireActive(int beatTick) {
+        auto expired = std::remove_if(
+            active.begin(),
+            active.end(),
+            [beatTick](const ActivePattern& pattern) {
+                return pattern.endTick <= beatTick;
+            }
+        );
+
+        active.erase(expired, active.end());
+    }
+
+    void tryPlaceOnSlot(const std::vector<Pattern>& pool, size_t slotIndex, int slotTick) {
+        float intensity = audio.gridIntensity[slotIndex];
+
+        if (intensity < thresholdForSlot(slotIndex)) return;
+        if ((int)active.size() >= spec.maxConcurrentPatterns) return;
+
+        float nowSec = (float)slotTick * secondsPerTick;
+
+        if (notesPerSecondAt(nowSec) >= spec.targetNotesPerSecond) return;
+
+        int index = choosePattern(pool, intensity, slotTick);
+
+        if (index < 0) return;
+
+        int stretch = stretchFor(pool[index]);
+        float anchor = chooseAnchor(pool[index], nowSec);
+
+        if (!std::isfinite(anchor)) return;
+
+        emitPattern(pool[index], slotTick, anchor, stretch, nowSec);
+    }
+
+    /**
+     * Downbeats are the musically obvious place for a pattern, so they qualify
+     * sooner; slots inside a beat have to be clearly audible to earn a note.
+     */
+    float thresholdForSlot(size_t slotIndex) const {
+        size_t ticksPerBar = (size_t)(INTENSITY_SUBDIVISION * beatsPerPage);
+
+        if (slotIndex % ticksPerBar == 0) return spec.intensityThreshold * 0.8f;
+        if (slotIndex % (size_t)INTENSITY_SUBDIVISION == 0) return spec.intensityThreshold;
+
+        return spec.intensityThreshold * 1.3f;
+    }
+
+    float notesPerSecondAt(float nowSec) {
+        float windowStart = nowSec - DENSITY_WINDOW_SEC;
+
+        while (!recentNoteTimes.empty() && recentNoteTimes.front() < windowStart) {
+            recentNoteTimes.pop_front();
+        }
+
+        return (float)recentNoteTimes.size() / DENSITY_WINDOW_SEC;
+    }
+
+    int choosePattern(const std::vector<Pattern>& pool, float intensity, int beatTick) {
+        for (int attempt = 0; attempt < PATTERN_TRIES; ++attempt) {
+            int index = drawPatternIndex(intensity);
+
+            if (index >= 0 && patternFitsHere(pool[index], beatTick)) return index;
+        }
+
+        return -1;
+    }
+
+    /** Loud beats draw from the hardest level the difficulty allows, quiet ones from level 1. */
+    int drawPatternIndex(float intensity) {
+        int wanted = 1 + (int)(intensity * (float)spec.maxPatternLevel);
+        wanted = std::clamp(wanted, 1, spec.maxPatternLevel);
+
+        for (int level = wanted; level >= 1; --level) {
+            if (!patternsByLevel[level - 1].empty()) return pickFromLevel(level);
+        }
+
+        return -1;
+    }
+
+    int pickFromLevel(int level) {
+        const std::vector<int>& candidates = patternsByLevel[level - 1];
+        std::uniform_int_distribution<size_t> pick(0, candidates.size() - 1);
+
+        return candidates[pick(rng)];
+    }
+
+    bool patternFitsHere(const Pattern& pattern, int beatTick) {
+        int stretch = stretchFor(pattern);
+
+        if (stretch <= 0) return false;
+        if (!fitsDensityBudget(pattern, beatTick)) return false;
+
+        return ticksAreFree(pattern, beatTick, stretch);
+    }
+
+    bool fitsDensityBudget(const Pattern& pattern, int beatTick) {
+        float nowSec = (float)beatTick * secondsPerTick;
+        float current = notesPerSecondAt(nowSec);
+        float added = (float)pattern.noteCount / DENSITY_WINDOW_SEC;
+
+        return current + added <= spec.targetNotesPerSecond;
+    }
+
+    bool ticksAreFree(const Pattern& pattern, int beatTick, int stretch) const {
+        for (const auto& [authoredTick, count] : pattern.tapTicks) {
+            int tick = beatTick + authoredTick * tickScale * stretch;
+
+            if (!tickAvailable(tick, count)) return false;
+        }
+
+        return true;
+    }
+
+    bool tickAvailable(int tick, int count) const {
+        int existing = 0;
+        auto found = notesPerTick.find(tick);
+
+        if (found != notesPerTick.end()) {
+            existing = found->second;
+        }
+
+        if (existing + count > spec.maxNotesPerTick) return false;
+
+        return !hasNeighbourWithin(tick, minIntervalTicks);
+    }
+
+    /** True when another tap sits close enough that the two would fight for the same hand. */
+    bool hasNeighbourWithin(int tick, int distance) const {
+        auto after = occupiedTicks.lower_bound(tick);
+
+        if (after != occupiedTicks.end() && *after != tick && *after - tick < distance) {
             return true;
         }
+
+        if (after == occupiedTicks.begin()) {
+            return false;
+        }
+
+        return tick - *std::prev(after) < distance;
     }
 
-    return false;
-}
+    /**
+     * Places the pattern horizontally within reach of the previous one. The
+     * reach grows with the gap since the last placement, so a pattern that
+     * follows immediately stays close and one after a rest may cross the field.
+     */
+    float chooseAnchor(const Pattern& pattern, float nowSec) {
+        float width = pattern.maxX - pattern.minX;
+        float centerOffset = (pattern.minX + pattern.maxX) * 0.5f;
+        float reach = reachableDistance(nowSec);
 
-static std::vector<std::pair<float, float>> simultaneousPairs(const nlohmann::json& notes) {
-    std::map<int, std::vector<float>> byTick;
+        for (int attempt = 0; attempt < ANCHOR_TRIES; ++attempt) {
+            float center = proposeCenter(reach * (1.0f + (float)attempt * 0.25f), width);
+            float anchor = center - centerOffset;
 
-    for (auto& note : notes) {
+            if (xRangeFree(anchor + pattern.minX, anchor + pattern.maxX)) return anchor;
+        }
+
+        return std::numeric_limits<float>::quiet_NaN();
+    }
+
+    float reachableDistance(float nowSec) const {
+        float restSec = std::max(0.0f, nowSec - previousPlacementSec);
+        float reach = spec.handSpeedPerSecond * restSec;
+
+        return std::clamp(reach, 0.12f, PLAYFIELD_MAX_X - PLAYFIELD_MIN_X);
+    }
+
+    float proposeCenter(float reach, float width) {
+        std::uniform_real_distribution<float> offset(-reach, reach);
+
+        // A mild pull to the middle keeps a run of patterns from parking on an edge.
+        float target = previousCenter + (0.5f - previousCenter) * 0.15f + offset(rng);
+        float half = width * 0.5f;
+
+        return std::clamp(target, PLAYFIELD_MIN_X + half, PLAYFIELD_MAX_X - half);
+    }
+
+    bool xRangeFree(float minX, float maxX) const {
+        for (const ActivePattern& other : active) {
+            if (minX < other.maxX + PATTERN_X_GAP && maxX > other.minX - PATTERN_X_GAP) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    void emitPattern(
+        const Pattern& pattern,
+        int beatTick,
+        float anchor,
+        int stretch,
+        float nowSec
+    ) {
+        for (const nlohmann::json& source : pattern.notes) {
+            nlohmann::json note = transformNote(source, beatTick, anchor, stretch);
+
+            registerNote(note);
+            notes.push_back(note);
+        }
+
+        active.push_back({
+            anchor + pattern.minX,
+            anchor + pattern.maxX,
+            beatTick + patternSpanTicks(pattern, stretch)
+        });
+
+        previousCenter = anchor + (pattern.minX + pattern.maxX) * 0.5f;
+        previousPlacementSec = nowSec;
+    }
+
+    nlohmann::json transformNote(
+        const nlohmann::json& source,
+        int beatTick,
+        float anchor,
+        int stretch
+    ) const {
+        nlohmann::json note = source;
+        int multiplier = tickScale * stretch;
+
         if (!note.contains("nodes")) {
-            int tick = note.value("tick", 0);
-            float x = note.value("x", 0.0f);
-            byTick[tick].push_back(x);
+            note["tick"] = beatTick + note.value("tick", 0) * multiplier;
+            note["duration"] = note.value("duration", 0) * multiplier;
+            note["x"] = anchor + note.value("x", 0.0f);
+            return note;
         }
+
+        for (nlohmann::json& node : note["nodes"]) {
+            node["tick"] = beatTick + node.value("tick", 0) * multiplier;
+            node["duration"] = node.value("duration", 0) * multiplier;
+            node["x"] = anchor + node.value("x", 0.0f);
+        }
+
+        return note;
     }
 
-    std::vector<std::pair<float, float>> pairs;
+    void registerNote(const nlohmann::json& note) {
+        int tick = noteStartTick(note);
 
-    for (auto& [tick, xs] : byTick) {
-        if (xs.size() >= 2) {
-            pairs.push_back({xs[0], xs[1]});
-        }
+        notesPerTick[tick]++;
+        occupiedTicks.insert(tick);
+        recentNoteTimes.push_back((float)tick * secondsPerTick);
     }
 
-    return pairs;
-}
+    /** The engine keys notes by id, so ids are handed out in play order. */
+    nlohmann::json sortedNoteList() {
+        std::sort(
+            notes.begin(),
+            notes.end(),
+            [](const nlohmann::json& a, const nlohmann::json& b) {
+                return noteStartTick(a) < noteStartTick(b);
+            }
+        );
 
-static bool hasTapNotes(const nlohmann::json& notes) {
-    for (auto& note : notes) {
-        if (!note.contains("nodes") && note.value("duration", 0) == 0) {
-            return true;
+        nlohmann::json noteList = nlohmann::json::array();
+
+        for (size_t index = 0; index < notes.size(); ++index) {
+            notes[index]["id"] = (int)index;
+            noteList.push_back(notes[index]);
         }
-    }
 
-    return false;
+        return noteList;
+    }
+};
+
+static uint32_t seedFor(const AudioAnalysis& audio, const std::string& difficulty) {
+    size_t bpmHash = std::hash<float>{}(audio.bpm);
+    size_t durationHash = std::hash<float>{}(audio.durationSec);
+    size_t difficultyHash = std::hash<std::string>{}(difficulty);
+
+    return 42069u
+        ^ (uint32_t)(bpmHash * 6364136223846793005ULL)
+        ^ (uint32_t)(durationHash * 1442695040888963407ULL)
+        ^ (uint32_t)(difficultyHash * 1099511628211ULL);
 }
 
 nlohmann::json buildNoteList(
-    float bpm,
-    float durationSec,
+    const AudioAnalysis& audio,
     const nlohmann::json& patternsJson,
-    int timeBase = 480,
-    int beatsPerPage = 4
+    const std::string& difficulty,
+    int timeBase,
+    int beatsPerPage
 ) {
-    nlohmann::json noteList = nlohmann::json::array();
-
-    if (bpm <= 0.0f || durationSec <= 0.0f || timeBase <= 0 || beatsPerPage <= 0) {
-        return noteList;
+    if (audio.bpm <= 0.0f || audio.gridIntensity.empty()) {
+        return nlohmann::json::array();
     }
 
-    if (!patternsJson.contains("patterns") || !patternsJson["patterns"].is_object()) {
-        return noteList;
-    }
-
-    const int scale = beatsPerPage;
-    const float secondsPerTick = 60.0f / (bpm * timeBase);
-    const int totalTicks = (int)(durationSec / secondsPerTick);
-    const int ticksPerPage = timeBase * beatsPerPage;
-
-    std::vector<nlohmann::json> pool;
-
-    for (auto& [levelName, level] : patternsJson["patterns"].items()) {
-        if (!level.is_object()) continue;
-
-        for (auto& [key, val] : level.items()) {
-            if (!key.empty() && key[0] == '_') continue;
-            collectPatterns(val, pool);
-        }
-    }
+    std::vector<Pattern> pool = loadPatternPool(patternsJson);
 
     if (pool.empty()) {
-        return noteList;
+        return nlohmann::json::array();
     }
 
-    struct PatternMeta {
-        float lo;
-        float hi;
-        int span;
-        bool isStream;
-        std::vector<std::pair<float, float>> simPairs;
-    };
+    DifficultySpec spec = specForDifficulty(difficulty);
 
-    std::vector<PatternMeta> meta;
-    meta.reserve(pool.size());
+    ChartBuilder builder(audio, spec, timeBase, beatsPerPage, seedFor(audio, difficulty));
 
-    for (auto& pattern : pool) {
-        auto [lo, hi] = patternXExtent(pattern);
-
-        meta.push_back({
-            lo,
-            hi,
-            patternSpan(pattern),
-            isStreamPattern(pattern),
-            simultaneousPairs(pattern)
-        });
-    }
-
-    auto directionAt = [&](int tick) -> int {
-        int page = tick / ticksPerPage;
-        return (page % 2 == 0) ? -1 : 1;
-    };
-
-    struct Active {
-        float lo;
-        float hi;
-        int endsAt;
-        bool isStream;
-    };
-
-    std::vector<Active> active;
-
-    const float X_GAP = 0.05f;
-    const float X_MAX = 0.9f;
-
-    // Seed combines the magic base with bpm and duration so every song gets
-    // a distinct, reproducible sequence.
-    // std::mt19937 rng(42069u ^ (std::hash<float>{}(bpm) * 2654435761u)
-    //                           ^ (std::hash<float>{}(durationSec) * 2246822519u));
-
-    size_t h1 = std::hash<float>{}(bpm);
-    size_t h2 = std::hash<float>{}(durationSec);
-
-    // Mix properly before narrowing to 32-bit
-    uint32_t seed = 42069u
-        ^ (uint32_t)(h1 * 6364136223846793005ULL)   // 64-bit multiplier
-        ^ (uint32_t)(h2 * 1442695040888963407ULL);
-
-    std::mt19937 rng(seed);
-    std::uniform_int_distribution<int> pick_pat(0, (int)pool.size() - 1);
-
-    std::map<int, int> tickCounts;
-
-    float prevCenter = 0.5f;
-    bool hasPrev = false;
-    bool nextMirror = true;
-
-    int streamStreak = 0;
-    int id = 0;
-
-    for (int beatTick = 0; beatTick < totalTicks; beatTick += timeBase) {
-        active.erase(
-            std::remove_if(
-                active.begin(),
-                active.end(),
-                [&](const Active& a) {
-                    return a.endsAt <= beatTick;
-                }
-            ),
-            active.end()
-        );
-
-        bool streamActive = std::any_of(
-            active.begin(),
-            active.end(),
-            [](const Active& a) {
-                return a.isStream;
-            }
-        );
-
-        std::vector<std::pair<float, float>> occupied;
-
-        for (auto& a : active) {
-            occupied.push_back({a.lo, a.hi});
-        }
-
-        std::sort(occupied.begin(), occupied.end());
-
-        std::vector<std::pair<float, float>> freeSegs;
-        float cursor = 0.1f;
-
-        for (auto& [olo, ohi] : occupied) {
-            float gapStart = cursor;
-            float gapEnd = olo - X_GAP;
-
-            if (gapEnd > gapStart + 0.2f) {
-                freeSegs.push_back({gapStart, gapEnd});
-            }
-
-            cursor = ohi + X_GAP;
-        }
-
-        if (cursor < X_MAX - 0.2f) {
-            freeSegs.push_back({cursor, X_MAX});
-        }
-
-        if (freeSegs.empty()) {
-            continue;
-        }
-
-        const int MAX_TRIES = 8;
-        bool placed = false;
-
-        for (int attempt = 0; attempt < MAX_TRIES && !placed; ++attempt) {
-            int          pi = pick_pat(rng);
-            PatternMeta& pm = meta[pi];
-
-            if (pm.isStream && streamStreak >= 4) {
-                continue;
-            }
-
-            if (streamActive && hasTapNotes(pool[pi])) {
-                continue;
-            }
-
-            float patCenterOffset = (pm.lo + pm.hi) / 2.0f;
-            float preferredCenter;
-
-            if (!hasPrev) {
-                // First pattern: pick a random edge-biased start (left or right third)
-                std::uniform_int_distribution<int> side(0, 1);
-                preferredCenter = side(rng) == 0 ? 0.2f : 0.8f;
-            } else if (nextMirror) {
-                // Hard mirror: flip to the opposite side
-                preferredCenter = 1.0f - prevCenter;
-            } else {
-                // Drift toward whichever edge we are closest to, with a strong pull
-                float edgeTarget = (prevCenter < 0.5f) ? 0.15f : 0.85f;
-                std::uniform_real_distribution<float> drift(0.0f, 1.0f);
-                // 60% pull toward edge, 40% random nudge
-                float t = drift(rng);
-                preferredCenter = prevCenter + (edgeTarget - prevCenter) * 0.6f
-                                  + (t - 0.5f) * 0.2f;
-            }
-            // Keep within playfield bounds
-            preferredCenter = std::clamp(preferredCenter, 0.15f, 0.85f);
-
-            float preferredAnchor = preferredCenter - patCenterOffset;
-
-            std::vector<int> candidates;
-
-            for (int si = 0; si < (int)freeSegs.size(); ++si) {
-                auto [fs, fe] = freeSegs[si];
-
-                if (fe - fs >= (pm.hi - pm.lo) + 0.2f) {  // min gap 0.2
-                    candidates.push_back(si);
-                }
-            }
-
-            if (candidates.empty()) {
-                continue;
-            }
-
-            int bestSi = candidates[0];
-            float bestDist = std::numeric_limits<float>::max();
-
-            for (int si : candidates) {
-                auto [fs, fe] = freeSegs[si];
-
-                float anchorMin = fs - pm.lo;
-                float anchorMax = fe - pm.hi;
-                float clamped = std::clamp(preferredAnchor, anchorMin, anchorMax);
-                float dist = std::abs(clamped - preferredAnchor);
-
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    bestSi = si;
-                }
-            }
-
-            auto [fs, fe] = freeSegs[bestSi];
-
-            float anchorMin = fs - pm.lo;
-            float anchorMax = fe - pm.hi;
-
-            if (anchorMax < anchorMin) {
-                continue;
-            }
-
-            float anchorBase = std::clamp(preferredAnchor, anchorMin, anchorMax);
-            float jitterRange = std::min(0.15f, (anchorMax - anchorMin) * 0.5f);
-
-            std::uniform_real_distribution<float> jitter(-jitterRange, jitterRange);
-
-            float anchor = std::clamp(anchorBase + jitter(rng), anchorMin, anchorMax);
-
-            if (pm.isStream && !pm.simPairs.empty()) {
-                bool pairsOk = true;
-
-                for (auto& [x1r, x2r] : pm.simPairs) {
-                    float diff = std::abs(x1r - x2r);
-                    float sum = (anchor + x1r) + (anchor + x2r);
-
-                    bool close = diff < 0.4f;
-                    bool mirrored = std::abs(sum - 1.0f) < 0.25f;
-
-                    if (!close && !mirrored) {
-                        pairsOk = false;
-                        break;
-                    }
-                }
-
-                if (!pairsOk) {
-                    auto& [x1r, x2r] = pm.simPairs[0];
-                    float mirrorAnchor = (1.0f - x1r - x2r) / 2.0f;
-
-                    if (mirrorAnchor >= anchorMin && mirrorAnchor <= anchorMax) {
-                        anchor = mirrorAnchor;
-                    } else {
-                        continue;
-                    }
-                }
-            }
-
-            int direction = directionAt(beatTick);
-            int unscaledSpan = pm.span;
-            int scaledSpan = unscaledSpan * scale;
-
-            auto transform_tick = [&](int t) -> int {
-                int scaled = t * scale;
-                return beatTick + (direction == -1 ? scaledSpan - scaled : scaled);
-            };
-
-            bool tickOk = true;
-
-            {
-                std::map<int, int> candidateCounts;
-
-                for (auto& note : pool[pi]) {
-                    if (note.contains("nodes")) {
-                        for (auto& node : note["nodes"]) {
-                            candidateCounts[transform_tick(node.value("tick", 0))]++;
-                        }
-                    } else {
-                        candidateCounts[transform_tick(note.value("tick", 0))]++;
-                    }
-                }
-
-                for (auto& [tick, count] : candidateCounts) {
-                    if (tickCounts[tick] + count > 3) {
-                        tickOk = false;
-                        break;
-                    }
-                }
-            }
-
-            if (!tickOk) {
-                continue;
-            }
-
-            const nlohmann::json& notes = pool[pi];
-            int noteCount = (int)notes.size();
-
-            for (int ni = 0; ni < noteCount; ++ni) {
-                int src = (direction == -1) ? (noteCount - 1 - ni) : ni;
-
-                nlohmann::json note = notes[src];
-
-                if (note.contains("nodes")) {
-                    auto& nodes = note["nodes"];
-
-                    if (direction == -1) {
-                        std::reverse(nodes.begin(), nodes.end());
-                    }
-
-                    for (auto& node : nodes) {
-                        int t = transform_tick(node.value("tick", 0));
-
-                        node["tick"] = t;
-                        node["x"] = anchor + node.value("x", 0.0f);
-
-                        tickCounts[t]++;
-                    }
-                } else {
-                    int origTick = note.value("tick", 0);
-                    int origDuration = note.value("duration", 0);
-
-                    int t = transform_tick(origTick);
-
-                    note["tick"] = t;
-                    note["duration"] = origDuration * scale;
-                    note["x"] = anchor + note.value("x", 0.0f);
-
-                    tickCounts[t]++;
-                }
-
-                note["id"] = id++;
-                noteList.push_back(note);
-            }
-
-            if (pm.isStream && scaledSpan > 0) {
-                float streamCenter = anchor + patCenterOffset;
-                float holdX = std::clamp(1.0f - streamCenter, 0.05f, 0.95f);
-
-                bool holdFree = true;
-
-                for (auto& a : active) {
-                    if (holdX >= a.lo - 0.05f && holdX <= a.hi + 0.05f) {
-                        holdFree = false;
-                        break;
-                    }
-                }
-
-                if (holdX >= anchor + pm.lo - 0.05f && holdX <= anchor + pm.hi + 0.05f) {
-                    holdFree = false;
-                }
-
-                if (holdFree) {
-                    noteList.push_back({
-                        {"type", 1},
-                        {"id", id++},
-                        {"tick", beatTick},
-                        {"x", holdX},
-                        {"duration", scaledSpan}
-                    });
-
-                    tickCounts[beatTick]++;
-                }
-            }
-
-            active.push_back({
-                anchor + pm.lo,
-                anchor + pm.hi,
-                beatTick + scaledSpan,
-                pm.isStream
-            });
-
-            prevCenter = anchor + patCenterOffset;
-            hasPrev = true;
-            nextMirror = !nextMirror;
-            streamStreak = pm.isStream ? streamStreak + 1 : 0;
-
-            placed = true;
-        }
-    }
-
-    return noteList;
+    return builder.build(pool);
 }
 
 extern "C" {
 
-EMSCRIPTEN_KEEPALIVE
+CHART_EXPORT
 char* analyze_audio_json(
     const float* monoSamples,
     int sampleCount,
     int sampleRate,
     const char* patternsJsonString,
     int timeBase,
-    int beatsPerPage
+    int beatsPerPage,
+    const char* difficultyName
 ) {
     try {
         if (!patternsJsonString) {
@@ -681,12 +1104,13 @@ char* analyze_audio_json(
             beatsPerPage = 4;
         }
 
-        AudioInfo audio = detectAudioFromMono(
-            monoSamples,
-            sampleCount,
-            sampleRate
-        );
+        std::string difficulty = "normal";
 
+        if (difficultyName && difficultyName[0] != '\0') {
+            difficulty = difficultyName;
+        }
+
+        AudioAnalysis audio = analyzeAudio(monoSamples, sampleCount, sampleRate);
         nlohmann::json patternsJson = nlohmann::json::parse(patternsJsonString);
 
         nlohmann::json chart;
@@ -694,19 +1118,20 @@ char* analyze_audio_json(
         chart["bpm"] = audio.bpm;
         chart["time_base"] = timeBase;
         chart["start_offset_time"] = 0;
-        chart["length"]            = audio.duration_sec;
+        chart["length"] = audio.durationSec;
 
         chart["page_list"] = buildPageList(
             audio.bpm,
-            audio.duration_sec,
+            audio.durationSec,
+            audio.beatOffsetSec,
             timeBase,
             beatsPerPage
         );
 
         chart["note_list"] = buildNoteList(
-            audio.bpm,
-            audio.duration_sec,
+            audio,
             patternsJson,
+            difficulty,
             timeBase,
             beatsPerPage
         );
@@ -721,7 +1146,7 @@ char* analyze_audio_json(
     }
 }
 
-EMSCRIPTEN_KEEPALIVE
+CHART_EXPORT
 void free_result(char* ptr) {
     std::free(ptr);
 }
