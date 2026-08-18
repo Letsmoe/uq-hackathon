@@ -12,7 +12,6 @@
   import RecentlyPlayed from "./lib/components/RecentlyPlayed.svelte";
   import type { RecentTrack } from "./lib/components/RecentlyPlayed.svelte";
   import Logo from "./lib/components/Logo.svelte";
-  import VersionTag from "./lib/components/VersionTag.svelte";
   import UploadButton from "./lib/components/UploadButton.svelte";
   import MenuPanel from "./lib/components/MenuPanel.svelte";
   import MessagesPanel from "./lib/components/MessagesPanel.svelte";
@@ -288,8 +287,6 @@
                 <div aria-hidden="true"></div>
               </div>
             </div>
-
-            <VersionTag version={__APP_VERSION__} />
           </div>
 
           {#if openPanel === "messages"}
