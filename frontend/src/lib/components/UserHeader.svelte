@@ -27,7 +27,7 @@
     onsettings = () => {},
   }: Props = $props();
 
-  const ratingProgress = $derived((ratingCurrent / ratingMax) * 100);
+  const ratingFraction = $derived(ratingCurrent / ratingMax);
 
   const iconButtonClass =
     "relative flex h-12 w-12 items-center justify-center border border-line bg-raised text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg cursor-pointer";
@@ -54,10 +54,12 @@
         <span class="text-sm leading-none font-semibold text-signal">
           {rating.toFixed(2)}
         </span>
+        <!-- Scaled rather than resized: a width animation relayouts the row
+             the bar sits in, a transform does not. -->
         <div class="relative h-1 w-20 overflow-hidden bg-line">
           <div
-            class="absolute top-0 left-0 h-full bg-signal transition-all duration-300"
-            style="width: {ratingProgress}%"
+            class="absolute inset-0 origin-left bg-signal transition-transform duration-300 ease-out"
+            style="transform: scaleX({ratingFraction});"
           ></div>
         </div>
         <span class="text-2xs text-fg-dim">

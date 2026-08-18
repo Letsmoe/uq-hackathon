@@ -125,6 +125,36 @@
 }
 
 /* ============================================================
+   ENTRY
+   Bands of the menu arrive in reading order. A CSS animation
+   rather than a Svelte transition, because this has to play on
+   the very first paint, and `backwards` makes the delay hold
+   the start state instead of flashing the end one.
+   ============================================================ */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise-in {
+  animation: rise-in var(--duration-slow) var(--ease-ui) backwards;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise-in {
+    animation: none;
+  }
+}
+
+/* ============================================================
    CHROME
    The one shape language Tailwind has no utility for: hard
    panels with a cut leading or trailing edge.

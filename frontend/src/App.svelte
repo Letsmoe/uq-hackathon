@@ -75,6 +75,9 @@
 
   const RECENT_LIMIT = 4;
   const PAGE_FADE_MS = 220;
+  // The menu's three bands arrive in reading order.
+  const CAROUSEL_ENTRY_DELAY_MS = 70;
+  const BOTTOM_ENTRY_DELAY_MS = 140;
 
   const selectedSong = $derived(songs[selected]);
   const selectedChart = $derived(selectedSong.charts[selectedSong.difficulty]);
@@ -231,7 +234,9 @@
                only the carousel takes up the slack. Navigation shares the
                header row, which is what buys the carousel its height. -->
           <div class="relative flex h-full w-full flex-col px-10 pt-6 pb-6">
-            <div class="flex h-16 shrink-0 flex-row items-center justify-between gap-8">
+            <div
+              class="rise-in flex h-16 shrink-0 flex-row items-center justify-between gap-8"
+            >
               <Logo />
               <NavButtons bind:active={activeTab} />
               <UserHeader
@@ -247,18 +252,18 @@
               />
             </div>
 
-            <div class="min-h-0 flex-1">
-              <SongCarousel
-                {songs}
-                bind:selected
-                onshuffle={pickRandomSong}
-              />
+            <div
+              class="rise-in min-h-0 flex-1"
+              style="animation-delay: {CAROUSEL_ENTRY_DELAY_MS}ms;"
+            >
+              <SongCarousel {songs} bind:selected onshuffle={pickRandomSong} />
             </div>
 
             <!-- Fixed side columns keep the song info on the frame's centre
                  line however wide the rails get. -->
             <div
-              class="grid h-[212px] shrink-0 grid-cols-[minmax(0,1fr)_640px_minmax(0,1fr)] items-end gap-6"
+              class="rise-in grid h-[212px] shrink-0 grid-cols-[minmax(0,1fr)_640px_minmax(0,1fr)] items-end gap-6"
+              style="animation-delay: {BOTTOM_ENTRY_DELAY_MS}ms;"
             >
               <RecentlyPlayed
                 tracks={recentTracks}

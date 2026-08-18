@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
+  import { carouselMotion } from "./carouselMotion";
 
   let canvas: HTMLCanvasElement;
 
@@ -16,8 +17,15 @@
   let mouseLocation: WebGLUniformLocation | null = null;
   let mouseActiveLocation: WebGLUniformLocation | null = null;
   let timeLocation: WebGLUniformLocation | null = null;
+  let driftLocation: WebGLUniformLocation | null = null;
 
   let startTime = performance.now();
+
+  // Carousel travel over the last frame, smoothed. Differencing here rather
+  // than publishing a velocity keeps the carousel from having to know about
+  // frame timing at all.
+  let lastCarouselPosition = 0;
+  let drift = 0;
 
   let mouseX = 0.5;
   let mouseY = 0.5;
@@ -41,6 +49,8 @@ uniform vec2 u_resolution;
 uniform vec2 u_mouse;
 uniform float u_mouseActive;
 uniform float u_time;
+// Signed carousel travel per frame. Leans the grid with a swipe.
+uniform float u_drift;
 
 float circle(vec2 p, float r) {
   return 1.0 - smoothstep(r, r + 0.0025, length(p));
@@ -99,6 +109,11 @@ void main() {
   p += dir * influence * 0.025;
   p += sin(vec2(p.y, p.x) * 28.0 + u_time * 0.8) * influence * 0.002;
 
+  // The grid slides against the swipe and brightens with it, so the
+  // background reads as part of the same gesture as the cards.
+  float swipe = clamp(abs(u_drift) * 7.0, 0.0, 1.0);
+  p.x += u_drift * 1.6;
+
   // Colors — mirrors the --color-canvas / --color-accent tokens
   vec3 bg         = vec3(13.0, 14.0, 19.0) / 255.0;
   vec3 dotColor   = vec3(0.62, 0.62, 0.70);
@@ -148,6 +163,8 @@ void main() {
 
   color += accent * cursorGlow * 0.22;
   color = mix(color, accent, cursorRing * 0.45);
+
+  color += accent * swipe * (dots * 0.35 + gridLines * 0.25 + 0.02);
 
   // Darkening the edges on a light canvas reads as depth; on a dark one it
   // crushes to black, so the vignette lifts the centre instead.
@@ -266,6 +283,10 @@ void main() {
     mouseY += (targetMouseY - mouseY) * 0.12;
     mouseActive += (targetMouseActive - mouseActive) * 0.08;
 
+    const travelled = carouselMotion.position - lastCarouselPosition;
+    lastCarouselPosition = carouselMotion.position;
+    drift += (travelled - drift) * 0.2;
+
     const time = (performance.now() - startTime) / 1000;
 
     gl.useProgram(program);
@@ -274,6 +295,7 @@ void main() {
     gl.uniform2f(mouseLocation, mouseX, mouseY);
     gl.uniform1f(mouseActiveLocation, mouseActive);
     gl.uniform1f(timeLocation, time);
+    gl.uniform1f(driftLocation, drift);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -300,6 +322,9 @@ void main() {
     mouseLocation = gl.getUniformLocation(program, "u_mouse");
     mouseActiveLocation = gl.getUniformLocation(program, "u_mouseActive");
     timeLocation = gl.getUniformLocation(program, "u_time");
+    driftLocation = gl.getUniformLocation(program, "u_drift");
+
+    lastCarouselPosition = carouselMotion.position;
 
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);

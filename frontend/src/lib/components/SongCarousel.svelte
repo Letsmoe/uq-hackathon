@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Spring } from "svelte/motion";
   import ShuffleIcon from "phosphor-svelte/lib/ShuffleIcon";
+  import { carouselMotion } from "../carouselMotion";
   import {
     CENTER_SIZE,
     STAGE_HEIGHT,
@@ -58,6 +59,12 @@
       return;
     }
     position.target = selected;
+  });
+
+  // The background shader leans with the swipe, so it needs the same position
+  // the cards are placed from.
+  $effect(() => {
+    carouselMotion.position = position.current;
   });
 
   function prev() {

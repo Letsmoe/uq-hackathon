@@ -1,7 +1,11 @@
 <script lang="ts">
   import type { MouseEventHandler } from "svelte/elements";
+  import { Tween } from "svelte/motion";
+  import { cubicOut } from "svelte/easing";
   import { DIFFICULTIES } from "../chartGeneration";
   import type { Difficulty } from "../chartGeneration";
+
+  const SCORE_COUNT_MS = 520;
 
   interface Props {
     description?: string;
@@ -40,6 +44,21 @@
     }
     return "Start";
   });
+
+  // The score counts up to the newly selected song's best rather than
+  // swapping, so switching songs reads as a change and not a redraw.
+  const countedScore = new Tween(bestScore, {
+    duration: SCORE_COUNT_MS,
+    easing: cubicOut,
+  });
+
+  $effect(() => {
+    countedScore.target = bestScore;
+  });
+
+  const scoreDigits = $derived(
+    String(Math.round(countedScore.current)).padStart(7, "0"),
+  );
 </script>
 
 <div class="flex h-full w-full flex-col items-center justify-end gap-3">
@@ -68,8 +87,8 @@
   <!-- Score readout -->
   <div class="flex w-full flex-row items-baseline justify-center gap-4">
     <span class="label-caps">Best Score</span>
-    <span class="text-xl leading-none font-semibold tracking-num text-fg">
-      {String(bestScore).padStart(7, "0")}
+    <span class="text-xl leading-none font-semibold tracking-num text-fg tabular-nums">
+      {scoreDigits}
     </span>
     <span class="text-2xl leading-none font-bold text-accent">{badge}</span>
   </div>
