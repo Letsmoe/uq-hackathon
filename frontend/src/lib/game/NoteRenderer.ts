@@ -14,11 +14,25 @@ const NOTE_R = 105;
 // Drag nodes stay a little smaller than taps so a chain still reads as one
 // gesture rather than a row of separate notes.
 const CHAIN_R = Math.round(NOTE_R * 0.7);
-const APPROACH_S = 1;
 const HIT_DURATION = 420;
 
-/** Distance from the scanline, in px, over which a note lights up. */
-const SCANLIT_FALLOFF = 190;
+/** Seconds a note is on screen ahead of its hit time. */
+const APPROACH_S = 1.15;
+/** Eased ramp at the head of the approach window. */
+const FADE_IN_S = 0.45;
+/** Fade for a note that is past its hit time but not yet judged. */
+const FADE_OUT_S = 0.15;
+
+/**
+ * Seconds before its hit time over which a note charges up. Driven by time
+ * rather than by distance to the scanline: the beam crosses a note's row on
+ * the pass before its own, so a distance-based highlight lights the note up
+ * on the wrong sweep.
+ */
+const CHARGE_S = 0.4;
+
+/** Width of the hold channel, in px. Wide enough to read as a conduit. */
+const HOLD_TRACK_WIDTH = 46;
 
 const HIT_COLOR: Record<JudgmentResult, number> = {
   perfect: 0xffffff,
@@ -76,6 +90,21 @@ function mixColor(from: number, to: number, t: number): number {
   return (r << 16) | (g << 8) | b;
 }
 
+function smoothstep(t: number): number {
+  const clamped = Math.max(0, Math.min(1, t));
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
+/**
+ * Jagged -1..1 noise for the hold arcs. Two incommensurate sines, so the bolt
+ * crackles instead of settling into a visible travelling wave.
+ */
+function boltNoise(index: number, phase: number): number {
+  const a = Math.sin(index * 12.9898 + phase * 3.1);
+  const b = Math.cos(index * 4.1421 - phase * 1.7);
+  return (a + b) * 0.5;
+}
+
 export class NoteRenderer {
   private textures: NoteTextureSet;
   private connectorGfx: Graphics;
@@ -113,12 +142,7 @@ export class NoteRenderer {
     stage.addChild(this.popupLayer);
   }
 
-  update(
-    notes: RuntimeNote[],
-    scanPixelY: number,
-    elapsed: number,
-    deltaMs: number,
-  ) {
+  update(notes: RuntimeNote[], elapsed: number, deltaMs: number) {
     this.connectorGfx.clear();
     this.liveThisFrame.clear();
 
@@ -126,7 +150,7 @@ export class NoteRenderer {
       this.drawConnector(note, elapsed);
     }
     for (const note of notes) {
-      this.updateNoteVisual(note, scanPixelY, elapsed);
+      this.updateNoteVisual(note, elapsed);
     }
 
     this.retireUnusedVisuals();
@@ -136,16 +160,12 @@ export class NoteRenderer {
 
   // ── Note bodies ──────────────────────────────────────────────────────────
 
-  private updateNoteVisual(
-    note: RuntimeNote,
-    scanPixelY: number,
-    elapsed: number,
-  ) {
+  private updateNoteVisual(note: RuntimeNote, elapsed: number) {
     if (note.missed) return;
     if (note.hit && note.type !== 2) return;
 
     if (note.type === 3) {
-      this.updateChainVisuals(note, scanPixelY, elapsed);
+      this.updateChainVisuals(note, elapsed);
       return;
     }
 
@@ -156,20 +176,15 @@ export class NoteRenderer {
       key: note.id,
       x: note.pixelX,
       y: note.pixelY,
-      scanPixelY,
       alpha,
       radius: NOTE_R,
       texture: "body",
       approach: this.approachProgress(note.timeSeconds, elapsed),
-      forceHot: note.holdActive,
+      charge: this.chargeLevel(note.timeSeconds, elapsed),
     });
   }
 
-  private updateChainVisuals(
-    note: RuntimeNote,
-    scanPixelY: number,
-    elapsed: number,
-  ) {
+  private updateChainVisuals(note: RuntimeNote, elapsed: number) {
     if (!note.nodes) return;
 
     for (let i = 0; i < note.nodes.length; i++) {
@@ -184,12 +199,11 @@ export class NoteRenderer {
         key: note.id * 10000 + i + 1_000_000,
         x: node.pixelX,
         y: node.pixelY,
-        scanPixelY,
         alpha,
         radius: CHAIN_R,
         texture: "chainBody",
         approach: this.approachProgress(node.timeSeconds, elapsed),
-        forceHot: false,
+        charge: this.chargeLevel(node.timeSeconds, elapsed),
       });
     }
   }
@@ -198,53 +212,51 @@ export class NoteRenderer {
     key: number;
     x: number;
     y: number;
-    scanPixelY: number;
     alpha: number;
     radius: number;
     texture: "body" | "chainBody";
     approach: number;
-    forceHot: boolean;
+    charge: number;
   }) {
     const visual = this.acquireVisual(options.key);
     this.liveThisFrame.add(options.key);
-
-    const scanDistance = Math.abs(options.y - options.scanPixelY);
-    let scanlit = Math.max(0, 1 - scanDistance / SCANLIT_FALLOFF);
-    if (options.forceHot) {
-      scanlit = 1;
-    }
+    const charge = options.charge;
 
     visual.root.position.set(options.x, options.y);
-    visual.root.alpha = options.alpha;
+    // Uncharged notes sit back so the one that is actually due stands out.
+    visual.root.alpha = options.alpha * (0.6 + charge * 0.4);
 
     // Body: settles to full size as it approaches, so notes "arrive".
-    const bodyScale = 0.86 + options.approach * 0.14 + scanlit * 0.05;
+    const bodyScale = 0.86 + options.approach * 0.14 + charge * 0.06;
     visual.body.texture = this.textures[options.texture];
     visual.body.scale.set(bodyScale);
 
-    // Core brightens and shifts from cyan to purple at the scanline.
-    const coreColor = mixColor(
-      PALETTE.coreApproach,
-      PALETTE.coreActive,
-      scanlit,
-    );
-    visual.core.tint = mixColor(coreColor, PALETTE.coreHot, scanlit * 0.75);
-    visual.core.alpha = 0.55 + scanlit * 0.45;
-    const coreScale = ((options.radius * (0.9 + scanlit * 1.5)) / 128) * 1.0;
-    visual.core.scale.set(coreScale);
+    // Core brightens and shifts from cyan to purple as its hit time nears.
+    const coreColor = mixColor(PALETTE.coreApproach, PALETTE.coreActive, charge);
+    visual.core.tint = mixColor(coreColor, PALETTE.coreHot, charge * charge);
+    visual.core.alpha = 0.32 + charge * 0.68;
+    visual.core.scale.set((options.radius * (0.85 + charge * 1.7)) / 128);
 
-    // Outer halo only really blooms near the line.
+    // Outer halo only really blooms on the note that is due.
     visual.halo.tint = coreColor;
-    visual.halo.alpha = 0.1 + scanlit * 0.5;
-    visual.halo.scale.set((options.radius * (2.4 + scanlit * 1.6)) / 128);
+    visual.halo.alpha = 0.05 + charge * 0.6;
+    visual.halo.scale.set((options.radius * (2.2 + charge * 1.9)) / 128);
 
-    // Approach ring collapses onto the note.
-    const showRing = options.texture === "body" && options.approach < 1;
+    this.placeApproachRing(visual, options.texture, options.approach);
+  }
+
+  /** Ring collapses onto the note over the approach window. */
+  private placeApproachRing(
+    visual: NoteVisual,
+    texture: "body" | "chainBody",
+    approach: number,
+  ) {
+    const showRing = texture === "body" && approach < 1;
     visual.ring.visible = showRing;
-    if (showRing) {
-      visual.ring.alpha = (1 - options.approach) * 0.5;
-      visual.ring.scale.set(1 + (1 - options.approach) * 2.2);
-    }
+    if (!showRing) return;
+
+    visual.ring.alpha = (1 - approach) * 0.65;
+    visual.ring.scale.set(1 + (1 - approach) * 2.2);
   }
 
   private acquireVisual(key: number): NoteVisual {
@@ -319,20 +331,126 @@ export class NoteRenderer {
 
     const top = Math.min(note.pixelY, note.endPixelY);
     const bottom = Math.max(note.pixelY, note.endPixelY);
-    if (bottom - top <= 0) return;
+    if (bottom - top < 2) return;
 
-    this.drawDashedLine(note.pixelX, top, bottom, alpha * 0.75);
+    let charge = this.chargeLevel(note.timeSeconds, elapsed);
+    if (note.holdActive) {
+      charge = 1;
+    }
+
+    this.drawHoldChannel(note.pixelX, top, bottom, alpha, charge);
+    this.drawHoldArcs(note.pixelX, top, bottom, alpha, charge, elapsed);
 
     if (note.holdActive) {
-      const filled = top + (bottom - top) * note.holdProgress;
-      this.connectorGfx.moveTo(note.pixelX, top);
-      this.connectorGfx.lineTo(note.pixelX, filled);
-      this.connectorGfx.stroke({
-        width: 5,
-        color: PALETTE.accent,
-        alpha: alpha * 0.9,
+      this.drawHoldFill(note, alpha, elapsed);
+    }
+  }
+
+  /** The conduit the energy runs through: a slab, not a hairline. */
+  private drawHoldChannel(
+    x: number,
+    top: number,
+    bottom: number,
+    alpha: number,
+    charge: number,
+  ) {
+    const half = HOLD_TRACK_WIDTH / 2;
+    const height = bottom - top;
+
+    this.connectorGfx.roundRect(x - half, top, HOLD_TRACK_WIDTH, height, half);
+    this.connectorGfx.fill({
+      color: PALETTE.holdTrack,
+      alpha: alpha * (0.26 + charge * 0.24),
+    });
+
+    this.connectorGfx.roundRect(x - half, top, HOLD_TRACK_WIDTH, height, half);
+    this.connectorGfx.stroke({
+      width: 2.5,
+      color: PALETTE.holdRim,
+      alpha: alpha * (0.35 + charge * 0.55),
+    });
+  }
+
+  /**
+   * Stacked jittering bolts inside the channel. Thin and dim while the note is
+   * still far out, thick and near-white once it is due or being held.
+   */
+  private drawHoldArcs(
+    x: number,
+    top: number,
+    bottom: number,
+    alpha: number,
+    charge: number,
+    elapsed: number,
+  ) {
+    const spread = (HOLD_TRACK_WIDTH / 2) * (0.3 + charge * 0.55);
+    const color = mixColor(PALETTE.holdCharge, PALETTE.holdHot, charge);
+    const bolts = [
+      { phase: elapsed * 17, width: 5, strength: 0.9 },
+      { phase: elapsed * 23 + 11, width: 2.6, strength: 0.6 },
+      { phase: elapsed * 31 + 47, width: 1.4, strength: 0.4 },
+    ];
+
+    for (const bolt of bolts) {
+      this.strokeBolt({
+        x,
+        top,
+        bottom,
+        phase: bolt.phase,
+        amplitude: spread,
+        width: bolt.width * (0.55 + charge * 0.75),
+        color,
+        alpha: alpha * bolt.strength * (0.3 + charge * 0.7),
       });
     }
+  }
+
+  private strokeBolt(options: {
+    x: number;
+    top: number;
+    bottom: number;
+    phase: number;
+    amplitude: number;
+    width: number;
+    color: number;
+    alpha: number;
+  }) {
+    const height = options.bottom - options.top;
+    const steps = Math.max(4, Math.min(48, Math.round(height / 22)));
+
+    this.connectorGfx.moveTo(options.x, options.top);
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      // Pinned at both ends so the arc springs between the note and its tail.
+      const taper = Math.sin(t * Math.PI);
+      const offset = boltNoise(i, options.phase) * options.amplitude * taper;
+      this.connectorGfx.lineTo(options.x + offset, options.top + height * t);
+    }
+
+    this.connectorGfx.stroke({
+      width: options.width,
+      color: options.color,
+      alpha: options.alpha,
+      cap: "round",
+      join: "round",
+    });
+  }
+
+  /** Charge front sweeping from the note head toward the tail end. */
+  private drawHoldFill(note: RuntimeNote, alpha: number, elapsed: number) {
+    const span = note.endPixelY - note.pixelY;
+    const head = note.pixelY + span * note.holdProgress;
+    const top = Math.min(note.pixelY, head);
+    const height = Math.abs(head - note.pixelY);
+    if (height < 1) return;
+
+    const half = HOLD_TRACK_WIDTH / 2 - 3;
+    this.connectorGfx.roundRect(note.pixelX - half, top, half * 2, height, half);
+    this.connectorGfx.fill({ color: PALETTE.holdCharge, alpha: alpha * 0.45 });
+
+    const flare = half + 5 + 3 * Math.sin(elapsed * 30);
+    this.connectorGfx.circle(note.pixelX, head, flare);
+    this.connectorGfx.fill({ color: PALETTE.holdHot, alpha: alpha * 0.8 });
   }
 
   private drawChainTrail(note: RuntimeNote, elapsed: number) {
@@ -375,23 +493,6 @@ export class NoteRenderer {
     });
   }
 
-  /** Vertical dashed drop line, as under the notes in the reference art. */
-  private drawDashedLine(x: number, top: number, bottom: number, alpha: number) {
-    const dash = 8;
-    const period = 18;
-
-    for (let y = top; y < bottom; y += period) {
-      const end = Math.min(y + dash, bottom);
-      this.connectorGfx.moveTo(x, y);
-      this.connectorGfx.lineTo(x, end);
-    }
-    this.connectorGfx.stroke({
-      width: 3,
-      color: PALETTE.connector,
-      alpha,
-    });
-  }
-
   // ── Timing helpers ───────────────────────────────────────────────────────
 
   private approachProgress(timeSeconds: number, elapsed: number): number {
@@ -401,10 +502,19 @@ export class NoteRenderer {
 
   private approachAlpha(timeSeconds: number, elapsed: number): number {
     const remaining = timeSeconds - elapsed;
-    if (remaining > APPROACH_S) {
-      return Math.max(0, 1 - (remaining - APPROACH_S) / 0.1);
+    if (remaining > APPROACH_S) return 0;
+    if (remaining < 0) {
+      return Math.max(0, 1 + remaining / FADE_OUT_S);
     }
-    return Math.min(1, Math.max(0, 1 + remaining / 0.25));
+    return smoothstep((APPROACH_S - remaining) / FADE_IN_S);
+  }
+
+  /** 0 while a note is still far out, 1 from its hit time on. */
+  private chargeLevel(timeSeconds: number, elapsed: number): number {
+    const remaining = timeSeconds - elapsed;
+    if (remaining <= 0) return 1;
+    if (remaining >= CHARGE_S) return 0;
+    return smoothstep(1 - remaining / CHARGE_S);
   }
 
   // ── Hit feedback ─────────────────────────────────────────────────────────

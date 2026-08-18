@@ -14,7 +14,11 @@ export const PALETTE = {
   coreApproach: 0x4db8ff,
   coreActive: 0xb07cff,
   coreHot: 0xffffff,
-  connector: 0xffffff,
+  connector: 0x4a3f7a,
+  holdTrack: 0x2a2148,
+  holdRim: 0x7d67d2,
+  holdCharge: 0x9a74ff,
+  holdHot: 0xe6dcff,
   accent: 0x7d67d2,
   scanline: 0xffffff,
 } as const;

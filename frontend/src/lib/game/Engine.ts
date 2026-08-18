@@ -14,8 +14,8 @@ import { InputHandler } from "./InputHandler";
 import { JudgmentSystem } from "./Judgment";
 import { AudioPlayer } from "./AudioPlayer";
 
-// Must be >= NoteRenderer's APPROACH_S (1.8) so notes enter the visible list
-// early enough for their full approach animation to play.
+// Must be >= NoteRenderer's APPROACH_S so notes enter the visible list early
+// enough for their full approach animation to play.
 const APPROACH_S = 2.0;
 
 /** How close (in logical px) a dragging finger must be to claim a chain node. */
@@ -383,12 +383,7 @@ export class GameEngine {
       );
     });
 
-    this.renderer.update(
-      visible,
-      this.scanner.scanPixelY,
-      this.state.elapsed,
-      ticker.deltaMS,
-    );
+    this.renderer.update(visible, this.state.elapsed, ticker.deltaMS);
 
     // Hold updates
     for (const note of this.notes) {
