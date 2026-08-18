@@ -53,9 +53,7 @@ export default defineConfig({
       },
 
       workbox: {
-        // wasm is required: the chart generator is the wasm module, so without
-        // it an offline install can load the UI but cannot generate a level.
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,wasm}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,ico}"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
         cleanupOutdatedCaches: true,
         clientsClaim: true,

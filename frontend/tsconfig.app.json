@@ -7,17 +7,7 @@
     "module": "ESNext",
     "types": ["svelte", "vite/client"],
     "noEmit": true,
-    /**
-     * The only .js in the project is Emscripten-generated glue, which is
-     * machine-written, rewritten on every build, and not typecheckable.
-     * TypeScript still checks .ts and .svelte normally.
-     */
-    "allowJs": true,
-    "checkJs": false,
     "moduleDetection": "force"
   },
-  "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte"],
-  // Emscripten-generated glue. Machine-written, reformatted on every build,
-  // and not meaningfully typecheckable.
-  "exclude": ["src/lib/cpp/main.js"]
+  "include": ["src/**/*.ts", "src/**/*.svelte"]
 }

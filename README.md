@@ -15,11 +15,17 @@ uploads.
 
 ```
 audio file
-  → WebAudio decodeAudioData        (browser, → mono Float32)
-  → analyze_audio_json              (C++ compiled to WASM)
-      → BPM via energy autocorrelation
-      → page list (scanline sweeps)
-      → note list (patterns stamped onto the beat grid)
+  → WebAudio decodeAudioData        (main thread, → mono Float32)
+  → analyzeAudio                    (worker, once per track)
+      → log-frequency spectrogram
+      → SuperFlux onsets, split into low / mid / high registers
+      → tempo + beat grid (comb-filtered tempogram, DP beat tracking)
+      → onsets quantized onto the grid
+      → sections and their repeats (self-similarity)
+  → buildChart                      (worker, once per difficulty)
+      → ranked onset selection per section
+      → note kinds: taps, chords, holds, drags
+      → x from register and pitch, under a hand-travel budget
   → Chart JSON
   → PixiJS renderer + judgment      (frontend/src/lib/game/)
 ```
@@ -30,10 +36,10 @@ Chart generation runs entirely client-side. There is no server.
 
 | Path | Purpose |
 | --- | --- |
-| `main.cpp` | BPM detection and chart generation. Compiled to WASM. |
-| `patterns.json` | Note-pattern library the generator samples from. |
+| `frontend/src/lib/chart/dsp/` | Spectrogram, onset detection, tempo tracking, section detection. |
+| `frontend/src/lib/chart/generator/` | Quantization, difficulty, note selection, layout, chart assembly. |
 | `frontend/src/lib/game/` | Engine, scanline, renderer, judgment, input, audio clock. |
-| `frontend/src/lib/cpp/` | WASM module and its typed JS bridge. |
+| `patterns.json` | Charting vocabulary. Reference for pattern design, not read at runtime. |
 | `frontend/src/lib/components/` | Menu and in-game UI. |
 | `frontend/android/` | Capacitor native Android shell. |
 | `playground/` | Native audio-analysis experiments (aubio). Reference only. |
@@ -58,25 +64,17 @@ bun run check           # svelte-check + tsc
 bun run build           # production build into frontend/dist
 ```
 
-### WASM toolchain
+### Generator tests
 
-Only needed if you change `main.cpp`. Requires
-[Emscripten](https://emscripten.org/):
-
-```sh
-git clone https://github.com/emscripten-core/emsdk.git
-cd emsdk && ./emsdk install latest && ./emsdk activate latest
-source ./emsdk_env.sh   # per shell, or add to your shell rc
-```
-
-Then from the repo root:
+The generator is plain TypeScript, so its rules are checked without a browser.
+From the repo root:
 
 ```sh
-make                    # emits into frontend/src/lib/cpp/
+bun test
 ```
 
-`main.js` and `main.wasm` are committed so the frontend builds without
-Emscripten installed.
+The tests synthesize drum tracks with known hit times and assert that the
+recovered tempo, the onset placement and each difficulty's own limits hold.
 
 ### Android (Capacitor)
 
@@ -148,11 +146,10 @@ flattens chains into head/child notes linked by `next_id`, and carries a
 
 ## Known gaps
 
-**Generator** — the highest-value area. It currently knows only BPM and
-duration, so patterns are stamped onto a blind 4-beat grid with no awareness of
-what the music is doing. Onset detection, spectral flux and section detection
-would let patterns actually land on the audio. `playground/audio_analysis.cpp`
-has aubio-based framing to build from.
+**Generator** — note *kinds* are chosen from a single onset's own properties.
+A real charter also uses rhythmic context: the same sound should keep the same
+shape across a section, and a pattern should resolve rather than stop. Sibling
+note pairs are also not flagged for the renderer.
 
 **Renderer** — sibling notes (two notes on the same tick) should be joined by a
 connector line, as in Cytus. The generator computes the pairs but does not flag

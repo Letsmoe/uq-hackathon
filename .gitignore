@@ -1,13 +1,7 @@
 # OS
 *.DS_Store
 
-# Emscripten SDK
-emsdk/
-
-# Native build output (anchored: the frontend's committed wasm must stay tracked)
-/main
-/main.js
-/main.wasm
+# Native build output from playground/ experiments
 /playground/audio_analysis
 /playground/bpmdetect
 

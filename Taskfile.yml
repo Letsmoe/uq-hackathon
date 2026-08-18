@@ -50,24 +50,10 @@ tasks:
     cmds:
       - rm -f {{.FRONTEND}}/public/demo.mp3
 
-  # ── Chart generator (C++ → WASM) ─────────────────────────────────────────
-
-  wasm:
-    desc: Compile main.cpp to WASM (requires an active emsdk environment)
-    preconditions:
-      - sh: command -v em++
-        msg: "em++ not found. Run: source /path/to/emsdk/emsdk_env.sh"
-    sources:
-      - main.cpp
-      - vendor/nlohmann/json.hpp
-    generates:
-      - "{{.FRONTEND}}/src/lib/cpp/main.js"
-      - "{{.FRONTEND}}/src/lib/cpp/main.wasm"
-    cmds:
-      - make
+  # ── Chart generator ──────────────────────────────────────────────────────
 
   test:
-    desc: Run the chart generator rule checks natively (no emsdk needed)
+    desc: Run the chart generator checks against synthesized drum tracks
     cmds:
       - bun test
 
