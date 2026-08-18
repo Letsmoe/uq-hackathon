@@ -3,9 +3,19 @@
 
   let canvas: HTMLCanvasElement;
 
+  // The fragment shader is heavy per-pixel, so total fragments are capped
+  // rather than following devicePixelRatio. A 2x tablet panel would otherwise
+  // ask for roughly four times what the GPU can sustain at 60fps.
+  const MAX_RENDER_PIXELS = 1_300_000;
+
   let gl: WebGLRenderingContext | null = null;
   let program: WebGLProgram | null = null;
   let animationFrame = 0;
+
+  let resolutionLocation: WebGLUniformLocation | null = null;
+  let mouseLocation: WebGLUniformLocation | null = null;
+  let mouseActiveLocation: WebGLUniformLocation | null = null;
+  let timeLocation: WebGLUniformLocation | null = null;
 
   let startTime = performance.now();
 
@@ -198,12 +208,26 @@ void main() {
     return program;
   }
 
+  function computeRenderScale(cssWidth: number, cssHeight: number): number {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const requestedPixels = cssWidth * cssHeight * dpr * dpr;
+
+    if (requestedPixels <= MAX_RENDER_PIXELS) {
+      return dpr;
+    }
+    return dpr * Math.sqrt(MAX_RENDER_PIXELS / requestedPixels);
+  }
+
   function resizeCanvas() {
     if (!canvas || !gl) return;
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const width = Math.floor(canvas.clientWidth * dpr);
-    const height = Math.floor(canvas.clientHeight * dpr);
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth === 0 || cssHeight === 0) return;
+
+    const scale = computeRenderScale(cssWidth, cssHeight);
+    const width = Math.floor(cssWidth * scale);
+    const height = Math.floor(cssHeight * scale);
 
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
@@ -224,6 +248,13 @@ void main() {
     targetMouseActive = 0;
   }
 
+  // A lifted finger has no hover position, but a mouse still does.
+  function handlePointerUp(event: PointerEvent) {
+    if (event.pointerType === "touch") {
+      targetMouseActive = 0;
+    }
+  }
+
   function render() {
     if (!gl || !program) return;
 
@@ -236,11 +267,6 @@ void main() {
     const time = (performance.now() - startTime) / 1000;
 
     gl.useProgram(program);
-
-    const resolutionLocation = gl.getUniformLocation(program, "u_resolution");
-    const mouseLocation = gl.getUniformLocation(program, "u_mouse");
-    const mouseActiveLocation = gl.getUniformLocation(program, "u_mouseActive");
-    const timeLocation = gl.getUniformLocation(program, "u_time");
 
     gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
     gl.uniform2f(mouseLocation, mouseX, mouseY);
@@ -268,6 +294,11 @@ void main() {
 
     program = createProgram(gl);
 
+    resolutionLocation = gl.getUniformLocation(program, "u_resolution");
+    mouseLocation = gl.getUniformLocation(program, "u_mouse");
+    mouseActiveLocation = gl.getUniformLocation(program, "u_mouseActive");
+    timeLocation = gl.getUniformLocation(program, "u_time");
+
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
@@ -291,6 +322,8 @@ void main() {
 
 <svelte:window
   onpointerleave={handlePointerLeave}
+  onpointercancel={handlePointerLeave}
+  onpointerup={handlePointerUp}
   onpointerdown={handlePointerMove}
   onresize={resizeCanvas}
   onpointermove={handlePointerMove}
@@ -308,5 +341,8 @@ void main() {
     display: block;
     background: #ebe8df;
     cursor: crosshair;
+    /* Without this the WebView claims a drag as a scroll gesture and fires
+       pointercancel, so the cursor effect only responds to taps. */
+    touch-action: none;
   }
 </style>

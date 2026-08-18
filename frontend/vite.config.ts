@@ -9,23 +9,33 @@ export default defineConfig({
     tailwindcss(),
     svelte(),
     VitePWA({
+      // Inside the Capacitor shell every asset is already bundled and served
+      // from the app package, so a service worker adds no offline benefit and
+      // actively breaks updates: it keeps serving a precached index bundle
+      // whose dynamic-import chunk hashes no longer exist in the new build.
+      disable: process.env.CAPACITOR_BUILD === "1",
       registerType: "autoUpdate",
       injectRegister: "auto",
 
+      // Icons are maintained by hand in public/icons and referenced from
+      // index.html. The generator's 2023 preset expects a favicon.ico that
+      // does not exist, and the resulting 404 fails the whole precache.
       pwaAssets: {
-        disabled: false,
-        config: true,
+        disabled: true,
       },
       manifest: {
         name: "Synapse: Rhythm Protocol",
         short_name: "Synapse",
         description:
           "A highly engaging rhythm game built with Svelte and PixiJS.",
-        display: "fullscreen",
+        // "standalone" is the mode iOS actually honours; "fullscreen" is
+        // unreliable there and falls back inconsistently.
+        display: "standalone",
+        orientation: "landscape",
         start_url: "/",
         scope: "/",
-        background_color: "#eceae4",
-        theme_color: "#eceae4",
+        background_color: "#04060f",
+        theme_color: "#04060f",
         icons: [
           {
             src: "icons/icon-192.png",
@@ -43,7 +53,9 @@ export default defineConfig({
       },
 
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,ico}"],
+        // wasm is required: the chart generator is the wasm module, so without
+        // it an offline install can load the UI but cannot generate a level.
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,wasm}"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
         cleanupOutdatedCaches: true,
         clientsClaim: true,

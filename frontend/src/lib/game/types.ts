@@ -51,6 +51,7 @@ export const TP_TABLE: Record<JudgmentResult, number> = {
 
 export interface JudgmentEvent {
   noteId: number;
+  noteType: RuntimeNote['type'];
   result: JudgmentResult;
   x: number;
   y: number;

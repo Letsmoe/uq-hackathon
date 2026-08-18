@@ -1,6 +1,8 @@
 <script lang="ts">
   import { ChevronLeft, ChevronRight } from "svelte-radix";
 
+  const SWIPE_THRESHOLD_PX = 40;
+
   let { songs, selected = $bindable(1) } = $props();
 
   function prev() {
@@ -10,7 +12,50 @@
     if (selected < songs.length - 1) selected++;
   }
 
-  let touchStartX = $state(0);
+  let dragStartX = 0;
+  let dragging = false;
+  let didDrag = false;
+
+  function handlePointerDown(event: PointerEvent) {
+    dragStartX = event.clientX;
+    dragging = true;
+    didDrag = false;
+  }
+
+  function handlePointerUp(event: PointerEvent) {
+    if (!dragging) {
+      return;
+    }
+    dragging = false;
+
+    const dx = event.clientX - dragStartX;
+    if (Math.abs(dx) < SWIPE_THRESHOLD_PX) {
+      return;
+    }
+
+    // Suppresses the card's click, which fires straight after pointerup.
+    didDrag = true;
+    if (dx < 0) {
+      next();
+    } else {
+      prev();
+    }
+  }
+
+  function handlePointerCancel() {
+    dragging = false;
+  }
+
+  function handleCardClick(offset: number) {
+    if (didDrag) {
+      return;
+    }
+    if (offset < 0) {
+      prev();
+    } else if (offset > 0) {
+      next();
+    }
+  }
 
   function getCardProps(i: number) {
     const offset = i - selected;
@@ -42,15 +87,10 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="relative flex flex-col items-center justify-center w-full h-full select-none overflow-hidden"
-  ontouchstart={(e) => {
-    touchStartX = e.touches[0].clientX;
-  }}
-  ontouchend={(e) => {
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    if (dx < -40) next();
-    else if (dx > 40) prev();
-  }}
+  class="relative flex flex-col items-center justify-center w-full h-full select-none overflow-hidden touch-none"
+  onpointerdown={handlePointerDown}
+  onpointerup={handlePointerUp}
+  onpointercancel={handlePointerCancel}
 >
   <!-- Cards stage -->
   <div
@@ -61,10 +101,7 @@
       {@const p = getCardProps(i)}
 
       <button
-        onclick={() => {
-          if (p.offset < 0) prev();
-          else if (p.offset > 0) next();
-        }}
+        onclick={() => handleCardClick(p.offset)}
         aria-label={song.title}
         class="absolute top-1/2 left-1/2 overflow-hidden border-none p-0 cursor-pointer transition-all duration-500 ease-out {p.abs ===
         0

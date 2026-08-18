@@ -2,13 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <link href="/src/style/global.css" rel="stylesheet" />
     <meta name="description" content="Synapse: Rhythm Protocol" />
     <link rel="icon" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/icon-192.png" sizes="192x192" />
-    <link rel="mask-icon" href="/icon-512.png" color="#FFFFFF" />
-    <meta name="theme-color" content="#eceae4" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" sizes="192x192" />
+    <link rel="mask-icon" href="/icons/icon-512.png" color="#FFFFFF" />
+    <meta name="theme-color" content="#04060f" />
+
+    <!-- iOS home-screen launch: without these iOS opens in a Safari tab with
+         full browser chrome, ignoring the manifest display mode. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Synapse" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
     <title>Synapse: Rhythm Protocol</title>
   </head>
   <body>

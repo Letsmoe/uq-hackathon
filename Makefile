@@ -2,7 +2,10 @@ CXX = em++
 
 CXXFLAGS = -std=c++17 -Wall -O3
 
-TARGET = main.js
+# Emit directly into the frontend source tree. Emscripten writes main.wasm
+# alongside main.js, so both land where the Vite build imports them.
+OUT_DIR = frontend/src/lib/cpp
+TARGET = $(OUT_DIR)/main.js
 SRC = main.cpp
 
 EMFLAGS = \
@@ -18,4 +21,6 @@ $(TARGET): $(SRC)
 	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(EMFLAGS)
 
 clean:
-	rm -f main.js main.wasm
+	rm -f $(OUT_DIR)/main.js $(OUT_DIR)/main.wasm
+
+.PHONY: clean

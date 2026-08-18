@@ -1,4 +1,4 @@
-import type { RuntimeNote, RuntimeChainNode, GameState, JudgmentResult, JudgmentEvent } from './types';
+import type { RuntimeNote, GameState, JudgmentResult, JudgmentEvent } from './types';
 import { JUDGMENT_WINDOWS, SCORE_TABLE, TP_TABLE } from './types';
 
 export type JudgmentCallback = (event: JudgmentEvent) => void;
@@ -15,7 +15,7 @@ export class JudgmentSystem {
     if (note.hit || note.missed) return 'miss';
     const result = this.resultFromOffset(Math.abs(elapsed - note.timeSeconds));
     note.hit = true;
-    this.applyResult(result, note.pixelX, note.pixelY, note.id);
+    this.applyResult(result, note.pixelX, note.pixelY, note);
     return result;
   }
 
@@ -27,7 +27,7 @@ export class JudgmentSystem {
     if (result === 'miss') return false;
     nd.judged = true;
     note.chainNodeIdx++;
-    this.applyResult(result, nd.pixelX, nd.pixelY, note.id);
+    this.applyResult(result, nd.pixelX, nd.pixelY, note);
     if (note.chainNodeIdx >= note.nodes.length) note.hit = true;
     return true;
   }
@@ -38,7 +38,7 @@ export class JudgmentSystem {
     if (result === 'miss') return;
     note.holdActive = true;
     note.holdProgress = 0;
-    this.applyResult(result, note.pixelX, note.pixelY, note.id);
+    this.applyResult(result, note.pixelX, note.pixelY, note);
   }
 
   updateHold(note: RuntimeNote, elapsed: number): boolean {
@@ -70,18 +70,18 @@ export class JudgmentSystem {
         if (elapsed > nd.timeSeconds + JUDGMENT_WINDOWS.bad) {
           nd.judged = true;
           note.chainNodeIdx++;
-          this.applyResult('miss', nd.pixelX, nd.pixelY, note.id);
+          this.applyResult('miss', nd.pixelX, nd.pixelY, note);
           if (note.chainNodeIdx >= note.nodes.length) note.hit = true;
         }
       } else if (note.type === 2) {
         if (!note.holdActive && elapsed > note.timeSeconds + JUDGMENT_WINDOWS.bad) {
           note.missed = true;
-          this.applyResult('miss', note.pixelX, note.pixelY, note.id);
+          this.applyResult('miss', note.pixelX, note.pixelY, note);
         }
       } else {
         if (elapsed > note.timeSeconds + JUDGMENT_WINDOWS.bad) {
           note.missed = true;
-          this.applyResult('miss', note.pixelX, note.pixelY, note.id);
+          this.applyResult('miss', note.pixelX, note.pixelY, note);
         }
       }
     }
@@ -94,7 +94,7 @@ export class JudgmentSystem {
     return 'miss';
   }
 
-  private applyResult(result: JudgmentResult, x: number, y: number, noteId: number) {
+  private applyResult(result: JudgmentResult, x: number, y: number, note: RuntimeNote) {
     const s = this.state;
     if (result === 'miss' || result === 'bad') {
       s.combo = 0;
@@ -110,7 +110,7 @@ export class JudgmentSystem {
     const judged = s.perfects + s.goods + s.bads + s.misses;
     this.tpSum += TP_TABLE[result];
     s.tp = parseFloat(((this.tpSum / judged) * 100).toFixed(2));
-    this.onJudge({ noteId, result, x, y });
+    this.onJudge({ noteId: note.id, noteType: note.type, result, x, y });
   }
 
   reset() { this.tpSum = 0; }

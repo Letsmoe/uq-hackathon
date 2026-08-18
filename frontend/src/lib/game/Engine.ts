@@ -12,10 +12,22 @@ import { Scanner } from "./Scanner";
 import { NoteRenderer } from "./NoteRenderer";
 import { InputHandler } from "./InputHandler";
 import { JudgmentSystem } from "./Judgment";
+import { AudioPlayer } from "./AudioPlayer";
 
 // Must be >= NoteRenderer's APPROACH_S (1.8) so notes enter the visible list
 // early enough for their full approach animation to play.
 const APPROACH_S = 2.0;
+
+/** How close (in logical px) a dragging finger must be to claim a chain node. */
+const CHAIN_TOUCH_RADIUS = 150;
+
+const SHAKE_BY_RESULT: Record<string, number> = {
+  perfect: 7,
+  good: 4,
+  bad: 2,
+  miss: 0,
+};
+const SHAKE_DECAY_PER_SECOND = 14;
 
 export class GameEngine {
   private app: Application;
@@ -28,11 +40,14 @@ export class GameEngine {
   private renderer: NoteRenderer | null = null;
   private input: InputHandler | null = null;
   private judgment: JudgmentSystem | null = null;
-  private audioEl: HTMLAudioElement | null = null;
+  private audioPlayer: AudioPlayer | null = null;
 
   readonly state: GameState = makeInitialState();
   private chart: Chart | null = null;
   private notes: RuntimeNote[] = [];
+  /** Pointer id → id of the hold note that pointer started. */
+  private heldNotesByPointer = new Map<number, number>();
+  private shakeMagnitude = 0;
 
   onStateChange: (() => void) | null = null;
   onJudgment: ((e: JudgmentEvent) => void) | null = null;
@@ -102,6 +117,7 @@ export class GameEngine {
 
     this.judgment = new JudgmentSystem(this.state, (e) => {
       this.renderer!.triggerHit(e.noteId, e.result, e.x, e.y, e.noteType === 3);
+      this.addShake(SHAKE_BY_RESULT[e.result]);
       this.onJudgment?.(e);
       this.onStateChange?.();
     });
@@ -109,19 +125,13 @@ export class GameEngine {
     let autoId = 0;
     this.notes = chart.note_list.map((n) => this.buildNote(n, chart, autoId++));
 
+    this.heldNotesByPointer.clear();
     this.input = new InputHandler(
       this.app.canvas as HTMLCanvasElement,
-      (x, y) => this.handleInput(x, y),
-      (id, held) => {
-        const note = this.notes.find((n) => n.id === id);
-        if (!note) return;
-        if (held) {
-          this.judgment!.judgeHoldStart(note, this.state.elapsed);
-        } else {
-          this.judgment!.judgeHoldEnd(note);
-        }
-        this.onStateChange?.();
-      },
+      this.W,
+      this.H,
+      (x, y, pointerId) => this.handlePress(x, y, pointerId),
+      (pointerId) => this.handleRelease(pointerId),
     );
 
     Object.assign(this.state, makeInitialState());
@@ -186,7 +196,7 @@ export class GameEngine {
     };
   }
 
-  private handleInput(touchX: number, _touchY: number) {
+  private handlePress(touchX: number, _touchY: number, pointerId: number) {
     if (!this.judgment) return;
     const elapsed = this.state.elapsed;
     let bestScore = -Infinity;
@@ -233,14 +243,78 @@ export class GameEngine {
       this.judgment.judgeChainNode(bestNote, elapsed);
     } else if (bestNote.type === 2) {
       this.judgment.judgeHoldStart(bestNote, elapsed);
+      this.heldNotesByPointer.set(pointerId, bestNote.id);
     } else {
       this.judgment.judgeNote(bestNote, elapsed);
     }
     this.onStateChange?.();
   }
 
-  start(audio?: HTMLAudioElement) {
-    this.audioEl = audio ?? null;
+  private addShake(magnitude: number) {
+    if (magnitude > this.shakeMagnitude) {
+      this.shakeMagnitude = magnitude;
+    }
+  }
+
+  private applyShake(deltaSeconds: number) {
+    if (this.shakeMagnitude <= 0.01) {
+      this.shakeMagnitude = 0;
+      this.app.stage.position.set(0, 0);
+      return;
+    }
+    const angle = Math.random() * Math.PI * 2;
+    this.app.stage.position.set(
+      Math.cos(angle) * this.shakeMagnitude,
+      Math.sin(angle) * this.shakeMagnitude,
+    );
+    this.shakeMagnitude -= this.shakeMagnitude * SHAKE_DECAY_PER_SECOND * deltaSeconds;
+  }
+
+  /**
+   * Drag notes are played by holding and sliding, so their nodes are claimed
+   * by a finger that is simply near them when the scanline arrives, rather
+   * than by a fresh press on each node.
+   */
+  private judgeChainNodesUnderPointers(elapsed: number) {
+    if (!this.input || !this.judgment) return;
+    if (this.input.activePointerCount === 0) return;
+
+    for (const note of this.notes) {
+      this.judgeNextChainNode(note, elapsed);
+    }
+  }
+
+  private judgeNextChainNode(note: RuntimeNote, elapsed: number) {
+    if (note.type !== 3 || note.hit || note.missed || !note.nodes) return;
+
+    const node = note.nodes[note.chainNodeIdx];
+    if (!node || node.judged) return;
+    if (Math.abs(elapsed - node.timeSeconds) > JUDGMENT_WINDOWS.good) return;
+    if (!this.input!.hasPointerNearX(node.pixelX, CHAIN_TOUCH_RADIUS)) return;
+
+    this.judgment!.judgeChainNode(note, elapsed);
+    this.onStateChange?.();
+  }
+
+  private handleRelease(pointerId: number) {
+    const noteId = this.heldNotesByPointer.get(pointerId);
+    if (noteId === undefined) {
+      return;
+    }
+    this.heldNotesByPointer.delete(pointerId);
+
+    const note = this.notes.find((n) => n.id === noteId);
+    if (!note) {
+      return;
+    }
+    this.judgment?.judgeHoldEnd(note);
+    this.onStateChange?.();
+  }
+
+  start(audioPlayer?: AudioPlayer) {
+    if (audioPlayer) {
+      this.audioPlayer = audioPlayer;
+    }
     this.state.running = true;
     this.state.paused = false;
     this.app.ticker.add(this.tick);
@@ -261,10 +335,11 @@ export class GameEngine {
     if (!this.scanner || !this.renderer || !this.judgment || !this.chart)
       return;
 
-    // Use audio.currentTime as authoritative clock when available — prevents
-    // drift and eliminates the startup offset between audio and engine.
-    if (this.audioEl) {
-      this.state.elapsed = this.audioEl.currentTime;
+    // The audio hardware clock is authoritative: it is latency-compensated,
+    // so elapsed tracks what the player hears rather than what has decoded.
+    // Frame delta is only a fallback for previewing a chart with no audio.
+    if (this.audioPlayer) {
+      this.state.elapsed = this.audioPlayer.positionSeconds;
     } else {
       this.state.elapsed += ticker.deltaMS / 1000;
     }
@@ -324,8 +399,9 @@ export class GameEngine {
       }
     }
 
+    this.judgeChainNodesUnderPointers(this.state.elapsed);
     this.judgment.checkMisses(this.notes, this.state.elapsed);
-    this.input?.setActiveNotes(visible, this.scanner.scanPixelY);
+    this.applyShake(ticker.deltaMS / 1000);
   };
 
   destroy() {

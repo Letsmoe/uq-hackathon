@@ -1,5 +1,11 @@
 <script lang="ts">
-  let { onclick = () => {} } = $props();
+  import type { MouseEventHandler } from "svelte/elements";
+
+  interface Props {
+    onclick?: MouseEventHandler<HTMLButtonElement>;
+  }
+
+  let { onclick = () => {} }: Props = $props();
 </script>
 
 <button {onclick} class="start-btn">

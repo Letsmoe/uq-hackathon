@@ -1,7 +1,18 @@
 <script lang="ts">
-  export let active: "solo" | "course" | "event" | "random" = "solo";
+  type NavId = "solo" | "course" | "event" | "random";
 
-  const buttons = [
+  interface NavButton {
+    id: NavId;
+    label: string;
+    sub: string;
+    shape: string;
+  }
+
+  export let active: NavId = "solo";
+
+  // Widened to NavId so the entries still typecheck against `active` while the
+  // non-solo modes are commented out.
+  const buttons: NavButton[] = [
     {
       id: "solo",
       label: "SOLO",

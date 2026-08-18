@@ -1,13 +1,22 @@
 <script lang="ts">
   import { Plus, Upload } from "svelte-radix";
+  import type { MouseEventHandler } from "svelte/elements";
   import UploadButton from "./UploadButton.svelte";
+  import type { UploadHandler } from "./UploadButton.svelte";
+
+  interface Props {
+    notifications?: number;
+    version?: string;
+    onquickplay?: MouseEventHandler<HTMLButtonElement>;
+    onupload?: UploadHandler;
+  }
 
   let {
     notifications = 2,
     version = "1.2.0",
     onquickplay = () => {},
     onupload = () => {},
-  } = $props();
+  }: Props = $props();
 </script>
 
 <div class="flex flex-col justify-end gap-3 w-full h-full pb-4 pr-4">

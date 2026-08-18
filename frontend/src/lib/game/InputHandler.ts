@@ -1,90 +1,104 @@
-import type { RuntimeNote } from "./types";
+export type PressCallback = (x: number, y: number, pointerId: number) => void;
+export type ReleaseCallback = (pointerId: number) => void;
 
-export type InputCallback = (x: number, y: number) => void;
-export type HoldCallback = (noteId: number, held: boolean) => void;
-
+/**
+ * Translates pointer events into playfield coordinates.
+ *
+ * Coordinates are reported in the renderer's logical space rather than in
+ * backing-store pixels. The canvas is sized by devicePixelRatio and the whole
+ * frame is additionally CSS-scaled to fit the screen, so the only reliable
+ * mapping is from the element's visual rect onto the logical dimensions.
+ */
 export class InputHandler {
-  private activeNotes: RuntimeNote[] = [];
-  private scanPixelY = 0;
-  private heldNoteId: number | null = null;
+  private pointerPositions = new Map<number, { x: number; y: number }>();
 
   constructor(
     private canvas: HTMLCanvasElement,
-    private onInput: InputCallback,
-    private onHold: HoldCallback,
+    private logicalWidth: number,
+    private logicalHeight: number,
+    private onPress: PressCallback,
+    private onRelease: ReleaseCallback,
   ) {
     this.attach();
   }
 
-  private attach() {
-    this.canvas.addEventListener("touchstart", this.onTouchDown, { passive: false });
-    this.canvas.addEventListener("touchend", this.onTouchUp);
-    this.canvas.addEventListener("touchmove", this.onTouchDown, { passive: false });
-    this.canvas.addEventListener("mousedown", this.onMouseDown);
-    this.canvas.addEventListener("mouseup", this.onMouseUp);
-    this.canvas.style.touchAction = "none";
+  setLogicalSize(width: number, height: number) {
+    this.logicalWidth = width;
+    this.logicalHeight = height;
+  }
+
+  /**
+   * True when a finger is currently within `radius` of the given x. Drag notes
+   * are judged by proximity of a held finger rather than by a fresh press, so
+   * the engine polls this each frame.
+   */
+  hasPointerNearX(x: number, radius: number): boolean {
+    for (const position of this.pointerPositions.values()) {
+      if (Math.abs(position.x - x) <= radius) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  get activePointerCount(): number {
+    return this.pointerPositions.size;
   }
 
   detach() {
-    this.canvas.removeEventListener("touchstart", this.onTouchDown);
-    this.canvas.removeEventListener("touchend", this.onTouchUp);
-    this.canvas.removeEventListener("touchmove", this.onTouchDown);
-    this.canvas.removeEventListener("mousedown", this.onMouseDown);
-    this.canvas.removeEventListener("mouseup", this.onMouseUp);
+    this.canvas.removeEventListener("pointerdown", this.handlePointerDown);
+    this.canvas.removeEventListener("pointermove", this.handlePointerMove);
+    this.canvas.removeEventListener("pointerup", this.handlePointerUp);
+    this.canvas.removeEventListener("pointercancel", this.handlePointerUp);
+    this.pointerPositions.clear();
   }
 
-  setActiveNotes(notes: RuntimeNote[], scanPixelY: number) {
-    this.activeNotes = notes;
-    this.scanPixelY = scanPixelY;
+  private attach() {
+    this.canvas.addEventListener("pointerdown", this.handlePointerDown);
+    this.canvas.addEventListener("pointermove", this.handlePointerMove);
+    this.canvas.addEventListener("pointerup", this.handlePointerUp);
+    this.canvas.addEventListener("pointercancel", this.handlePointerUp);
+    this.canvas.style.touchAction = "none";
   }
 
-  private canvasCoords(clientX: number, clientY: number): { x: number; y: number } {
+  private toLogical(clientX: number, clientY: number) {
     const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.width / rect.width;
-    const scaleY = this.canvas.height / rect.height;
     return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY,
+      x: ((clientX - rect.left) / rect.width) * this.logicalWidth,
+      y: ((clientY - rect.top) / rect.height) * this.logicalHeight,
     };
   }
 
-  private handleDown(x: number, y: number) {
-    const hold = this.activeNotes.find(
-      (n) => n.type === 2 && !n.hit && !n.missed && !n.holdActive,
-    );
-    if (hold) {
-      this.heldNoteId = hold.id;
-      this.onHold(hold.id, true);
-    } else {
-      this.onInput(x, y);
+  private handlePointerDown = (event: PointerEvent) => {
+    event.preventDefault();
+
+    // Keeps events flowing for this finger even if it slides off the canvas,
+    // so a hold or drag is not silently dropped part-way through.
+    this.canvas.setPointerCapture(event.pointerId);
+
+    const { x, y } = this.toLogical(event.clientX, event.clientY);
+    this.pointerPositions.set(event.pointerId, { x, y });
+    this.onPress(x, y, event.pointerId);
+  };
+
+  // Tracks position only. A moving finger must not re-trigger a press, or
+  // dragging across the playfield would machine-gun taps.
+  private handlePointerMove = (event: PointerEvent) => {
+    if (!this.pointerPositions.has(event.pointerId)) {
+      return;
     }
-  }
+    event.preventDefault();
+    const { x, y } = this.toLogical(event.clientX, event.clientY);
+    this.pointerPositions.set(event.pointerId, { x, y });
+  };
 
-  private handleUp() {
-    if (this.heldNoteId !== null) {
-      this.onHold(this.heldNoteId, false);
-      this.heldNoteId = null;
+  private handlePointerUp = (event: PointerEvent) => {
+    if (!this.pointerPositions.delete(event.pointerId)) {
+      return;
     }
-  }
-
-  private onTouchDown = (e: TouchEvent) => {
-    e.preventDefault();
-    const t = e.touches[0] ?? e.changedTouches[0];
-    if (!t) return;
-    const { x, y } = this.canvasCoords(t.clientX, t.clientY);
-    this.handleDown(x, y);
-  };
-
-  private onTouchUp = (_e: TouchEvent) => {
-    this.handleUp();
-  };
-
-  private onMouseDown = (e: MouseEvent) => {
-    const { x, y } = this.canvasCoords(e.clientX, e.clientY);
-    this.handleDown(x, y);
-  };
-
-  private onMouseUp = (_e: MouseEvent) => {
-    this.handleUp();
+    if (this.canvas.hasPointerCapture(event.pointerId)) {
+      this.canvas.releasePointerCapture(event.pointerId);
+    }
+    this.onRelease(event.pointerId);
   };
 }

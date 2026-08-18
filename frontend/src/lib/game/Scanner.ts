@@ -1,6 +1,7 @@
 import { Application, Graphics } from 'pixi.js';
 import type { PageEntry } from './chart';
 import { getScanLineY, getCurrentPageDir } from './chart';
+import { PALETTE } from './noteTextures';
 
 export class Scanner {
   private gfx: Graphics;
@@ -35,46 +36,44 @@ export class Scanner {
     this._dir   = getCurrentPageDir(elapsed, pageList, bpm, timeBase);
 
     const scanY = this.PLAY_TOP + this._scanY * this.PLAY_H;
-    const pulse  = 0.85 + 0.15 * Math.sin(elapsed * 2.8);
+    const pulse  = 0.9 + 0.1 * Math.sin(elapsed * 2.8);
     const bright = pulse * (1 + activeBoost * 0.4);
 
-    // accent-blue: 0x3e9bff  accent-cyan: 0x00d4e8
     this.gfx.clear();
 
-    // Wide halo
-    this.gfx.rect(0, scanY - 20, this.W, 40);
-    this.gfx.fill({ color: 0x3e9bff, alpha: 0.04 * bright });
-
-    // Mid band
-    this.gfx.rect(0, scanY - 6, this.W, 12);
-    this.gfx.fill({ color: 0x3e9bff, alpha: 0.14 * bright });
-
-    // Core line
-    this.gfx.rect(0, scanY - 1, this.W, 2);
-    this.gfx.fill({ color: 0x00d4e8, alpha: 0.85 * bright });
-
-    // Direction arrows (small, clean)
-    const a = 8;
-    if (this._dir === -1) {
-      this.gfx.poly([16, scanY, 10, scanY - a, 22, scanY - a]);
-      this.gfx.fill({ color: 0x00d4e8, alpha: 0.6 * bright });
-      this.gfx.poly([this.W - 16, scanY, this.W - 10, scanY - a, this.W - 22, scanY - a]);
-      this.gfx.fill({ color: 0x00d4e8, alpha: 0.6 * bright });
-    } else {
-      this.gfx.poly([16, scanY, 10, scanY + a, 22, scanY + a]);
-      this.gfx.fill({ color: 0x00d4e8, alpha: 0.6 * bright });
-      this.gfx.poly([this.W - 16, scanY, this.W - 10, scanY + a, this.W - 22, scanY + a]);
-      this.gfx.fill({ color: 0x00d4e8, alpha: 0.6 * bright });
+    // Soft bloom. Stacked bands rather than one wide fill so the falloff
+    // reads as a glow against the pale playfield instead of a grey slab.
+    for (let i = 4; i >= 1; i--) {
+      const halfHeight = i * 9;
+      this.gfx.rect(0, scanY - halfHeight, this.W, halfHeight * 2);
+      this.gfx.fill({ color: PALETTE.scanline, alpha: 0.09 * bright });
     }
 
-    // Tick marks — small diamonds
-    const spacing = this.W / 16;
-    const offset  = (elapsed * 18) % spacing;
-    for (let i = -1; i <= 17; i++) {
-      const tx = i * spacing + offset;
-      const ts = 3;
-      this.gfx.poly([tx, scanY - ts, tx + ts, scanY, tx, scanY + ts, tx - ts, scanY]);
-      this.gfx.fill({ color: 0xe8e8ee, alpha: 0.22 * bright });
+    // Accent fringe gives the beam an edge on a light background.
+    this.gfx.rect(0, scanY - 7, this.W, 14);
+    this.gfx.fill({ color: PALETTE.accent, alpha: 0.1 * bright });
+
+    // Core
+    this.gfx.rect(0, scanY - 1.5, this.W, 3);
+    this.gfx.fill({ color: PALETTE.scanline, alpha: bright });
+
+    // Static diamond markers along the beam.
+    const spacing = this.W / 14;
+    for (let i = 0; i <= 14; i++) {
+      const tx = i * spacing;
+      const size = 5;
+      this.gfx.poly([tx, scanY - size, tx + size, scanY, tx, scanY + size, tx - size, scanY]);
+      this.gfx.fill({ color: PALETTE.scanline, alpha: 0.95 * bright });
+      this.gfx.poly([tx, scanY - size, tx + size, scanY, tx, scanY + size, tx - size, scanY]);
+      this.gfx.stroke({ width: 1, color: PALETTE.accent, alpha: 0.35 * bright });
+    }
+
+    // Travel direction, marked at both ends.
+    const arrow = 9;
+    const tip = this._dir === -1 ? scanY + arrow : scanY - arrow;
+    for (const edgeX of [26, this.W - 26]) {
+      this.gfx.poly([edgeX, tip, edgeX - arrow, scanY, edgeX + arrow, scanY]);
+      this.gfx.fill({ color: PALETTE.accent, alpha: 0.55 * bright });
     }
   }
 
