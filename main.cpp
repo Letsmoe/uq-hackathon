@@ -30,8 +30,9 @@ static const int PATTERN_TIME_BASE = 240;
 static const float PLAYFIELD_MIN_X = 0.08f;
 static const float PLAYFIELD_MAX_X = 0.92f;
 
-// Horizontal clearance between two patterns that are on screen together.
-static const float PATTERN_X_GAP = 0.08f;
+// Horizontal clearance between two patterns that are on screen together, wide
+// enough that two note bodies never touch.
+static const float PATTERN_X_GAP = 0.11f;
 
 static const float DENSITY_WINDOW_SEC = 4.0f;
 static const int ENERGY_WINDOW = 1024;
@@ -382,6 +383,10 @@ struct DifficultySpec {
     float targetNotesPerSecond;
     // Floor on the time between two consecutive taps anywhere in the chart.
     float minNoteIntervalSec;
+    // Floor on the spacing between the nodes of a drag. Measured in beats
+    // rather than seconds because the scan line covers a fixed number of beats
+    // per page, so this is what decides how far apart the nodes are drawn.
+    float minDragNodeBeats;
     // Widest chord allowed.
     int maxNotesPerTick;
     // How many patterns may be on screen at the same time.
@@ -394,22 +399,22 @@ struct DifficultySpec {
 
 static DifficultySpec specForDifficulty(const std::string& name) {
     if (name == "easy") {
-        return {1, 1.3f, 0.30f, 1, 1, 0.50f, 0.55f};
+        return {1, 1.3f, 0.30f, 0.500f, 1, 1, 0.50f, 0.55f};
     }
 
     if (name == "hard") {
-        return {3, 3.5f, 0.14f, 3, 2, 0.30f, 1.25f};
+        return {3, 3.5f, 0.14f, 0.375f, 3, 2, 0.30f, 1.25f};
     }
 
     if (name == "expert") {
-        return {4, 5.0f, 0.10f, 3, 2, 0.22f, 1.70f};
+        return {4, 5.0f, 0.10f, 0.375f, 3, 2, 0.22f, 1.70f};
     }
 
     if (name == "chaos") {
-        return {5, 6.5f, 0.075f, 4, 3, 0.15f, 2.20f};
+        return {5, 6.5f, 0.075f, 0.250f, 4, 3, 0.15f, 2.20f};
     }
 
-    return {2, 2.3f, 0.20f, 2, 1, 0.40f, 0.85f};
+    return {2, 2.3f, 0.20f, 0.500f, 2, 1, 0.40f, 0.85f};
 }
 
 // ── Pattern library ─────────────────────────────────────────────────────────
@@ -424,6 +429,9 @@ struct Pattern {
     int span;
     // Authored ticks between the two closest taps, 0 when everything is one chord.
     int minTapInterval;
+    // Authored ticks between the two closest nodes of any drag, 0 when the
+    // pattern holds no drag.
+    int minNodeInterval;
     // Authored tick → how many notes start on it.
     std::map<int, int> tapTicks;
     int maxNotesPerTick;
@@ -476,6 +484,16 @@ static std::pair<float, float> patternXExtent(const nlohmann::json& notes) {
     return {lo, hi};
 }
 
+static std::set<int> nodeTicks(const nlohmann::json& note) {
+    std::set<int> ticks;
+
+    for (const nlohmann::json& node : note["nodes"]) {
+        ticks.insert(node.value("tick", 0));
+    }
+
+    return ticks;
+}
+
 static int patternSpan(const nlohmann::json& notes) {
     int last = 0;
 
@@ -493,18 +511,35 @@ static int patternSpan(const nlohmann::json& notes) {
     return last;
 }
 
-static int smallestGap(const std::map<int, int>& tapTicks) {
+/** Smallest distance between two consecutive entries, 0 when there is only one. */
+static int smallestGap(const std::set<int>& ticks) {
     int smallest = 0;
     bool hasPrevious = false;
     int previous = 0;
 
-    for (const auto& [tick, count] : tapTicks) {
+    for (int tick : ticks) {
         if (hasPrevious && (smallest == 0 || tick - previous < smallest)) {
             smallest = tick - previous;
         }
 
         previous = tick;
         hasPrevious = true;
+    }
+
+    return smallest;
+}
+
+static int smallestNodeGap(const nlohmann::json& notes) {
+    int smallest = 0;
+
+    for (const nlohmann::json& note : notes) {
+        if (!note.contains("nodes")) continue;
+
+        int gap = smallestGap(nodeTicks(note));
+
+        if (gap > 0 && (smallest == 0 || gap < smallest)) {
+            smallest = gap;
+        }
     }
 
     return smallest;
@@ -531,7 +566,14 @@ static Pattern makePattern(const nlohmann::json& notes, int level) {
         pattern.maxNotesPerTick = std::max(pattern.maxNotesPerTick, count);
     }
 
-    pattern.minTapInterval = smallestGap(pattern.tapTicks);
+    std::set<int> distinctTapTicks;
+
+    for (const auto& [tick, count] : pattern.tapTicks) {
+        distinctTapTicks.insert(tick);
+    }
+
+    pattern.minTapInterval = smallestGap(distinctTapTicks);
+    pattern.minNodeInterval = smallestNodeGap(notes);
 
     return pattern;
 }
@@ -679,6 +721,7 @@ public:
         tickScale = std::max(1, timeBase / PATTERN_TIME_BASE);
         offsetTicks = (int)(audio.beatOffsetSec / secondsPerTick);
         minIntervalTicks = (int)(spec.minNoteIntervalSec / secondsPerTick);
+        minDragNodeTicks = (int)(spec.minDragNodeBeats * (float)timeBase);
         maxPatternSpanTicks = timeBase * beatsPerPage * 2;
         slotsPerBeat = slotsPerBeatFor(audio.bpm);
     }
@@ -722,6 +765,7 @@ private:
     int tickScale = 1;
     int offsetTicks = 0;
     int minIntervalTicks = 0;
+    int minDragNodeTicks = 0;
     int maxPatternSpanTicks = 0;
     int slotsPerBeat = 1;
 
@@ -757,21 +801,32 @@ private:
 
     /**
      * Smallest power-of-two tick multiplier that spaces the pattern's taps at
-     * least minNoteIntervalSec apart. Returns 0 when even the widest stretch
-     * would leave the pattern too fast or make it outstay its welcome.
+     * least minNoteIntervalSec apart and its drag nodes at least
+     * minDragNodeBeats apart. Returns 0 when even the widest stretch would
+     * leave the pattern too fast or make it outstay its welcome.
      */
     int stretchFor(const Pattern& pattern) const {
         for (int stretch = 1; stretch <= MAX_STRETCH; stretch *= 2) {
             if (patternSpanTicks(pattern, stretch) > maxPatternSpanTicks) return 0;
-            if (tapsAreReachable(pattern, stretch)) return stretch;
+            if (spacingIsReachable(pattern, stretch)) return stretch;
         }
 
         return 0;
     }
 
+    bool spacingIsReachable(const Pattern& pattern, int stretch) const {
+        if (!tapsAreReachable(pattern, stretch)) return false;
+        return nodesAreSpacedOut(pattern, stretch);
+    }
+
     bool tapsAreReachable(const Pattern& pattern, int stretch) const {
         if (pattern.minTapInterval <= 0) return true;
         return pattern.minTapInterval * tickScale * stretch >= minIntervalTicks;
+    }
+
+    bool nodesAreSpacedOut(const Pattern& pattern, int stretch) const {
+        if (pattern.minNodeInterval <= 0) return true;
+        return pattern.minNodeInterval * tickScale * stretch >= minDragNodeTicks;
     }
 
     int patternSpanTicks(const Pattern& pattern, int stretch) const {

@@ -78,6 +78,24 @@ static int startTickOf(const nlohmann::json& note) {
     return noteStartTick(note);
 }
 
+static std::vector<int> nodeGaps(const nlohmann::json& note) {
+    std::set<int> ticks = nodeTicks(note);
+    std::vector<int> gaps;
+    int previous = 0;
+    bool hasPrevious = false;
+
+    for (int tick : ticks) {
+        if (hasPrevious) {
+            gaps.push_back(tick - previous);
+        }
+
+        previous = tick;
+        hasPrevious = true;
+    }
+
+    return gaps;
+}
+
 static void checkOrdering(const nlohmann::json& noteList, const std::string& label) {
     int previousTick = -1;
 
@@ -136,6 +154,23 @@ static void checkDensity(
 
         float notesPerSecond = (float)(end - start) / DENSITY_WINDOW_SEC;
         expect(notesPerSecond <= spec.targetNotesPerSecond + 0.01f, label + ": density budget exceeded");
+    }
+}
+
+static void checkDragNodeSpacing(
+    const nlohmann::json& noteList,
+    const DifficultySpec& spec,
+    int timeBase,
+    const std::string& label
+) {
+    float minimumTicks = spec.minDragNodeBeats * (float)timeBase;
+
+    for (const nlohmann::json& note : noteList) {
+        if (!note.contains("nodes")) continue;
+
+        for (int gap : nodeGaps(note)) {
+            expect((float)gap >= minimumTicks, label + ": drag nodes bunched closer than minDragNodeBeats");
+        }
     }
 }
 
@@ -269,6 +304,7 @@ int main(int argc, char** argv) {
         checkOrdering(noteList, difficulty);
         checkTickSpacing(noteList, spec, secondsPerTick, difficulty);
         checkDensity(noteList, spec, secondsPerTick, difficulty);
+        checkDragNodeSpacing(noteList, spec, timeBase, difficulty);
         checkPlayfield(noteList, difficulty);
         checkQuietSections(noteList, secondsPerTick, difficulty);
         checkHandTravel(noteList, spec, secondsPerTick, difficulty);
