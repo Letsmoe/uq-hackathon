@@ -1,4 +1,5 @@
 import type { Chart, ChartNote, PageEntry } from "../../game/chart";
+import { NoteType } from "../../game/types";
 import type { Section } from "../dsp/structure";
 import type { BeatGrid } from "../dsp/tempo";
 import type { AudioAnalysis } from "../analyze";
@@ -16,6 +17,7 @@ import {
   selectEvents,
   MIN_HOLD_BEATS,
   SLOTS_PER_BEAT,
+  type NoteKind,
   type SectionEvents,
 } from "./select";
 import { BEATS_PER_PAGE } from "./pageGeometry";
@@ -26,7 +28,11 @@ export const TIME_BASE = 480;
 const TICKS_PER_SLOT = TIME_BASE / SLOTS_PER_BEAT;
 const FALLBACK_BPM = 120;
 
-const NOTE_TYPE = { tap: 0, hold: 2, drag: 3 } as const;
+const NOTE_TYPE_BY_KIND: Record<NoteKind, NoteType> = {
+  tap: NoteType.Tap,
+  hold: NoteType.Hold,
+  drag: NoteType.Chain,
+};
 
 export function buildChart(analysis: AudioAnalysis, difficulty: Difficulty): Chart {
   if (!analysis.grid) {
@@ -238,11 +244,11 @@ function toChartNotes(note: PlacedNote, offsetTicks: number): ChartNote[] {
  */
 function memberNote(note: PlacedNote, tick: number, x: number, member: number): ChartNote {
   if (member > 0) {
-    return { type: NOTE_TYPE.tap, tick, x, duration: 0 };
+    return { type: NoteType.Tap, tick, x, duration: 0 };
   }
 
   return {
-    type: NOTE_TYPE[note.kind],
+    type: NOTE_TYPE_BY_KIND[note.kind],
     tick,
     x,
     duration: note.durationSlots * TICKS_PER_SLOT,
@@ -257,7 +263,7 @@ function dragNote(note: PlacedNote, tick: number, offsetTicks: number): ChartNot
     duration: 0,
   }));
 
-  return { type: NOTE_TYPE.drag, nodes: [head, ...tail] };
+  return { type: NoteType.Chain, nodes: [head, ...tail] };
 }
 
 // ── Pages ───────────────────────────────────────────────────────────────────

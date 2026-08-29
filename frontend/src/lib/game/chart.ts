@@ -1,8 +1,10 @@
 // Real Cytus II-style chart schema
 
+import type { NoteType } from "./types";
+
 export interface ChartNote {
   id?: number;
-  type: 0 | 1 | 2 | 3; // 0=tap, 1=flick, 2=hold, 3=chain
+  type: NoteType;
   tick?: number;
   duration?: number;
   x?: number;

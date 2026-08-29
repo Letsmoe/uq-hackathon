@@ -4,6 +4,7 @@ import { buildChart } from "../frontend/src/lib/chart/generator/chart";
 import { DIFFICULTIES, specForDifficulty } from "../frontend/src/lib/chart/generator/difficulty";
 import { getScanLineY, tickToSeconds } from "../frontend/src/lib/game/chart";
 import type { Chart, ChartNote } from "../frontend/src/lib/game/chart";
+import { NoteType } from "../frontend/src/lib/game/types";
 import { SAMPLE_RATE, synthesizeTrack, type BarLayer } from "./synthesizeTrack";
 
 const TRACK_BPM = 128;
@@ -113,7 +114,9 @@ describe("chart building", () => {
     const holds = buildChart(analysis, "normal").note_list.filter(
       (note) => (note.duration ?? 0) > 0,
     );
-    const drags = buildChart(analysis, "chaos").note_list.filter((note) => note.type === 3);
+    const drags = buildChart(analysis, "chaos").note_list.filter(
+      (note) => note.type === NoteType.Chain,
+    );
 
     expect(holds.length).toBeGreaterThan(0);
     expect(drags.length).toBeGreaterThan(0);
@@ -123,7 +126,7 @@ describe("chart building", () => {
     const chart = buildChart(analysis, difficulty);
     const spec = specForDifficulty(difficulty);
     const dragNodes = chart.note_list
-      .filter((note) => note.type === 3)
+      .filter((note) => note.type === NoteType.Chain)
       .reduce((total, note) => total + (note.nodes?.length ?? 0), 0);
 
     expect(dragNodes / hitCount(chart)).toBeLessThanOrEqual(spec.dragShare + 0.15);

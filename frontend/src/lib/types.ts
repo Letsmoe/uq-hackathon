@@ -2,6 +2,8 @@
 //  types.ts — Domain types shared across the app
 // ============================================================
 
+import type { NoteType } from "./game/types";
+
 export interface ChartNote {
 	/** Beat index (0 = first beat of the song) */
 	beat: number;
@@ -37,12 +39,12 @@ export interface Song {
 		length: number;
 		note_list: {
 			id?: number;
-			type: 0 | 1 | 2 | 3;
-			// type 0 (tap) and type 2 (hold)
+			type: NoteType;
+			// Tap and Hold
 			tick?: number;
 			duration?: number;
 			x?: number;
-			// type 3 (drag / slide)
+			// Chain (drag / slide)
 			nodes?: {
 				tick: number;
 				duration: number;

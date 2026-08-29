@@ -7,7 +7,7 @@ import type {
   GameState,
   JudgmentEvent,
 } from "./types";
-import { makeInitialState, JUDGMENT_WINDOWS } from "./types";
+import { makeInitialState, JUDGMENT_WINDOWS, NoteType } from "./types";
 import { Scanner } from "./Scanner";
 import { NoteRenderer } from "./NoteRenderer";
 import { noteClearance } from "./noteTextures";
@@ -123,7 +123,7 @@ export class GameEngine {
     this.renderer = new NoteRenderer(this.app, this.app.stage, this.W, this.H);
 
     this.judgment = new JudgmentSystem(this.state, (e) => {
-      this.renderer!.triggerHit(e.noteId, e.result, e.x, e.y, e.noteType === 3);
+      this.renderer!.triggerHit(e.noteId, e.result, e.x, e.y, e.noteType === NoteType.Chain);
       this.addShake(SHAKE_BY_RESULT[e.result]);
       this.onJudgment?.(e);
       this.onStateChange?.();
@@ -155,11 +155,11 @@ export class GameEngine {
 
     const timeSeconds = tickToSeconds(tick, bpm, tb);
     const endTimeSeconds =
-      n.type === 2 ? tickToSeconds(tick + duration, bpm, tb) : timeSeconds;
+      n.type === NoteType.Hold ? tickToSeconds(tick + duration, bpm, tb) : timeSeconds;
 
     const scanY = getScanLineY(timeSeconds, chart.page_list, bpm, tb);
     const endScanY =
-      n.type === 2
+      n.type === NoteType.Hold
         ? getScanLineY(endTimeSeconds, chart.page_list, bpm, tb)
         : scanY;
 
@@ -168,7 +168,7 @@ export class GameEngine {
     const endPixelY = this.PLAY_TOP + endScanY * this.PLAY_H;
 
     let nodes: RuntimeChainNode[] | undefined;
-    if (n.type === 3 && n.nodes) {
+    if (n.type === NoteType.Chain && n.nodes) {
       nodes = n.nodes.map((nd) => {
         const ndTime = tickToSeconds(nd.tick, bpm, tb);
         const ndScanY = getScanLineY(ndTime, chart.page_list, bpm, tb);
@@ -216,12 +216,12 @@ export class GameEngine {
       let noteTime: number;
       let notePxX: number;
 
-      if (note.type === 3) {
+      if (note.type === NoteType.Chain) {
         if (!note.nodes || note.chainNodeIdx >= note.nodes.length) continue;
         const nd = note.nodes[note.chainNodeIdx];
         noteTime = nd.timeSeconds;
         notePxX = nd.pixelX;
-      } else if (note.type === 2) {
+      } else if (note.type === NoteType.Hold) {
         if (note.holdActive) continue;
         noteTime = note.timeSeconds;
         notePxX = note.pixelX;
@@ -247,9 +247,9 @@ export class GameEngine {
 
     if (!bestNote || bestScore <= 0) return;
 
-    if (bestNote.type === 3) {
+    if (bestNote.type === NoteType.Chain) {
       this.judgment.judgeChainNode(bestNote, elapsed);
-    } else if (bestNote.type === 2) {
+    } else if (bestNote.type === NoteType.Hold) {
       this.judgment.judgeHoldStart(bestNote, elapsed);
       this.heldNotesByPointer.set(pointerId, bestNote.id);
     } else {
@@ -260,7 +260,7 @@ export class GameEngine {
 
   private updateActiveHolds() {
     for (const note of this.notes) {
-      if (note.type !== 2 || !note.holdActive) continue;
+      if (note.type !== NoteType.Hold || !note.holdActive) continue;
       const completed = this.judgment!.updateHold(note, this.state.elapsed);
       if (completed) this.onStateChange?.();
     }
@@ -301,7 +301,7 @@ export class GameEngine {
   }
 
   private judgeNextChainNode(note: RuntimeNote, elapsed: number) {
-    if (note.type !== 3 || note.hit || note.missed || !note.nodes) return;
+    if (note.type !== NoteType.Chain || note.hit || note.missed || !note.nodes) return;
 
     const node = note.nodes[note.chainNodeIdx];
     if (!node || node.judged) return;
@@ -382,21 +382,19 @@ export class GameEngine {
     // level it actually has this frame, not the previous one's.
     this.updateActiveHolds();
 
-    // Note types
-    // 0 = tap, 1 = flick, 2 = hold, 3 = chain
     // Visible notes: within approach window (and not fully done)
     const visible = this.notes.filter((note) => {
       // Exclude fully judged notes
       if (note.missed) return false;
       // For taps and holds, hide immediately on hit; for chains, wait until all nodes hit so they don't vanish mid-chain
-      if (note.hit && note.type !== 2) return false;
-      if (note.hit && note.type === 2 && !note.holdActive) return false;
+      if (note.hit && note.type !== NoteType.Hold) return false;
+      if (note.hit && note.type === NoteType.Hold && !note.holdActive) return false;
       const earliest =
-        note.type === 3 && note.nodes
+        note.type === NoteType.Chain && note.nodes
           ? (note.nodes[note.chainNodeIdx]?.timeSeconds ?? Infinity)
           : note.timeSeconds;
       const latest =
-        note.type === 2
+        note.type === NoteType.Hold
           ? note.endTimeSeconds
           : note.nodes?.[note.nodes.length - 1].timeSeconds || note.timeSeconds;
 

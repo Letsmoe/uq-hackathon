@@ -6,6 +6,7 @@ import {
   statsForChart,
 } from "../frontend/src/lib/trackStats";
 import type { Chart } from "../frontend/src/lib/game/chart";
+import { NoteType } from "../frontend/src/lib/game/types";
 
 function chartWith(noteCount: number, lengthSeconds: number): Chart {
   return {
@@ -13,7 +14,7 @@ function chartWith(noteCount: number, lengthSeconds: number): Chart {
     time_base: 480,
     length: lengthSeconds,
     start_offset_time: 0,
-    note_list: Array.from({ length: noteCount }, () => ({ type: 0 as const })),
+    note_list: Array.from({ length: noteCount }, () => ({ type: NoteType.Tap })),
     page_list: [],
   };
 }

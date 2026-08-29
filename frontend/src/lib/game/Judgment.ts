@@ -1,5 +1,5 @@
 import type { RuntimeNote, GameState, JudgmentResult, JudgmentEvent } from './types';
-import { JUDGMENT_WINDOWS, SCORE_TABLE, TP_TABLE } from './types';
+import { JUDGMENT_WINDOWS, SCORE_TABLE, TP_TABLE, NoteType } from './types';
 
 export type JudgmentCallback = (event: JudgmentEvent) => void;
 
@@ -80,7 +80,7 @@ export class JudgmentSystem {
     for (const note of notes) {
       if (note.hit || note.missed) continue;
 
-      if (note.type === 3) {
+      if (note.type === NoteType.Chain) {
         if (!note.nodes) continue;
         const nd = note.nodes[note.chainNodeIdx];
         if (!nd || nd.judged) continue;
@@ -90,7 +90,7 @@ export class JudgmentSystem {
           this.applyResult('miss', nd.pixelX, nd.pixelY, note);
           if (note.chainNodeIdx >= note.nodes.length) note.hit = true;
         }
-      } else if (note.type === 2) {
+      } else if (note.type === NoteType.Hold) {
         if (!note.holdActive && elapsed > note.timeSeconds + JUDGMENT_WINDOWS.bad) {
           note.missed = true;
           this.applyResult('miss', note.pixelX, note.pixelY, note);

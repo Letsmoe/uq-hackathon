@@ -1,6 +1,6 @@
 import { test, expect, describe } from "bun:test";
 import { JudgmentSystem } from "../frontend/src/lib/game/Judgment";
-import { makeInitialState } from "../frontend/src/lib/game/types";
+import { makeInitialState, NoteType } from "../frontend/src/lib/game/types";
 import type { RuntimeNote, JudgmentEvent } from "../frontend/src/lib/game/types";
 
 const HOLD_START = 2;
@@ -9,7 +9,7 @@ const HOLD_END = 3;
 function makeHoldNote(): RuntimeNote {
   return {
     id: 1,
-    type: 2,
+    type: NoteType.Hold,
     tick: 0,
     x: 0.5,
     duration: 480,

@@ -8,6 +8,7 @@ import {
   type Renderer,
 } from "pixi.js";
 import type { RuntimeNote, JudgmentResult } from "./types";
+import { NoteType } from "./types";
 import {
   createNoteTextures,
   noteHalfFor,
@@ -64,11 +65,11 @@ const HIT_LABEL: Record<JudgmentResult, string> = {
   miss: "MISS",
 };
 
-const SKIN_BY_TYPE: Record<RuntimeNote["type"], NoteSkin> = {
-  0: "tap",
-  1: "flick",
-  2: "hold",
-  3: "chain",
+const SKIN_BY_TYPE: Record<NoteType, NoteSkin> = {
+  [NoteType.Tap]: "tap",
+  [NoteType.Flick]: "flick",
+  [NoteType.Hold]: "hold",
+  [NoteType.Chain]: "chain",
 };
 
 interface NoteVisual {
@@ -171,9 +172,9 @@ export class NoteRenderer {
 
   private updateNoteVisual(note: RuntimeNote, elapsed: number) {
     if (note.missed) return;
-    if (note.hit && note.type !== 2) return;
+    if (note.hit && note.type !== NoteType.Hold) return;
 
-    if (note.type === 3) {
+    if (note.type === NoteType.Chain) {
       this.updateChainVisuals(note, elapsed);
       return;
     }
@@ -194,7 +195,7 @@ export class NoteRenderer {
   }
 
   private noteAlpha(note: RuntimeNote, elapsed: number): number {
-    if (note.type === 2) return this.holdAlpha(note, elapsed);
+    if (note.type === NoteType.Hold) return this.holdAlpha(note, elapsed);
     return this.approachAlpha(note.timeSeconds, elapsed);
   }
 
@@ -332,11 +333,11 @@ export class NoteRenderer {
 
   private drawConnector(note: RuntimeNote, elapsed: number) {
     if (note.missed) return;
-    if (note.type === 2) {
+    if (note.type === NoteType.Hold) {
       this.drawHoldTail(note, elapsed);
       return;
     }
-    if (note.type === 3) {
+    if (note.type === NoteType.Chain) {
       this.drawChainTrail(note, elapsed);
     }
   }

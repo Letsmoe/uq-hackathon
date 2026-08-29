@@ -1,5 +1,13 @@
 export type JudgmentResult = 'perfect' | 'good' | 'bad' | 'miss';
 
+/** Note kinds, numbered as the Cytus II chart format serialises them. */
+export enum NoteType {
+  Tap = 0,
+  Flick = 1,
+  Hold = 2,
+  Chain = 3,
+}
+
 export interface RuntimeChainNode {
   tick: number;
   x: number;
@@ -11,7 +19,7 @@ export interface RuntimeChainNode {
 
 export interface RuntimeNote {
   id: number;
-  type: 0 | 1 | 2 | 3; // 0=tap, 1=flick, 2=hold, 3=chain
+  type: NoteType;
   tick: number;
   x: number;            // 0..1 normalized
   duration: number;     // ticks; 0 for taps/flicks
@@ -53,7 +61,7 @@ export const TP_TABLE: Record<JudgmentResult, number> = {
 
 export interface JudgmentEvent {
   noteId: number;
-  noteType: RuntimeNote['type'];
+  noteType: NoteType;
   result: JudgmentResult;
   x: number;
   y: number;
